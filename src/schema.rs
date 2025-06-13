@@ -1289,4 +1289,3 @@ pub enum ServerResult {
     CallTool(CallToolResult),
     ListTools(ListToolsResult),
 }
-

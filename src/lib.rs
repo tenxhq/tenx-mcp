@@ -1,4 +1,14 @@
+pub mod client;
+pub mod codec;
+pub mod error;
 pub mod schema;
+pub mod server;
+pub mod transport;
+
+// Re-export commonly used types
+pub use client::MCPClient;
+pub use error::{MCPError, Result};
+pub use server::{MCPServer, PromptHandler, ResourceHandler, ToolHandler};
 
 #[cfg(test)]
 mod tests {
@@ -18,7 +28,7 @@ mod tests {
 
         let json = serde_json::to_string(&request).unwrap();
         let parsed: JSONRPCRequest = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(parsed.jsonrpc, JSONRPC_VERSION);
         assert_eq!(parsed.id, RequestId::Number(1));
         assert_eq!(parsed.request.method, "initialize");
@@ -29,7 +39,7 @@ mod tests {
         let role = Role::User;
         let json = serde_json::to_string(&role).unwrap();
         assert_eq!(json, "\"user\"");
-        
+
         let role = Role::Assistant;
         let json = serde_json::to_string(&role).unwrap();
         assert_eq!(json, "\"assistant\"");
