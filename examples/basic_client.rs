@@ -1,4 +1,5 @@
-use tenx_mcp::{MCPClient, Result};
+use std::env;
+use tenx_mcp::{ClientCapabilities, Content, Implementation, MCPClient, Result, TcpTransport};
 use tracing::info;
 
 #[tokio::main]
@@ -6,52 +7,58 @@ async fn main() -> Result<()> {
     // Initialize logging
     tracing_subscriber::fmt::init();
 
-    info!("Starting basic MCP client example");
+    // Parse command line arguments
+    let args: Vec<String> = env::args().collect();
+    let addr = if args.len() == 3 {
+        format!("{}:{}", args[1], args[2])
+    } else {
+        "localhost:3000".to_string()
+    };
 
-    // Create client
-    let _client = MCPClient::new();
+    info!("Connecting to MCP server at {}", addr);
 
-    // In a real implementation, you would:
-    // 1. Create a transport (e.g., TcpTransport::new("localhost:8080"))
-    // 2. Connect the client: client.connect(Box::new(transport)).await?
-    // 3. Initialize the connection
+    // Create client and connect
+    let mut client = MCPClient::new();
+    let transport = Box::new(TcpTransport::new(addr));
+    client.connect(transport).await?;
 
-    // Example of what the initialization would look like:
-    // let client_info = Implementation {
-    // name: "example-client".to_string(),
-    // version: "1.0.0".to_string(),
-    // };
-    //
-    // let capabilities = ClientCapabilities {
-    // tools: Some(ToolsCapability {
-    // list_changed: Some(true),
-    // }),
-    // resources: None,
-    // prompts: None,
-    // logging: None,
-    // };
-    //
-    // let init_result = client.initialize(client_info, capabilities).await?;
-    // info!("Connected to server: {:?}", init_result.server_info);
-    //
+    // Initialize the connection
+    let client_info = Implementation {
+        name: "example-client".to_string(),
+        version: "0.1.0".to_string(),
+    };
+
+    let capabilities = ClientCapabilities::default();
+
+    let init_result = client.initialize(client_info, capabilities).await?;
+    info!("Connected to server: {}", init_result.server_info.name);
+
     // List available tools
-    // let tools = client.list_tools().await?;
-    // info!("Available tools:");
-    // for tool in tools.tools {
-    // info!("  - {}: {:?}", tool.name, tool.description);
-    // }
-    //
-    // Call a tool
-    // let result = client.call_tool(
-    // "echo".to_string(),
-    // Some(serde_json::json!({
-    // "message": "Hello, MCP!"
-    // }))
-    // ).await?;
-    //
-    // info!("Tool result: {:?}", result);
+    let tools = client.list_tools().await?;
+    info!("\nAvailable tools:");
+    for tool in &tools.tools {
+        info!(
+            "  - {}: {}",
+            tool.name,
+            tool.description.as_deref().unwrap_or("")
+        );
+    }
 
-    info!("Client example complete");
+    // Call the echo tool
+    info!("\nCalling echo tool...");
+    let result = client
+        .call_tool(
+            "echo".to_string(),
+            Some(serde_json::json!({
+                "message": "Hello from tenx-mcp client!"
+            })),
+        )
+        .await?;
+
+    // Assume text response
+    if let Some(Content::Text(text_content)) = result.content.first() {
+        info!("Response: {}", text_content.text);
+    }
 
     Ok(())
 }

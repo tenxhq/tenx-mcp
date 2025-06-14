@@ -146,6 +146,37 @@ impl Transport for TcpTransport {
     }
 }
 
+/// TCP server transport that accepts incoming connections
+pub struct TcpServerTransport {
+    stream: Option<TcpStream>,
+}
+
+impl TcpServerTransport {
+    /// Create a new TCP server transport from an accepted connection
+    pub fn new(stream: TcpStream) -> Self {
+        Self {
+            stream: Some(stream),
+        }
+    }
+}
+
+#[async_trait]
+impl Transport for TcpServerTransport {
+    async fn connect(&mut self) -> Result<()> {
+        // Server transport is already connected
+        Ok(())
+    }
+
+    fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
+        let stream = self
+            .stream
+            .ok_or_else(|| MCPError::Transport("TCP server transport not connected".to_string()))?;
+
+        let framed = Framed::new(stream, JsonRpcCodec::new());
+        Ok(Box::new(framed))
+    }
+}
+
 #[cfg(test)]
 pub use test_transport::TestTransport;
 

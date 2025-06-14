@@ -1,8 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
-
+use futures::stream::SplitSink;
 use futures::{SinkExt, StreamExt};
-use tokio::sync::{Mutex, mpsc, oneshot};
-use tracing::{debug, error, info};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::{mpsc, oneshot, Mutex};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     error::{MCPError, Result},
@@ -11,7 +12,6 @@ use crate::{
 };
 
 /// Type for handling either a response or error from JSON-RPC
-#[derive(Debug)]
 enum ResponseOrError {
     Response(JSONRPCResponse),
     Error(JSONRPCError),
@@ -19,7 +19,7 @@ enum ResponseOrError {
 
 /// MCP Client implementation
 pub struct MCPClient {
-    transport_tx: Option<mpsc::UnboundedSender<JSONRPCMessage>>,
+    transport_tx: Option<SplitSink<Box<dyn TransportStream>, JSONRPCMessage>>,
     pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<ResponseOrError>>>>,
     notification_tx: mpsc::Sender<JSONRPCNotification>,
     notification_rx: Option<mpsc::Receiver<JSONRPCNotification>>,
@@ -45,11 +45,8 @@ impl MCPClient {
         transport.connect().await?;
         let stream = transport.framed()?;
 
-        let (transport_tx, transport_rx) = mpsc::unbounded_channel();
-        self.transport_tx = Some(transport_tx);
-
-        // Start the transport handler task
-        self.start_transport_handler(stream, transport_rx).await;
+        // Start the message handler task before storing transport
+        self.start_message_handler(stream).await?;
 
         info!("MCP client connected");
         Ok(())
@@ -165,9 +162,8 @@ impl MCPClient {
 
     /// Send a message through the transport
     async fn send_message(&mut self, message: JSONRPCMessage) -> Result<()> {
-        if let Some(tx) = &self.transport_tx {
-            tx.send(message)
-                .map_err(|_| MCPError::Transport("Transport channel closed".to_string()))?;
+        if let Some(transport_tx) = &mut self.transport_tx {
+            transport_tx.send(message).await?;
             Ok(())
         } else {
             Err(MCPError::Transport("Not connected".to_string()))
@@ -209,121 +205,91 @@ impl MCPClient {
         format!("req-{current}")
     }
 
-    /// Start the transport handler task that manages the transport stream
-    async fn start_transport_handler(
-        &mut self,
-        mut stream: Box<dyn TransportStream>,
-        mut transport_rx: mpsc::UnboundedReceiver<JSONRPCMessage>,
-    ) {
+    /// Start the background task that handles incoming messages
+    async fn start_message_handler(&mut self, stream: Box<dyn TransportStream>) -> Result<()> {
         let pending_requests = self.pending_requests.clone();
         let notification_tx = self.notification_tx.clone();
 
-        tokio::spawn(async move {
-            debug!("Transport handler started");
+        // Split the transport stream into read and write halves
+        let (tx, mut rx) = stream.split();
 
-            loop {
-                tokio::select! {
-                    // Handle outgoing messages
-                    msg = transport_rx.recv() => {
-                        match msg {
-                            Some(json_msg) => {
-                                if let Err(e) = stream.send(json_msg).await {
-                                    error!("Failed to send message: {}", e);
+        // Store the sender half for sending messages
+        self.transport_tx = Some(tx);
+
+        // Spawn a task to handle incoming messages
+        tokio::spawn(async move {
+            debug!("Message handler started");
+
+            while let Some(result) = rx.next().await {
+                match result {
+                    Ok(message) => {
+                        debug!("Received message: {:?}", message);
+
+                        match message {
+                            JSONRPCMessage::Response(response) => {
+                                // Extract the ID and find the corresponding request
+                                if let RequestId::String(id) = &response.id {
+                                    let mut pending = pending_requests.lock().await;
+                                    if let Some(tx) = pending.remove(id) {
+                                        // Send the response to the waiting request
+                                        let _ = tx.send(ResponseOrError::Response(response));
+                                    } else {
+                                        warn!("Received response for unknown request ID: {}", id);
+                                    }
+                                }
+                            }
+                            JSONRPCMessage::Notification(notification) => {
+                                // Forward notifications to the notification channel
+                                if let Err(e) = notification_tx.send(notification).await {
+                                    error!("Failed to send notification: {}", e);
+                                    // If the receiver is dropped, we should stop
                                     break;
                                 }
                             }
-                            None => {
-                                debug!("Transport channel closed");
-                                break;
+                            JSONRPCMessage::Error(error) => {
+                                // Handle JSON-RPC errors
+                                if let RequestId::String(id) = &error.id {
+                                    let mut pending = pending_requests.lock().await;
+                                    if let Some(tx) = pending.remove(id) {
+                                        let _ = tx.send(ResponseOrError::Error(error));
+                                    } else {
+                                        warn!("Received error for unknown request ID: {}", id);
+                                    }
+                                } else {
+                                    error!(
+                                        "Received error with non-string request ID: {:?}",
+                                        error.id
+                                    );
+                                }
+                            }
+                            JSONRPCMessage::Request(_request) => {
+                                // Clients typically don't receive requests from servers in MCP
+                                warn!("Received unexpected request from server");
+                            }
+                            JSONRPCMessage::BatchRequest(_batch) => {
+                                // Clients typically don't receive batch requests from servers
+                                warn!("Received unexpected batch request from server");
+                            }
+                            JSONRPCMessage::BatchResponse(_batch) => {
+                                // TODO: Handle batch responses if we implement batch requests
+                                warn!(
+                                    "Received batch response - batch requests not yet implemented"
+                                );
                             }
                         }
                     }
-
-                    // Handle incoming messages
-                    msg_result = stream.next() => {
-                        match msg_result {
-                            Some(Ok(message)) => {
-                                match message {
-                                    JSONRPCMessage::Response(response) => {
-                                        // Handle response - match to pending request
-                                        let id_str = match &response.id {
-                                            RequestId::String(s) => s.clone(),
-                                            RequestId::Number(n) => n.to_string(),
-                                        };
-
-                                        debug!("Received response for request ID: {}", id_str);
-
-                                        // Find and remove the pending request
-                                        let mut pending = pending_requests.lock().await;
-                                        if let Some(tx) = pending.remove(&id_str) {
-                                            if let Err(e) = tx.send(ResponseOrError::Response(response)) {
-                                                error!("Failed to send response - receiver dropped: {:?}", e);
-                                            }
-                                        } else {
-                                            debug!("No pending request found for ID: {}", id_str);
-                                        }
-                                    }
-                                    JSONRPCMessage::Error(error) => {
-                                        // Handle error response - match to pending request
-                                        let id_str = match &error.id {
-                                            RequestId::String(s) => s.clone(),
-                                            RequestId::Number(n) => n.to_string(),
-                                        };
-
-                                        debug!("Received error response for request ID: {}", id_str);
-
-                                        // Find and remove the pending request
-                                        let mut pending = pending_requests.lock().await;
-                                        if let Some(tx) = pending.remove(&id_str) {
-                                            if let Err(e) = tx.send(ResponseOrError::Error(error)) {
-                                                error!("Failed to send error response - receiver dropped: {:?}", e);
-                                            }
-                                        } else {
-                                            debug!("No pending request found for error ID: {}", id_str);
-                                        }
-                                    }
-                                    JSONRPCMessage::Notification(notification) => {
-                                        // Handle notification
-                                        debug!("Received notification: {}", notification.notification.method);
-                                        if let Err(e) = notification_tx.send(notification).await {
-                                            error!("Failed to send notification: {}", e);
-                                        }
-                                    }
-                                    _ => {
-                                        debug!("Received unexpected message type: {:?}", message);
-                                    }
-                                }
-                            }
-                            Some(Err(e)) => {
-                                debug!("Error reading message: {}", e);
-                                // Connection error - we should close all pending requests
-                                let mut pending = pending_requests.lock().await;
-                                for (id, tx) in pending.drain() {
-                                    debug!("Closing pending request {} due to connection error", id);
-                                    let _ = tx.send(ResponseOrError::Error(JSONRPCError {
-                                        jsonrpc: JSONRPC_VERSION.to_string(),
-                                        id: RequestId::String(id),
-                                        error: ErrorObject {
-                                            code: -32603,
-                                            message: format!("Connection error: {}", e),
-                                            data: None,
-                                        },
-                                    }));
-                                }
-                                break;
-                            }
-                            None => {
-                                // Stream ended
-                                debug!("Transport stream ended");
-                                break;
-                            }
-                        }
+                    Err(e) => {
+                        error!("Error receiving message: {}", e);
+                        // On error, we should probably break the loop
+                        break;
                     }
                 }
             }
 
-            debug!("Transport handler stopped");
+            info!("Message handler stopped");
         });
+
+        Ok(())
     }
 }
 
