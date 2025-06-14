@@ -285,7 +285,8 @@ impl MCPServer {
             .execute(
                 params
                     .arguments
-                    .map(|args| serde_json::to_value(args).unwrap()),
+                    .map(|args| serde_json::to_value(args))
+                    .transpose()?,
             )
             .await?;
 
@@ -392,7 +393,8 @@ impl MCPServer {
             .get_messages(
                 params
                     .arguments
-                    .map(|args| serde_json::to_value(args).unwrap()),
+                    .map(|args| serde_json::to_value(args))
+                    .transpose()?,
             )
             .await?;
 

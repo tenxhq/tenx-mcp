@@ -2,6 +2,10 @@
 name = "tenx-mcp"
 version = "0.1.0"
 edition = "2021"
+authors = ["Aldo Cortesi <aldo@corte.si>"]
+description = "Complete, ergonomic implementation of the Model Context Protocol (MCP)"
+license = "MIT"
+keywords = ["mcp", "ai"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
