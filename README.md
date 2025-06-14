@@ -34,4 +34,3 @@ Want to contribute? Have ideas or feature requests? Come tell us about it on
 [Discord](https://discord.gg/fHmRmuBDxF). 
 
 
----
