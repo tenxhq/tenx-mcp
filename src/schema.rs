@@ -205,13 +205,6 @@ pub struct CancelledParams {
 }
 
 // Initialization
-/// This request is sent from the client to the server when it first connects,
-/// asking it to begin initialization.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InitializeRequest {
-    pub method: String,
-    pub params: InitializeParams,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitializeParams {
@@ -337,13 +330,6 @@ pub struct Implementation {
 }
 
 // Ping
-/// A ping, issued by either the server or the client, to check that the other
-/// party is still alive. The receiver must promptly respond, or else may be
-/// disconnected.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PingRequest {
-    pub method: String,
-}
 
 // Progress notifications
 /// An out-of-band notification used to inform the receiver of a progress update
@@ -400,11 +386,6 @@ pub struct PaginatedResult {
 }
 
 // Resources
-/// Sent from the client to request a list of resources the server has.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListResourcesRequest {
-    pub method: String,
-}
 
 /// The server's response to a resources/list request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -414,12 +395,6 @@ pub struct ListResourcesResult {
     pub paginated: PaginatedResult,
 }
 
-/// Sent from the client to request a list of resource templates the server has.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListResourceTemplatesRequest {
-    pub method: String,
-}
-
 /// The server's response to a resources/templates/list request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListResourceTemplatesResult {
@@ -427,13 +402,6 @@ pub struct ListResourceTemplatesResult {
     pub resource_templates: Vec<ResourceTemplate>,
     #[serde(flatten)]
     pub paginated: PaginatedResult,
-}
-
-/// Sent from the client to the server, to read a specific resource URI.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReadResourceRequest {
-    pub method: String,
-    pub params: ReadResourceParams,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -457,36 +425,6 @@ pub struct ReadResourceResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceListChangedNotification {
     pub method: String,
-}
-
-/// Sent from the client to request resources/updated notifications from the
-/// server whenever a particular resource changes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubscribeRequest {
-    pub method: String,
-    pub params: SubscribeParams,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubscribeParams {
-    /// The URI of the resource to subscribe to. The URI can use any protocol;
-    /// it is up to the server how to interpret it.
-    pub uri: String,
-}
-
-/// Sent from the client to request cancellation of resources/updated
-/// notifications from the server. This should follow a previous
-/// resources/subscribe request.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnsubscribeRequest {
-    pub method: String,
-    pub params: UnsubscribeParams,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnsubscribeParams {
-    /// The URI of the resource to unsubscribe from.
-    pub uri: String,
 }
 
 /// A notification from the server to the client, informing it that a resource
@@ -596,12 +534,6 @@ pub struct BlobResourceContents {
 }
 
 // Prompts
-/// Sent from the client to request a list of prompts and prompt templates the
-/// server has.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListPromptsRequest {
-    pub method: String,
-}
 
 /// The server's response to a prompts/list request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -609,22 +541,6 @@ pub struct ListPromptsResult {
     pub prompts: Vec<Prompt>,
     #[serde(flatten)]
     pub paginated: PaginatedResult,
-}
-
-/// Used by the client to get a prompt provided by the server.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetPromptRequest {
-    pub method: String,
-    pub params: GetPromptParams,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetPromptParams {
-    /// The name of the prompt or prompt template.
-    pub name: String,
-    /// Arguments to use for templating the prompt.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub arguments: Option<HashMap<String, String>>,
 }
 
 /// The server's response to a prompts/get request from the client.
@@ -712,11 +628,6 @@ pub struct PromptListChangedNotification {
 }
 
 // Tools
-/// Sent from the client to request a list of tools the server has.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListToolsRequest {
-    pub method: String,
-}
 
 /// The server's response to a tools/list request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -746,20 +657,6 @@ pub struct CallToolResult {
     pub is_error: Option<bool>,
     #[serde(flatten)]
     pub result: Result,
-}
-
-/// Used by the client to invoke a tool provided by the server.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CallToolRequest {
-    pub method: String,
-    pub params: CallToolParams,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CallToolParams {
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub arguments: Option<HashMap<String, Value>>,
 }
 
 /// An optional notification from the server to the client, informing it that
@@ -814,6 +711,26 @@ pub struct ToolAnnotations {
     pub open_world_hint: Option<bool>,
 }
 
+/// Parameters for calling a tool.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallToolParams {
+    /// The name of the tool to call.
+    pub name: String,
+    /// Arguments to pass to the tool.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<HashMap<String, Value>>,
+}
+
+/// Parameters for getting a prompt.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetPromptParams {
+    /// The name of the prompt to get.
+    pub name: String,
+    /// Arguments to use for templating the prompt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<HashMap<String, Value>>,
+}
+
 /// Definition for a tool the client can call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tool {
@@ -844,20 +761,6 @@ pub struct ToolInputSchema {
 }
 
 // Logging
-/// A request from the client to the server, to enable or adjust logging.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SetLevelRequest {
-    pub method: String,
-    pub params: SetLevelParams,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SetLevelParams {
-    /// The level of logging that the client wants to receive from the server.
-    /// The server should send all logs at this level and higher (i.e., more
-    /// severe) to the client as notifications/message.
-    pub level: LoggingLevel,
-}
 
 /// Notification of a log message passed from server to client. If no
 /// logging/setLevel request has been sent from the client, the server MAY
@@ -964,11 +867,12 @@ pub struct CreateMessageResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[serde(rename_all = "camelCase")]
 pub enum StopReason {
     EndTurn,
     StopSequence,
     MaxTokens,
+    #[serde(untagged)]
     Other(String),
 }
 
@@ -1112,20 +1016,6 @@ pub struct ModelHint {
 }
 
 // Autocomplete
-/// A request from the client to the server, to ask for completion options.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompleteRequest {
-    pub method: String,
-    pub params: CompleteParams,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompleteParams {
-    #[serde(rename = "ref")]
-    pub reference: Reference,
-    /// The argument's information
-    pub argument: ArgumentInfo,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArgumentInfo {
@@ -1182,18 +1072,6 @@ pub struct CompletionInfo {
 }
 
 // Roots
-/// Sent from the server to request a list of root URIs from the client. Roots
-/// allow servers to ask for specific directories or files to operate on. A
-/// common example for roots is providing a set of repositories or directories a
-/// server should operate on.
-///
-/// This request is typically used when the server needs to understand the file
-/// system structure or access specific locations that the client has permission
-/// to read from.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListRootsRequest {
-    pub method: String,
-}
 
 /// The client's response to a roots/list request from the server.
 /// This result contains an array of Root objects, each representing a root
@@ -1234,44 +1112,118 @@ pub struct RootsListChangedNotification {
 #[serde(tag = "method")]
 pub enum ClientRequest {
     #[serde(rename = "ping")]
-    Ping(PingRequest),
+    Ping,
     #[serde(rename = "initialize")]
-    Initialize(InitializeRequest),
+    Initialize {
+        #[serde(rename = "protocolVersion")]
+        protocol_version: String,
+        capabilities: ClientCapabilities,
+        #[serde(rename = "clientInfo")]
+        client_info: Implementation,
+    },
     #[serde(rename = "completion/complete")]
-    Complete(CompleteRequest),
+    Complete {
+        #[serde(rename = "ref")]
+        reference: Reference,
+        /// The argument's information
+        argument: ArgumentInfo,
+    },
     #[serde(rename = "logging/setLevel")]
-    SetLevel(SetLevelRequest),
+    SetLevel {
+        /// The level of logging that the client wants to receive from the
+        /// server.
+        level: LoggingLevel,
+    },
     #[serde(rename = "prompts/get")]
-    GetPrompt(GetPromptRequest),
+    GetPrompt {
+        /// The name of the prompt or prompt template.
+        name: String,
+        /// Arguments to use for templating the prompt.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        arguments: Option<HashMap<String, String>>,
+    },
     #[serde(rename = "prompts/list")]
-    ListPrompts(ListPromptsRequest),
+    ListPrompts,
     #[serde(rename = "resources/list")]
-    ListResources(ListResourcesRequest),
+    ListResources,
     #[serde(rename = "resources/templates/list")]
-    ListResourceTemplates(ListResourceTemplatesRequest),
+    ListResourceTemplates,
     #[serde(rename = "resources/read")]
-    ReadResource(ReadResourceRequest),
+    ReadResource {
+        /// The URI of the resource to read.
+        uri: String,
+    },
     #[serde(rename = "resources/subscribe")]
-    Subscribe(SubscribeRequest),
+    Subscribe {
+        /// The URI of the resource to subscribe to.
+        uri: String,
+    },
     #[serde(rename = "resources/unsubscribe")]
-    Unsubscribe(UnsubscribeRequest),
+    Unsubscribe {
+        /// The URI of the resource to unsubscribe from.
+        uri: String,
+    },
     #[serde(rename = "tools/call")]
-    CallTool(CallToolRequest),
+    CallTool {
+        name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        arguments: Option<HashMap<String, Value>>,
+    },
     #[serde(rename = "tools/list")]
-    ListTools(ListToolsRequest),
+    ListTools,
+}
+
+impl ClientRequest {
+    /// Get the method name for this request
+    pub fn method(&self) -> &'static str {
+        match self {
+            ClientRequest::Ping => "ping",
+            ClientRequest::Initialize { .. } => "initialize",
+            ClientRequest::Complete { .. } => "completion/complete",
+            ClientRequest::SetLevel { .. } => "logging/setLevel",
+            ClientRequest::GetPrompt { .. } => "prompts/get",
+            ClientRequest::ListPrompts => "prompts/list",
+            ClientRequest::ListResources => "resources/list",
+            ClientRequest::ListResourceTemplates => "resources/templates/list",
+            ClientRequest::ReadResource { .. } => "resources/read",
+            ClientRequest::Subscribe { .. } => "resources/subscribe",
+            ClientRequest::Unsubscribe { .. } => "resources/unsubscribe",
+            ClientRequest::CallTool { .. } => "tools/call",
+            ClientRequest::ListTools => "tools/list",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
 pub enum ClientNotification {
     #[serde(rename = "notifications/cancelled")]
-    Cancelled(CancelledNotification),
+    Cancelled {
+        /// The ID of the request to cancel.
+        #[serde(rename = "requestId")]
+        request_id: RequestId,
+        /// An optional string describing the reason for the cancellation.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+    },
     #[serde(rename = "notifications/progress")]
-    Progress(ProgressNotification),
+    Progress {
+        /// The progress token which was given in the initial request.
+        #[serde(rename = "progressToken")]
+        progress_token: ProgressToken,
+        /// The progress thus far.
+        progress: f64,
+        /// Total number of items to process, if known.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        total: Option<f64>,
+        /// An optional message describing the current progress.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
+    },
     #[serde(rename = "notifications/initialized")]
-    Initialized(InitializedNotification),
+    Initialized,
     #[serde(rename = "notifications/roots/list_changed")]
-    RootsListChanged(RootsListChangedNotification),
+    RootsListChanged,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1287,30 +1239,81 @@ pub enum ClientResult {
 #[serde(tag = "method")]
 pub enum ServerRequest {
     #[serde(rename = "ping")]
-    Ping(PingRequest),
+    Ping,
     #[serde(rename = "sampling/createMessage")]
-    CreateMessage(Box<CreateMessageRequest>),
+    CreateMessage {
+        messages: Vec<SamplingMessage>,
+        /// The server's preferences for which model to select.
+        #[serde(rename = "modelPreferences", skip_serializing_if = "Option::is_none")]
+        model_preferences: Option<ModelPreferences>,
+        /// An optional system prompt the server wants to use for sampling.
+        #[serde(rename = "systemPrompt", skip_serializing_if = "Option::is_none")]
+        system_prompt: Option<String>,
+        /// A request to include context from one or more MCP servers.
+        #[serde(rename = "includeContext", skip_serializing_if = "Option::is_none")]
+        include_context: Option<IncludeContext>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        temperature: Option<f64>,
+        /// The maximum number of tokens to sample.
+        #[serde(rename = "maxTokens")]
+        max_tokens: i64,
+        #[serde(rename = "stopSequences", skip_serializing_if = "Option::is_none")]
+        stop_sequences: Option<Vec<String>>,
+        /// Optional metadata to pass through to the LLM provider.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        metadata: Option<Value>,
+    },
     #[serde(rename = "roots/list")]
-    ListRoots(ListRootsRequest),
+    ListRoots,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
 pub enum ServerNotification {
     #[serde(rename = "notifications/cancelled")]
-    Cancelled(CancelledNotification),
+    Cancelled {
+        /// The ID of the request to cancel.
+        #[serde(rename = "requestId")]
+        request_id: RequestId,
+        /// An optional string describing the reason for the cancellation.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+    },
     #[serde(rename = "notifications/progress")]
-    Progress(ProgressNotification),
+    Progress {
+        /// The progress token which was given in the initial request.
+        #[serde(rename = "progressToken")]
+        progress_token: ProgressToken,
+        /// The progress thus far.
+        progress: f64,
+        /// Total number of items to process, if known.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        total: Option<f64>,
+        /// An optional message describing the current progress.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
+    },
     #[serde(rename = "notifications/message")]
-    LoggingMessage(LoggingMessageNotification),
+    LoggingMessage {
+        /// The severity of this log message.
+        level: LoggingLevel,
+        /// An optional name of the logger issuing this message.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        logger: Option<String>,
+        /// The data to be logged.
+        data: Value,
+    },
     #[serde(rename = "notifications/resources/updated")]
-    ResourceUpdated(ResourceUpdatedNotification),
+    ResourceUpdated {
+        /// The URI of the resource that has been updated.
+        uri: String,
+    },
     #[serde(rename = "notifications/resources/list_changed")]
-    ResourceListChanged(ResourceListChangedNotification),
+    ResourceListChanged,
     #[serde(rename = "notifications/tools/list_changed")]
-    ToolListChanged(ToolListChangedNotification),
+    ToolListChanged,
     #[serde(rename = "notifications/prompts/list_changed")]
-    PromptListChanged(PromptListChangedNotification),
+    PromptListChanged,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

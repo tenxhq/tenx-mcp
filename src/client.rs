@@ -61,16 +61,14 @@ impl MCPClient {
         client_info: Implementation,
         capabilities: ClientCapabilities,
     ) -> Result<InitializeResult> {
-        let params = InitializeParams {
+        let request = ClientRequest::Initialize {
             protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
             capabilities,
             client_info,
         };
 
-        let value = self
-            .request("initialize", Some(serde_json::to_value(params)?))
-            .await;
-        let result: InitializeResult = serde_json::from_value(value?)?;
+        let value = self.request(request).await?;
+        let result: InitializeResult = serde_json::from_value(value)?;
 
         // Send the initialized notification to complete the handshake
         self.send_notification("notifications/initialized", None)
@@ -81,7 +79,7 @@ impl MCPClient {
 
     /// List available tools from the server
     pub async fn list_tools(&mut self) -> Result<ListToolsResult> {
-        let value = self.request("tools/list", None).await?;
+        let value = self.request(ClientRequest::ListTools).await?;
         let result: ListToolsResult = serde_json::from_value(value)?;
         Ok(result)
     }
@@ -92,20 +90,16 @@ impl MCPClient {
         name: String,
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
-        let params = CallToolParams {
-            name,
-            arguments: arguments.map(|args| {
-                if let serde_json::Value::Object(map) = args {
-                    map.into_iter().collect()
-                } else {
-                    std::collections::HashMap::new()
-                }
-            }),
-        };
+        let arguments = arguments.map(|args| {
+            if let serde_json::Value::Object(map) = args {
+                map.into_iter().collect()
+            } else {
+                std::collections::HashMap::new()
+            }
+        });
 
-        let value = self
-            .request("tools/call", Some(serde_json::to_value(params)?))
-            .await?;
+        let request = ClientRequest::CallTool { name, arguments };
+        let value = self.request(request).await?;
         let result: CallToolResult = serde_json::from_value(value)?;
         Ok(result)
     }
@@ -116,11 +110,7 @@ impl MCPClient {
     }
 
     /// Send a request and wait for response
-    async fn request(
-        &mut self,
-        method: &str,
-        params: Option<serde_json::Value>,
-    ) -> Result<serde_json::Value> {
+    async fn request(&mut self, request: ClientRequest) -> Result<serde_json::Value> {
         let id = self.next_request_id().await;
         let (tx, rx) = oneshot::channel();
 
@@ -130,27 +120,26 @@ impl MCPClient {
             pending.insert(id.clone(), tx);
         }
 
-        // Create the request params in the correct format
-        let request_params = params.map(|v| RequestParams {
-            meta: None,
-            other: if let Some(obj) = v.as_object() {
-                obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-            } else {
-                HashMap::new()
-            },
-        });
-
-        // Create and send the request
-        let request = JSONRPCRequest {
+        // Create the JSON-RPC request
+        let jsonrpc_request = JSONRPCRequest {
             jsonrpc: JSONRPC_VERSION.to_string(),
             id: RequestId::String(id.clone()),
             request: Request {
-                method: method.to_string(),
-                params: request_params,
+                method: request.method().to_string(),
+                params: Some(RequestParams {
+                    meta: None,
+                    other: serde_json::to_value(&request)?
+                        .as_object()
+                        .unwrap_or(&serde_json::Map::new())
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect(),
+                }),
             },
         };
 
-        self.send_message(JSONRPCMessage::Request(request)).await?;
+        self.send_message(JSONRPCMessage::Request(jsonrpc_request))
+            .await?;
 
         // Wait for response
         match rx.await {
@@ -167,7 +156,10 @@ impl MCPClient {
                     ))),
                 }
             }
-            Err(_) => Err(MCPError::Protocol("Response channel closed".to_string())),
+            Err(e) => {
+                error!("Response channel closed: {}", e);
+                Err(MCPError::Protocol("Response channel closed".to_string()))
+            }
         }
     }
 
