@@ -137,7 +137,6 @@ async fn test_tenx_server_with_rmcp_client() {
 }
 
 #[tokio::test]
-#[ignore = "RMCP server/client protocol incompatibility - needs investigation"]
 async fn test_rmcp_server_with_tenx_client() {
     use rmcp::handler::server::ServerHandler;
     use rmcp::service::{RequestContext, RoleServer};
@@ -242,6 +241,7 @@ async fn test_rmcp_server_with_tenx_client() {
         client_reader,
         client_writer,
     ));
+
     client.connect(transport).await.unwrap();
 
     // Initialize

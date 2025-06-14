@@ -1,9 +1,9 @@
 //! MCP Protocol Compliance Tests
-//! 
+//!
 //! This module contains tests that verify our implementation follows the MCP
 //! specification correctly. These tests focus on protocol compliance without
 //! requiring external dependencies.
-//! 
+//!
 //! For actual interoperability tests with rmcp, see rmcp_integration.rs
 
 use async_trait::async_trait;
