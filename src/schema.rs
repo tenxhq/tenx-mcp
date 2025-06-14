@@ -1241,28 +1241,7 @@ pub enum ServerRequest {
     #[serde(rename = "ping")]
     Ping,
     #[serde(rename = "sampling/createMessage")]
-    CreateMessage {
-        messages: Vec<SamplingMessage>,
-        /// The server's preferences for which model to select.
-        #[serde(rename = "modelPreferences", skip_serializing_if = "Option::is_none")]
-        model_preferences: Option<ModelPreferences>,
-        /// An optional system prompt the server wants to use for sampling.
-        #[serde(rename = "systemPrompt", skip_serializing_if = "Option::is_none")]
-        system_prompt: Option<String>,
-        /// A request to include context from one or more MCP servers.
-        #[serde(rename = "includeContext", skip_serializing_if = "Option::is_none")]
-        include_context: Option<IncludeContext>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        temperature: Option<f64>,
-        /// The maximum number of tokens to sample.
-        #[serde(rename = "maxTokens")]
-        max_tokens: i64,
-        #[serde(rename = "stopSequences", skip_serializing_if = "Option::is_none")]
-        stop_sequences: Option<Vec<String>>,
-        /// Optional metadata to pass through to the LLM provider.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        metadata: Option<Value>,
-    },
+    CreateMessage(Box<CreateMessageParams>),
     #[serde(rename = "roots/list")]
     ListRoots,
 }

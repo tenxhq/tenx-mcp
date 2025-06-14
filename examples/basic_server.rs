@@ -102,7 +102,7 @@ impl ToolHandler for AddToolHandler {
 
         Ok(vec![tenx_mcp::schema::Content::Text(
             tenx_mcp::schema::TextContent {
-                text: format!("{} + {} = {}", a, b, result),
+                text: format!("{a} + {b} = {result}"),
                 annotations: None,
             },
         )])
@@ -132,7 +132,7 @@ async fn main() -> Result<()> {
         std::process::exit(1);
     };
 
-    let addr = format!("{}:{}", host, port);
+    let addr = format!("{host}:{port}");
 
     // Create TCP listener
     let listener = TcpListener::bind(&addr).await?;
