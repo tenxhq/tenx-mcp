@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use tenx_mcp::schema::*;
 use tenx_mcp::{MCPServer, Result, ToolHandler};
 use tracing::info;
-use tracing_subscriber;
 
 /// Simple echo tool that returns the input as output
 struct EchoTool;
@@ -50,7 +49,7 @@ impl ToolHandler for EchoTool {
         };
 
         Ok(vec![Content::Text(TextContent {
-            text: format!("Echo: {}", message),
+            text: format!("Echo: {message}"),
             annotations: None,
         })])
     }

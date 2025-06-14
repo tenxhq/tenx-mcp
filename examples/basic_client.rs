@@ -1,6 +1,5 @@
 use tenx_mcp::{MCPClient, Result};
 use tracing::info;
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<()> {

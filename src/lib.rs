@@ -13,7 +13,6 @@ pub use server::{MCPServer, PromptHandler, ResourceHandler, ToolHandler};
 #[cfg(test)]
 mod tests {
     use super::schema::*;
-    use serde_json;
 
     #[test]
     fn test_jsonrpc_request_serialization() {

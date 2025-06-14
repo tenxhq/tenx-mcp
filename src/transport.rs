@@ -101,6 +101,110 @@ impl Transport for TcpTransport {
 }
 
 #[cfg(test)]
+pub use test_transport::TestTransport;
+
+#[cfg(test)]
+mod test_transport {
+    use super::*;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use tokio::sync::mpsc;
+
+    /// Test transport for unit testing
+    pub struct TestTransport {
+        sender: mpsc::UnboundedSender<JSONRPCMessage>,
+        receiver: mpsc::UnboundedReceiver<JSONRPCMessage>,
+    }
+
+    impl TestTransport {
+        /// Create a pair of connected test transports
+        pub fn create_pair() -> (Box<dyn Transport>, Box<dyn Transport>) {
+            let (tx1, rx1) = mpsc::unbounded_channel();
+            let (tx2, rx2) = mpsc::unbounded_channel();
+
+            let transport1 = Box::new(TestTransport {
+                sender: tx2,
+                receiver: rx1,
+            });
+
+            let transport2 = Box::new(TestTransport {
+                sender: tx1,
+                receiver: rx2,
+            });
+
+            (transport1, transport2)
+        }
+    }
+
+    #[async_trait]
+    impl Transport for TestTransport {
+        async fn connect(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
+            Ok(Box::new(TestTransportStream {
+                sender: self.sender,
+                receiver: self.receiver,
+            }))
+        }
+    }
+
+    struct TestTransportStream {
+        sender: mpsc::UnboundedSender<JSONRPCMessage>,
+        receiver: mpsc::UnboundedReceiver<JSONRPCMessage>,
+    }
+
+    impl Stream for TestTransportStream {
+        type Item = Result<JSONRPCMessage>;
+
+        fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+            match self.receiver.poll_recv(cx) {
+                Poll::Ready(Some(msg)) => Poll::Ready(Some(Ok(msg))),
+                Poll::Ready(None) => Poll::Ready(None),
+                Poll::Pending => Poll::Pending,
+            }
+        }
+    }
+
+    impl Sink<JSONRPCMessage> for TestTransportStream {
+        type Error = MCPError;
+
+        fn poll_ready(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<std::result::Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn start_send(
+            self: Pin<&mut Self>,
+            item: JSONRPCMessage,
+        ) -> std::result::Result<(), Self::Error> {
+            self.sender
+                .send(item)
+                .map_err(|_| MCPError::Transport("Failed to send message".to_string()))
+        }
+
+        fn poll_flush(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<std::result::Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_close(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<std::result::Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    impl TransportStream for TestTransportStream {}
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -114,5 +218,14 @@ mod tests {
     fn test_stdio_transport_creation() {
         let _transport = StdioTransport::new();
         // Just ensure it can be created
+    }
+
+    #[tokio::test]
+    async fn test_test_transport_pair() {
+        let (mut t1, mut t2) = TestTransport::create_pair();
+
+        // Both should connect successfully
+        t1.connect().await.unwrap();
+        t2.connect().await.unwrap();
     }
 }

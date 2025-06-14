@@ -174,7 +174,7 @@ impl MCPClient {
         let mut id = self.next_request_id.lock().await;
         let current = *id;
         *id += 1;
-        format!("req-{}", current)
+        format!("req-{current}")
     }
 
     /// Start the background task that handles incoming messages

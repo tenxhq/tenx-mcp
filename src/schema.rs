@@ -1251,7 +1251,7 @@ pub enum ServerRequest {
     #[serde(rename = "ping")]
     Ping(PingRequest),
     #[serde(rename = "sampling/createMessage")]
-    CreateMessage(CreateMessageRequest),
+    CreateMessage(Box<CreateMessageRequest>),
     #[serde(rename = "roots/list")]
     ListRoots(ListRootsRequest),
 }
