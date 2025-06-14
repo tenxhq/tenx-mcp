@@ -33,3 +33,11 @@ path = "examples/basic_client.rs"
 [[example]]
 name = "error_handling"
 path = "examples/error_handling.rs"
+
+[[example]]
+name = "timeout_server"
+path = "examples/timeout_server.rs"
+
+[[example]]
+name = "timeout_client"
+path = "examples/timeout_client.rs"

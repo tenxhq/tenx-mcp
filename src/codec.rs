@@ -54,11 +54,11 @@ impl Decoder for JsonRpcCodec {
             error!("Failed to parse JSON-RPC message: {}", e);
             if let Ok(text) = std::str::from_utf8(json_bytes) {
                 MCPError::InvalidMessageFormat {
-                    message: format!("Invalid JSON: {} (content: {})", e, text),
+                    message: format!("Invalid JSON: {e} (content: {text})"),
                 }
             } else {
                 MCPError::InvalidMessageFormat {
-                    message: format!("Invalid JSON: {} (non-UTF8 content)", e),
+                    message: format!("Invalid JSON: {e} (non-UTF8 content)"),
                 }
             }
         })?;

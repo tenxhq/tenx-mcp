@@ -137,7 +137,7 @@ impl Transport for TcpTransport {
     }
 
     fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
-        let stream = self.stream.ok_or_else(|| MCPError::TransportDisconnected)?;
+        let stream = self.stream.ok_or(MCPError::TransportDisconnected)?;
 
         let framed = Framed::new(stream, JsonRpcCodec::new());
         Ok(Box::new(framed))
@@ -166,7 +166,7 @@ impl Transport for TcpServerTransport {
     }
 
     fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
-        let stream = self.stream.ok_or_else(|| MCPError::TransportDisconnected)?;
+        let stream = self.stream.ok_or(MCPError::TransportDisconnected)?;
 
         let framed = Framed::new(stream, JsonRpcCodec::new());
         Ok(Box::new(framed))

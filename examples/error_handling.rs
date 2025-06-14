@@ -82,7 +82,7 @@ impl ToolHandler for StrictTool {
             })?;
 
         Ok(vec![Content::Text(TextContent {
-            text: format!("Received: {}", required_field),
+            text: format!("Received: {required_field}"),
             annotations: None,
         })])
     }

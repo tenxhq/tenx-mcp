@@ -300,12 +300,12 @@ impl MCPServer {
             .execute(
                 params
                     .arguments
-                    .map(|args| serde_json::to_value(args))
+                    .map(serde_json::to_value)
                     .transpose()
                     .map_err(|e| {
                         MCPError::invalid_params(
                             "tools/call",
-                            format!("Invalid arguments format: {}", e),
+                            format!("Invalid arguments format: {e}"),
                         )
                     })?,
             )
@@ -371,7 +371,7 @@ impl MCPServer {
         let uri = params.uri.clone();
         let contents = handler.read(params.uri).await.map_err(|e| match e {
             MCPError::ResourceNotFound { .. } => e,
-            _ => MCPError::handler_error("resource", format!("Failed to read '{}': {}", uri, e)),
+            _ => MCPError::handler_error("resource", format!("Failed to read '{uri}': {e}")),
         })?;
 
         let result = ReadResourceResult {
@@ -428,12 +428,12 @@ impl MCPServer {
             .get_messages(
                 params
                     .arguments
-                    .map(|args| serde_json::to_value(args))
+                    .map(serde_json::to_value)
                     .transpose()
                     .map_err(|e| {
                         MCPError::invalid_params(
                             "prompts/get",
-                            format!("Invalid arguments format: {}", e),
+                            format!("Invalid arguments format: {e}"),
                         )
                     })?,
             )
@@ -441,7 +441,7 @@ impl MCPServer {
             .map_err(|e| {
                 MCPError::handler_error(
                     "prompt",
-                    format!("Failed to get prompt '{}': {}", prompt_name, e),
+                    format!("Failed to get prompt '{prompt_name}': {e}"),
                 )
             })?;
 
