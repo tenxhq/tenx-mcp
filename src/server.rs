@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use schema::*;
-use tokio::sync::Mutex;
+use tokio::sync::{broadcast, Mutex};
 use tracing::{debug, error, info, warn};
 
 use crate::{
@@ -45,6 +45,14 @@ pub trait PromptHandler: Send + Sync {
     ) -> Result<Vec<PromptMessage>>;
 }
 
+/// Trait for handling server shutdown
+#[async_trait]
+pub trait ShutdownHandler: Send + Sync {
+    /// Called when the server is shutting down
+    /// Allows custom cleanup logic to be executed
+    async fn on_shutdown(&self) -> Result<()>;
+}
+
 /// MCP Server implementation
 pub struct MCPServer {
     server_info: Implementation,
@@ -52,17 +60,25 @@ pub struct MCPServer {
     tools: Arc<Mutex<HashMap<String, Box<dyn ToolHandler>>>>,
     resources: Arc<Mutex<HashMap<String, Box<dyn ResourceHandler>>>>,
     prompts: Arc<Mutex<HashMap<String, Box<dyn PromptHandler>>>>,
+    shutdown_handler: Option<Box<dyn ShutdownHandler>>,
+    shutdown_tx: broadcast::Sender<()>,
+    shutdown_rx: Option<broadcast::Receiver<()>>,
 }
 
 impl MCPServer {
     /// Create a new MCP server
     pub fn new(name: String, version: String) -> Self {
+        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+
         Self {
             server_info: Implementation { name, version },
             capabilities: ServerCapabilities::default(),
             tools: Arc::new(Mutex::new(HashMap::new())),
             resources: Arc::new(Mutex::new(HashMap::new())),
             prompts: Arc::new(Mutex::new(HashMap::new())),
+            shutdown_handler: None,
+            shutdown_tx,
+            shutdown_rx: Some(shutdown_rx),
         }
     }
 
@@ -93,22 +109,63 @@ impl MCPServer {
         self.prompts.lock().await.insert(name, handler);
     }
 
+    /// Register a shutdown handler
+    pub fn register_shutdown_handler(&mut self, handler: Box<dyn ShutdownHandler>) {
+        self.shutdown_handler = Some(handler);
+    }
+
+    /// Get a shutdown receiver for listening to shutdown signals
+    pub fn shutdown_receiver(&mut self) -> Option<broadcast::Receiver<()>> {
+        self.shutdown_rx.take()
+    }
+
+    /// Get a shutdown sender for triggering shutdown from external code
+    pub fn shutdown_sender(&self) -> broadcast::Sender<()> {
+        self.shutdown_tx.clone()
+    }
+
+    /// Signal the server to shutdown gracefully
+    pub async fn shutdown(&self) {
+        // Call the shutdown handler if one is registered
+        if let Some(ref handler) = self.shutdown_handler {
+            if let Err(e) = handler.on_shutdown().await {
+                error!("Error during shutdown handler execution: {}", e);
+            }
+        }
+        
+        // Send shutdown signal
+        let _ = self.shutdown_tx.send(());
+    }
+
     /// Start serving connections using the provided transport
     pub async fn serve(&self, mut transport: Box<dyn Transport>) -> Result<()> {
         transport.connect().await?;
         let mut stream = transport.framed()?;
+        let mut shutdown_rx = self.shutdown_tx.subscribe();
 
         info!("MCP server started");
 
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(message) => {
-                    if let Err(e) = self.handle_message(message, &mut stream).await {
-                        error!("Error handling message: {}", e);
+        loop {
+            tokio::select! {
+                result = stream.next() => {
+                    match result {
+                        Some(Ok(message)) => {
+                            if let Err(e) = self.handle_message(message, &mut stream).await {
+                                error!("Error handling message: {}", e);
+                            }
+                        }
+                        Some(Err(e)) => {
+                            error!("Error reading message: {}", e);
+                            break;
+                        }
+                        None => {
+                            debug!("Stream ended");
+                            break;
+                        }
                     }
                 }
-                Err(e) => {
-                    error!("Error reading message: {}", e);
+                _ = shutdown_rx.recv() => {
+                    info!("Shutdown signal received");
                     break;
                 }
             }
@@ -455,6 +512,28 @@ impl MCPServer {
         };
 
         Ok(serde_json::to_value(result)?)
+    }
+}
+
+impl Drop for MCPServer {
+    fn drop(&mut self) {
+        // Since Drop::drop is sync but our shutdown handler is async,
+        // we can only send the shutdown signal here
+        if let Err(e) = self.shutdown_tx.send(()) {
+            // Only log if there are no receivers, which is expected during shutdown
+            if e.0 != () {
+                eprintln!("Warning: Failed to send shutdown signal during Drop: {}", e);
+            }
+        }
+        
+        // Log the shutdown for external processes to detect
+        info!("MCPServer dropped - shutdown signal sent");
+        
+        // Note: Custom shutdown handlers must be called explicitly via shutdown() method
+        // before the server is dropped, since Drop::drop cannot be async
+        if self.shutdown_handler.is_some() {
+            warn!("Server dropped with shutdown handler registered - call shutdown() explicitly for proper cleanup");
+        }
     }
 }
 

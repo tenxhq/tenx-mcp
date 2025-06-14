@@ -1,9 +1,9 @@
+use std::env;
+
 use async_trait::async_trait;
 use serde_json::Value;
-use std::env;
 use tenx_mcp::{MCPServer, Result, ToolHandler};
-use tokio::net::TcpListener;
-use tokio::signal;
+use tokio::{net::TcpListener, signal};
 use tracing::{error, info};
 
 /// Example echo tool handler

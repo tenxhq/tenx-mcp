@@ -75,8 +75,7 @@ where
                 }
             }
             Err(_) => {
-                let timeout_error =
-                    MCPError::timeout(config.timeout, format!("attempt-{attempt}"));
+                let timeout_error = MCPError::timeout(config.timeout, format!("attempt-{attempt}"));
                 last_error = Some(timeout_error);
 
                 // Don't sleep on the last attempt

@@ -53,7 +53,7 @@ impl ToolHandler for FlakeyTool {
 
     async fn execute(&self, _arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
         let count = self.fail_count.fetch_add(1, Ordering::SeqCst);
-        
+
         if count < self.failures_before_success {
             warn!("FlakeyTool failing (attempt {})", count + 1);
             // Simulate a transient network error
@@ -99,10 +99,13 @@ impl ToolHandler for SlowTool {
     }
 
     async fn execute(&self, _arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
-        info!("SlowTool starting execution (will take {} seconds)...", self.delay_seconds);
+        info!(
+            "SlowTool starting execution (will take {} seconds)...",
+            self.delay_seconds
+        );
         sleep(Duration::from_secs(self.delay_seconds)).await;
         info!("SlowTool completed");
-        
+
         Ok(vec![Content::Text(TextContent {
             text: "Operation completed successfully".to_string(),
             annotations: None,
@@ -130,9 +133,9 @@ impl ToolHandler for BrokenTool {
 
     async fn execute(&self, _arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
         // Return an error that is not retryable
-        Err(MCPError::InvalidParams { 
-            method: "broken_operation".to_string(), 
-            message: "This operation is permanently broken".to_string() 
+        Err(MCPError::InvalidParams {
+            method: "broken_operation".to_string(),
+            message: "This operation is permanently broken".to_string(),
         })
     }
 }
@@ -166,9 +169,7 @@ impl ToolHandler for ReliableTool {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
-    tracing_subscriber::fmt()
-        .with_target(false)
-        .init();
+    tracing_subscriber::fmt().with_target(false).init();
 
     // Parse command line arguments
     let args: Vec<String> = env::args().collect();
