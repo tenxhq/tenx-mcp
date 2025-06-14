@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use schema::*;
-use tokio::sync::{Mutex, broadcast};
+use tokio::sync::{broadcast, Mutex};
 use tracing::{debug, error, info, warn};
 
 use crate::{
