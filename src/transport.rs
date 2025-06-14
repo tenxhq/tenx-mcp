@@ -137,9 +137,7 @@ impl Transport for TcpTransport {
     }
 
     fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
-        let stream = self
-            .stream
-            .ok_or_else(|| MCPError::Transport("TCP transport not connected".to_string()))?;
+        let stream = self.stream.ok_or_else(|| MCPError::TransportDisconnected)?;
 
         let framed = Framed::new(stream, JsonRpcCodec::new());
         Ok(Box::new(framed))
@@ -168,9 +166,7 @@ impl Transport for TcpServerTransport {
     }
 
     fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
-        let stream = self
-            .stream
-            .ok_or_else(|| MCPError::Transport("TCP server transport not connected".to_string()))?;
+        let stream = self.stream.ok_or_else(|| MCPError::TransportDisconnected)?;
 
         let framed = Framed::new(stream, JsonRpcCodec::new());
         Ok(Box::new(framed))
@@ -264,7 +260,7 @@ mod test_transport {
         ) -> std::result::Result<(), Self::Error> {
             self.sender
                 .send(item)
-                .map_err(|_| MCPError::Transport("Failed to send message".to_string()))
+                .map_err(|_| MCPError::ConnectionClosed)
         }
 
         fn poll_flush(

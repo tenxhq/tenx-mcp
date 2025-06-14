@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
-use tracing::debug;
+use tracing::{debug, error};
 
 use crate::{
     error::{MCPError, Result},
@@ -50,7 +50,18 @@ impl Decoder for JsonRpcCodec {
             std::str::from_utf8(json_bytes)
         );
 
-        let message: JSONRPCMessage = serde_json::from_slice(json_bytes)?;
+        let message: JSONRPCMessage = serde_json::from_slice(json_bytes).map_err(|e| {
+            error!("Failed to parse JSON-RPC message: {}", e);
+            if let Ok(text) = std::str::from_utf8(json_bytes) {
+                MCPError::InvalidMessageFormat {
+                    message: format!("Invalid JSON: {} (content: {})", e, text),
+                }
+            } else {
+                MCPError::InvalidMessageFormat {
+                    message: format!("Invalid JSON: {} (non-UTF8 content)", e),
+                }
+            }
+        })?;
         Ok(Some(message))
     }
 }
@@ -60,6 +71,16 @@ impl Encoder<JSONRPCMessage> for JsonRpcCodec {
 
     fn encode(&mut self, item: JSONRPCMessage, dst: &mut BytesMut) -> Result<()> {
         let json = serde_json::to_vec(&item)?;
+
+        // Check message size
+        const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; // 10MB
+        if json.len() > MAX_MESSAGE_SIZE {
+            return Err(MCPError::MessageTooLarge {
+                size: json.len(),
+                max_size: MAX_MESSAGE_SIZE,
+            });
+        }
+
         dst.reserve(json.len() + 1);
         dst.put_slice(&json);
         dst.put_u8(b'\n');

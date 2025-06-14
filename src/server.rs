@@ -155,7 +155,14 @@ impl MCPServer {
         let params = request
             .request
             .params
-            .map(|p| serde_json::to_value(p.other).unwrap_or(serde_json::Value::Null));
+            .map(|p| serde_json::to_value(p.other))
+            .transpose()
+            .map_err(|e| {
+                error!("Failed to serialize request params: {}", e);
+                e
+            })
+            .ok()
+            .flatten();
 
         let result_value = match request.request.method.as_str() {
             "initialize" => self.handle_initialize(params).await,
@@ -190,7 +197,9 @@ impl MCPServer {
                 // Create a proper JSON-RPC error response
                 let error_code = match &e {
                     MCPError::MethodNotFound(_) => METHOD_NOT_FOUND,
-                    MCPError::InvalidParams(_) => INVALID_PARAMS,
+                    MCPError::InvalidParams { .. } => INVALID_PARAMS,
+                    MCPError::InvalidRequest(_) => INVALID_REQUEST,
+                    MCPError::Json { .. } | MCPError::InvalidMessageFormat { .. } => PARSE_ERROR,
                     _ => INTERNAL_ERROR,
                 };
 
@@ -225,8 +234,9 @@ impl MCPServer {
         let _params: InitializeParams = if let Some(p) = params {
             serde_json::from_value(p)?
         } else {
-            return Err(MCPError::InvalidParams(
-                "Missing initialize params".to_string(),
+            return Err(MCPError::invalid_params(
+                "initialize",
+                "Missing required parameters",
             ));
         };
 
@@ -271,24 +281,40 @@ impl MCPServer {
         let params: CallToolParams = if let Some(p) = params {
             serde_json::from_value(p)?
         } else {
-            return Err(MCPError::InvalidParams(
-                "Missing call tool params".to_string(),
+            return Err(MCPError::invalid_params(
+                "tools/call",
+                "Missing required parameters",
             ));
         };
 
         let tools = self.tools.lock().await;
         let handler = tools
             .get(&params.name)
-            .ok_or_else(|| MCPError::MethodNotFound(format!("Tool '{}' not found", params.name)))?;
+            .ok_or_else(|| MCPError::ToolExecutionFailed {
+                tool: params.name.clone(),
+                message: "Tool not found".to_string(),
+            })?;
 
+        let tool_name = params.name.clone();
         let content = handler
             .execute(
                 params
                     .arguments
                     .map(|args| serde_json::to_value(args))
-                    .transpose()?,
+                    .transpose()
+                    .map_err(|e| {
+                        MCPError::invalid_params(
+                            "tools/call",
+                            format!("Invalid arguments format: {}", e),
+                        )
+                    })?,
             )
-            .await?;
+            .await
+            .map_err(|e| match e {
+                MCPError::ToolExecutionFailed { .. } => e,
+                MCPError::InvalidParams { .. } => e,
+                _ => MCPError::tool_execution_failed(tool_name, e.to_string()),
+            })?;
 
         let result = CallToolResult {
             content,
@@ -329,17 +355,24 @@ impl MCPServer {
         let params: ReadResourceParams = if let Some(p) = params {
             serde_json::from_value(p)?
         } else {
-            return Err(MCPError::InvalidParams(
-                "Missing read resource params".to_string(),
+            return Err(MCPError::invalid_params(
+                "resources/read",
+                "Missing required parameters",
             ));
         };
 
         let resources = self.resources.lock().await;
-        let handler = resources.get(&params.uri).ok_or_else(|| {
-            MCPError::MethodNotFound(format!("Resource '{}' not found", params.uri))
-        })?;
+        let handler = resources
+            .get(&params.uri)
+            .ok_or_else(|| MCPError::ResourceNotFound {
+                uri: params.uri.clone(),
+            })?;
 
-        let contents = handler.read(params.uri).await?;
+        let uri = params.uri.clone();
+        let contents = handler.read(params.uri).await.map_err(|e| match e {
+            MCPError::ResourceNotFound { .. } => e,
+            _ => MCPError::handler_error("resource", format!("Failed to read '{}': {}", uri, e)),
+        })?;
 
         let result = ReadResourceResult {
             contents,
@@ -379,24 +412,38 @@ impl MCPServer {
         let params: GetPromptParams = if let Some(p) = params {
             serde_json::from_value(p)?
         } else {
-            return Err(MCPError::InvalidParams(
-                "Missing get prompt params".to_string(),
+            return Err(MCPError::invalid_params(
+                "prompts/get",
+                "Missing required parameters",
             ));
         };
 
         let prompts = self.prompts.lock().await;
         let handler = prompts.get(&params.name).ok_or_else(|| {
-            MCPError::MethodNotFound(format!("Prompt '{}' not found", params.name))
+            MCPError::handler_error("prompt", format!("Prompt '{}' not found", params.name))
         })?;
 
+        let prompt_name = params.name.clone();
         let messages = handler
             .get_messages(
                 params
                     .arguments
                     .map(|args| serde_json::to_value(args))
-                    .transpose()?,
+                    .transpose()
+                    .map_err(|e| {
+                        MCPError::invalid_params(
+                            "prompts/get",
+                            format!("Invalid arguments format: {}", e),
+                        )
+                    })?,
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                MCPError::handler_error(
+                    "prompt",
+                    format!("Failed to get prompt '{}': {}", prompt_name, e),
+                )
+            })?;
 
         let result = GetPromptResult {
             description: None,

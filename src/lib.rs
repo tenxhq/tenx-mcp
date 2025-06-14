@@ -1,6 +1,7 @@
 pub mod client;
 pub mod codec;
 pub mod error;
+pub mod retry;
 pub mod schema;
 pub mod server;
 pub mod transport;

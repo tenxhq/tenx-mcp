@@ -49,11 +49,11 @@ impl ToolHandler for EchoTool {
         arguments: Option<serde_json::Value>,
     ) -> Result<Vec<Content>, MCPError> {
         let args =
-            arguments.ok_or_else(|| MCPError::InvalidParams("Missing arguments".to_string()))?;
+            arguments.ok_or_else(|| MCPError::invalid_params("echo", "Missing arguments"))?;
         let message = args
             .get("message")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| MCPError::InvalidParams("Missing message parameter".to_string()))?;
+            .ok_or_else(|| MCPError::invalid_params("echo", "Missing message parameter"))?;
 
         Ok(vec![Content::Text(TextContent {
             text: message.to_string(),
@@ -101,16 +101,17 @@ impl ToolHandler for AddTool {
         &self,
         arguments: Option<serde_json::Value>,
     ) -> Result<Vec<Content>, MCPError> {
-        let args =
-            arguments.ok_or_else(|| MCPError::InvalidParams("Missing arguments".to_string()))?;
+        let args = arguments.ok_or_else(|| MCPError::invalid_params("add", "Missing arguments"))?;
 
-        let a = args.get("a").and_then(|v| v.as_f64()).ok_or_else(|| {
-            MCPError::InvalidParams("Missing or invalid 'a' parameter".to_string())
-        })?;
+        let a = args
+            .get("a")
+            .and_then(|v| v.as_f64())
+            .ok_or_else(|| MCPError::invalid_params("add", "Missing or invalid 'a' parameter"))?;
 
-        let b = args.get("b").and_then(|v| v.as_f64()).ok_or_else(|| {
-            MCPError::InvalidParams("Missing or invalid 'b' parameter".to_string())
-        })?;
+        let b = args
+            .get("b")
+            .and_then(|v| v.as_f64())
+            .ok_or_else(|| MCPError::invalid_params("add", "Missing or invalid 'b' parameter"))?;
 
         Ok(vec![Content::Text(TextContent {
             text: format!("{}", a + b),
@@ -146,7 +147,7 @@ mod tests {
         // Test error on missing arguments
         let error = tool.execute(None).await.unwrap_err();
         match error {
-            MCPError::InvalidParams(_) => {}
+            MCPError::InvalidParams { .. } => {}
             _ => panic!("Expected InvalidParams error"),
         }
 
@@ -156,7 +157,7 @@ mod tests {
             .await
             .unwrap_err();
         match error {
-            MCPError::InvalidParams(_) => {}
+            MCPError::InvalidParams { .. } => {}
             _ => panic!("Expected InvalidParams error"),
         }
     }
@@ -203,21 +204,21 @@ mod tests {
         // Test error on missing arguments
         let error = tool.execute(None).await.unwrap_err();
         match error {
-            MCPError::InvalidParams(_) => {}
+            MCPError::InvalidParams { .. } => {}
             _ => panic!("Expected InvalidParams error"),
         }
 
         // Test error on missing 'a' field
         let error = tool.execute(Some(json!({ "b": 5 }))).await.unwrap_err();
         match error {
-            MCPError::InvalidParams(_) => {}
+            MCPError::InvalidParams { .. } => {}
             _ => panic!("Expected InvalidParams error"),
         }
 
         // Test error on missing 'b' field
         let error = tool.execute(Some(json!({ "a": 5 }))).await.unwrap_err();
         match error {
-            MCPError::InvalidParams(_) => {}
+            MCPError::InvalidParams { .. } => {}
             _ => panic!("Expected InvalidParams error"),
         }
     }

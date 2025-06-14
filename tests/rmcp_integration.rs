@@ -54,11 +54,11 @@ impl ToolHandler for EchoTool {
         arguments: Option<serde_json::Value>,
     ) -> Result<Vec<Content>, MCPError> {
         let args =
-            arguments.ok_or_else(|| MCPError::InvalidParams("Missing arguments".to_string()))?;
+            arguments.ok_or_else(|| MCPError::invalid_params("echo", "Missing arguments"))?;
         let message = args
             .get("message")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| MCPError::InvalidParams("Missing message parameter".to_string()))?;
+            .ok_or_else(|| MCPError::invalid_params("echo", "Missing message parameter"))?;
 
         Ok(vec![Content::Text(TextContent {
             text: message.to_string(),

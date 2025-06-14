@@ -36,12 +36,12 @@ impl ToolHandler for TestTool {
     }
 
     async fn execute(&self, arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
-        let args =
-            arguments.ok_or_else(|| MCPError::InvalidParams("Missing arguments".to_string()))?;
+        let args = arguments
+            .ok_or_else(|| MCPError::invalid_params("strict_params", "Missing arguments"))?;
 
         let _field = args
             .get("required_field")
-            .ok_or_else(|| MCPError::InvalidParams("Missing required_field".to_string()))?;
+            .ok_or_else(|| MCPError::invalid_params("strict_params", "Missing required_field"))?;
 
         Ok(vec![Content::Text(TextContent {
             text: "Success".to_string(),
@@ -166,7 +166,7 @@ async fn test_error_responses() {
     let response = stream.next().await.unwrap().unwrap();
     assert!(matches!(
         response,
-        JSONRPCMessage::Error(err) if err.error.code == INVALID_PARAMS && err.error.message.contains("required_field")
+        JSONRPCMessage::Error(err) if err.error.code == INVALID_PARAMS && err.error.message.contains("Missing required_field")
     ));
 
     drop(stream);

@@ -2,11 +2,14 @@ use futures::stream::SplitSink;
 use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 
 use crate::{
     error::{MCPError, Result},
+    retry::RetryConfig,
     schema::*,
     transport::{Transport, TransportStream},
 };
@@ -17,6 +20,24 @@ enum ResponseOrError {
     Error(JSONRPCError),
 }
 
+/// Configuration for the MCP client
+#[derive(Clone, Debug)]
+pub struct ClientConfig {
+    /// Retry configuration for requests
+    pub retry: RetryConfig,
+    /// Default timeout for requests
+    pub request_timeout: Duration,
+}
+
+impl Default for ClientConfig {
+    fn default() -> Self {
+        Self {
+            retry: RetryConfig::default(),
+            request_timeout: Duration::from_secs(30),
+        }
+    }
+}
+
 /// MCP Client implementation
 pub struct MCPClient {
     transport_tx: Option<SplitSink<Box<dyn TransportStream>, JSONRPCMessage>>,
@@ -24,11 +45,17 @@ pub struct MCPClient {
     notification_tx: mpsc::Sender<JSONRPCNotification>,
     notification_rx: Option<mpsc::Receiver<JSONRPCNotification>>,
     next_request_id: Arc<Mutex<u64>>,
+    config: ClientConfig,
 }
 
 impl MCPClient {
-    /// Create a new MCP client
+    /// Create a new MCP client with default configuration
     pub fn new() -> Self {
+        Self::with_config(ClientConfig::default())
+    }
+
+    /// Create a new MCP client with custom configuration
+    pub fn with_config(config: ClientConfig) -> Self {
         let (notification_tx, notification_rx) = mpsc::channel(100);
 
         Self {
@@ -37,6 +64,7 @@ impl MCPClient {
             notification_tx,
             notification_rx: Some(notification_rx),
             next_request_id: Arc::new(Mutex::new(1)),
+            config,
         }
     }
 
@@ -96,7 +124,7 @@ impl MCPClient {
         });
 
         let request = ClientRequest::CallTool { name, arguments };
-        let value = self.request(request).await?;
+        let value = self.request_with_retry(request).await?;
         let result: CallToolResult = serde_json::from_value(value)?;
         Ok(result)
     }
@@ -104,6 +132,13 @@ impl MCPClient {
     /// Take the notification receiver channel
     pub fn take_notification_receiver(&mut self) -> Option<mpsc::Receiver<JSONRPCNotification>> {
         self.notification_rx.take()
+    }
+
+    /// Send a request with retry logic
+    async fn request_with_retry(&mut self, request: ClientRequest) -> Result<serde_json::Value> {
+        // For now, we'll just do a single request without retry
+        // TODO: Implement proper retry logic that doesn't require mutable self in closure
+        self.request(request).await
     }
 
     /// Send a request and wait for response
@@ -138,24 +173,46 @@ impl MCPClient {
         self.send_message(JSONRPCMessage::Request(jsonrpc_request))
             .await?;
 
-        // Wait for response
-        match rx.await {
-            Ok(response_or_error) => {
+        // Wait for response with timeout
+        match timeout(self.config.request_timeout, rx).await {
+            Ok(Ok(response_or_error)) => {
                 match response_or_error {
                     ResponseOrError::Response(response) => {
                         // Extract result from the flattened Result structure
                         // For now, we'll return the whole result as JSON
                         Ok(serde_json::to_value(response.result)?)
                     }
-                    ResponseOrError::Error(error) => Err(MCPError::Protocol(format!(
-                        "JSON-RPC error {}: {}",
-                        error.error.code, error.error.message
-                    ))),
+                    ResponseOrError::Error(error) => {
+                        // Map JSON-RPC errors to appropriate MCPError variants
+                        match error.error.code {
+                            METHOD_NOT_FOUND => Err(MCPError::MethodNotFound(error.error.message)),
+                            INVALID_PARAMS => Err(MCPError::invalid_params(
+                                request.method(),
+                                error.error.message,
+                            )),
+                            _ => Err(MCPError::Protocol(format!(
+                                "JSON-RPC error {}: {}",
+                                error.error.code, error.error.message
+                            ))),
+                        }
+                    }
                 }
             }
-            Err(e) => {
-                error!("Response channel closed: {}", e);
+            Ok(Err(e)) => {
+                error!("Response channel closed for request {}: {}", id, e);
+                // Remove the pending request
+                self.pending_requests.lock().await.remove(&id);
                 Err(MCPError::Protocol("Response channel closed".to_string()))
+            }
+            Err(_) => {
+                // Timeout occurred
+                error!(
+                    "Request {} timed out after {:?}",
+                    id, self.config.request_timeout
+                );
+                // Remove the pending request
+                self.pending_requests.lock().await.remove(&id);
+                Err(MCPError::timeout(self.config.request_timeout, id))
             }
         }
     }

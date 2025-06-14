@@ -32,8 +32,9 @@ impl ToolHandler for FailingTool {
     }
 
     async fn execute(&self, _arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
-        Err(MCPError::InternalError(
-            "This tool always fails!".to_string(),
+        Err(MCPError::tool_execution_failed(
+            "always_fail",
+            "This tool always fails for testing purposes",
         ))
     }
 }
@@ -67,13 +68,18 @@ impl ToolHandler for StrictTool {
     }
 
     async fn execute(&self, arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
-        let args =
-            arguments.ok_or_else(|| MCPError::InvalidParams("Missing arguments".to_string()))?;
+        let args = arguments
+            .ok_or_else(|| MCPError::invalid_params("strict_tool", "Missing arguments object"))?;
 
         let required_field = args
             .get("required_field")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| MCPError::InvalidParams("Missing required_field".to_string()))?;
+            .ok_or_else(|| {
+                MCPError::invalid_params(
+                    "strict_tool",
+                    "Missing or invalid 'required_field' parameter",
+                )
+            })?;
 
         Ok(vec![Content::Text(TextContent {
             text: format!("Received: {}", required_field),
