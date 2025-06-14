@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use futures::{Sink, Stream};
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, BufReader};
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 use tracing::info;
@@ -23,6 +23,55 @@ pub trait Transport: Send + Sync {
 pub trait TransportStream:
     Stream<Item = Result<JSONRPCMessage>> + Sink<JSONRPCMessage, Error = MCPError> + Send + Unpin
 {
+}
+
+/// A duplex wrapper around stdin/stdout for use with codec framing
+pub struct StdioDuplex {
+    reader: BufReader<tokio::io::Stdin>,
+    writer: tokio::io::Stdout,
+}
+
+impl StdioDuplex {
+    pub fn new(stdin: tokio::io::Stdin, stdout: tokio::io::Stdout) -> Self {
+        Self {
+            reader: BufReader::new(stdin),
+            writer: stdout,
+        }
+    }
+}
+
+impl AsyncRead for StdioDuplex {
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::pin::Pin::new(&mut self.reader).poll_read(cx, buf)
+    }
+}
+
+impl AsyncWrite for StdioDuplex {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::result::Result<usize, std::io::Error>> {
+        std::pin::Pin::new(&mut self.writer).poll_write(cx, buf)
+    }
+
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), std::io::Error>> {
+        std::pin::Pin::new(&mut self.writer).poll_flush(cx)
+    }
+
+    fn poll_shutdown(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), std::io::Error>> {
+        std::pin::Pin::new(&mut self.writer).poll_shutdown(cx)
+    }
 }
 
 /// Wrapper to implement TransportStream for any Framed type
@@ -51,18 +100,11 @@ impl Transport for StdioTransport {
     }
 
     fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
-        // Create separate reader and writer
-        let _stdin = tokio::io::stdin();
-        let _stdout = tokio::io::stdout();
-
-        // We need to create a combined stream that can read from stdin and write to stdout
-        // For now, we'll use a simplified approach
-        // In a production implementation, you might want to use tokio::io::duplex or similar
-
-        // This is a placeholder - in practice, you'd need a proper duplex implementation
-        Err(MCPError::Transport(
-            "Stdio transport not fully implemented yet".to_string(),
-        ))
+        let stdin = tokio::io::stdin();
+        let stdout = tokio::io::stdout();
+        let duplex = StdioDuplex::new(stdin, stdout);
+        let framed = Framed::new(duplex, JsonRpcCodec::new());
+        Ok(Box::new(framed))
     }
 }
 

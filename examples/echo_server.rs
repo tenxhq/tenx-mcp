@@ -1,8 +1,10 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use tenx_mcp::schema::*;
+use tenx_mcp::transport::StdioTransport;
 use tenx_mcp::{MCPServer, Result, ToolHandler};
 use tracing::info;
+use tracing::level_filters::LevelFilter;
 
 /// Simple echo tool that returns the input as output
 struct EchoTool;
@@ -58,7 +60,10 @@ impl ToolHandler for EchoTool {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_max_level(LevelFilter::TRACE)
+        .with_writer(std::io::stderr) // Make sure we do not use stdout to conflict with the protocol
+        .init();
 
     info!("Starting echo MCP server example");
 
@@ -80,12 +85,10 @@ async fn main() -> Result<()> {
 
     info!("Echo tool registered");
 
-    // For this example, we'll just show the server is ready
-    // In a real implementation, you would:
-    // 1. Create a transport (e.g., StdioTransport or TcpTransport)
-    // 2. Call server.serve(transport).await
+    // Create stdio transport and start serving
+    let transport = StdioTransport::new();
 
-    info!("Server ready. In a real implementation, call server.serve(transport).await");
+    info!("Server ready, starting to serve on stdio");
 
-    Ok(())
+    server.serve(Box::new(transport)).await
 }
