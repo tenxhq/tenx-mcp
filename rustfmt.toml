@@ -1,0 +1,13 @@
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
+indent_style = "Block"
+reorder_imports = true
+error_on_unformatted = true
+style_edition = "2024"
+overflow_delimited_expr = false
+newline_style = "Unix"
+normalize_comments = true
+reorder_impl_items = true
+space_after_colon = true
+space_before_colon = false
+wrap_comments = true

@@ -2,8 +2,10 @@ use bytes::{BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 use tracing::debug;
 
-use crate::error::{MCPError, Result};
-use crate::schema::{JSONRPCMessage, JSONRPCNotification, JSONRPCRequest, JSONRPCResponse};
+use crate::{
+    error::{MCPError, Result},
+    schema::{JSONRPCMessage, JSONRPCNotification, JSONRPCRequest, JSONRPCResponse},
+};
 
 /// JSON-RPC codec for encoding/decoding messages over a stream
 /// Uses newline-delimited JSON format
@@ -22,8 +24,8 @@ impl Default for JsonRpcCodec {
 }
 
 impl Decoder for JsonRpcCodec {
-    type Item = JSONRPCMessage;
     type Error = MCPError;
+    type Item = JSONRPCMessage;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>> {
         // Look for newline delimiter
@@ -95,7 +97,7 @@ impl Encoder<JSONRPCNotification> for JsonRpcCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::{Request, RequestId, JSONRPC_VERSION};
+    use crate::schema::{JSONRPC_VERSION, Request, RequestId};
 
     #[test]
     fn test_encode_decode_request() {

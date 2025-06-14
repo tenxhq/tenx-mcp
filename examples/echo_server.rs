@@ -1,10 +1,8 @@
-use async_trait::async_trait;
 use std::collections::HashMap;
-use tenx_mcp::schema::*;
-use tenx_mcp::transport::StdioTransport;
-use tenx_mcp::{MCPServer, Result, ToolHandler};
-use tracing::info;
-use tracing::level_filters::LevelFilter;
+
+use async_trait::async_trait;
+use tenx_mcp::{MCPServer, Result, ToolHandler, schema::*, transport::StdioTransport};
+use tracing::{info, level_filters::LevelFilter};
 
 /// Simple echo tool that returns the input as output
 struct EchoTool;

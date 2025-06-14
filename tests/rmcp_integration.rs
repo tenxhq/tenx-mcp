@@ -1,24 +1,25 @@
 //! Integration tests for rmcp and tenx-mcp interoperability
 //!
-//! This module contains actual integration tests that verify both implementations
-//! can communicate with each other correctly.
+//! This module contains actual integration tests that verify both
+//! implementations can communicate with each other correctly.
+
+use std::collections::HashMap;
 
 use async_trait::async_trait;
-use serde_json::json;
-use std::collections::HashMap;
-use tokio::io::{AsyncRead, AsyncWrite};
-
-// Import tenx-mcp types
-use tenx_mcp::error::MCPError;
-use tenx_mcp::schema::{
-    ClientCapabilities, Content, Implementation, ServerCapabilities, TextContent, Tool,
-    ToolInputSchema, ToolsCapability,
-};
-use tenx_mcp::{MCPClient, MCPServer, ToolHandler};
-
+use rmcp::ServiceExt;
 // Import rmcp types
 use rmcp::model::{CallToolRequestParam, PaginatedRequestParam};
-use rmcp::ServiceExt;
+use serde_json::json;
+// Import tenx-mcp types
+use tenx_mcp::error::MCPError;
+use tenx_mcp::{
+    MCPClient, MCPServer, ToolHandler,
+    schema::{
+        ClientCapabilities, Content, Implementation, ServerCapabilities, TextContent, Tool,
+        ToolInputSchema, ToolsCapability,
+    },
+};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 // Simple echo tool for testing
 struct EchoTool;
@@ -137,8 +138,10 @@ async fn test_tenx_server_with_rmcp_client() {
 
 #[tokio::test]
 async fn test_rmcp_server_with_tenx_client() {
-    use rmcp::handler::server::ServerHandler;
-    use rmcp::service::{RequestContext, RoleServer};
+    use rmcp::{
+        handler::server::ServerHandler,
+        service::{RequestContext, RoleServer},
+    };
 
     // Create a simple rmcp server
     #[derive(Debug, Clone)]
@@ -288,11 +291,15 @@ async fn test_rmcp_server_with_tenx_client() {
 
 // Transport adapter helpers
 mod transport_helpers {
-    use super::*;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
+    use std::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
 
-    /// Helper to create a transport that works with tenx-mcp from AsyncRead/AsyncWrite
+    use super::*;
+
+    /// Helper to create a transport that works with tenx-mcp from
+    /// AsyncRead/AsyncWrite
     pub struct TransportAdapter<R, W> {
         reader: R,
         writer: W,

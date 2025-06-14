@@ -1,15 +1,16 @@
+use std::{collections::HashMap, sync::Arc};
+
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
-use std::collections::HashMap;
-use std::sync::Arc;
+use schema::*;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
-use crate::error::{MCPError, Result};
-use crate::schema;
-use crate::transport::{Transport, TransportStream};
-
-use schema::*;
+use crate::{
+    error::{MCPError, Result},
+    schema,
+    transport::{Transport, TransportStream},
+};
 
 /// Handler trait for MCP server tools
 #[async_trait]

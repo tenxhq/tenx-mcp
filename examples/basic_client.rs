@@ -17,41 +17,39 @@ async fn main() -> Result<()> {
     // 3. Initialize the connection
 
     // Example of what the initialization would look like:
-    /*
-    let client_info = Implementation {
-        name: "example-client".to_string(),
-        version: "1.0.0".to_string(),
-    };
-
-    let capabilities = ClientCapabilities {
-        tools: Some(ToolsCapability {
-            list_changed: Some(true),
-        }),
-        resources: None,
-        prompts: None,
-        logging: None,
-    };
-
-    let init_result = client.initialize(client_info, capabilities).await?;
-    info!("Connected to server: {:?}", init_result.server_info);
-
+    // let client_info = Implementation {
+    // name: "example-client".to_string(),
+    // version: "1.0.0".to_string(),
+    // };
+    //
+    // let capabilities = ClientCapabilities {
+    // tools: Some(ToolsCapability {
+    // list_changed: Some(true),
+    // }),
+    // resources: None,
+    // prompts: None,
+    // logging: None,
+    // };
+    //
+    // let init_result = client.initialize(client_info, capabilities).await?;
+    // info!("Connected to server: {:?}", init_result.server_info);
+    //
     // List available tools
-    let tools = client.list_tools().await?;
-    info!("Available tools:");
-    for tool in tools.tools {
-        info!("  - {}: {:?}", tool.name, tool.description);
-    }
-
+    // let tools = client.list_tools().await?;
+    // info!("Available tools:");
+    // for tool in tools.tools {
+    // info!("  - {}: {:?}", tool.name, tool.description);
+    // }
+    //
     // Call a tool
-    let result = client.call_tool(
-        "echo".to_string(),
-        Some(serde_json::json!({
-            "message": "Hello, MCP!"
-        }))
-    ).await?;
-
-    info!("Tool result: {:?}", result);
-    */
+    // let result = client.call_tool(
+    // "echo".to_string(),
+    // Some(serde_json::json!({
+    // "message": "Hello, MCP!"
+    // }))
+    // ).await?;
+    //
+    // info!("Tool result: {:?}", result);
 
     info!("Client example complete");
 

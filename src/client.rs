@@ -1,12 +1,14 @@
+use std::{collections::HashMap, sync::Arc};
+
 use futures::{SinkExt, StreamExt};
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::{debug, error, info};
 
-use crate::error::{MCPError, Result};
-use crate::schema::*;
-use crate::transport::{Transport, TransportStream};
+use crate::{
+    error::{MCPError, Result},
+    schema::*,
+    transport::{Transport, TransportStream},
+};
 
 /// Type for handling either a response or error from JSON-RPC
 #[derive(Debug)]

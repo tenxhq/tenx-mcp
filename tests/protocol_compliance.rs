@@ -6,14 +6,15 @@
 //!
 //! For actual interoperability tests with rmcp, see rmcp_integration.rs
 
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use serde_json::json;
-use std::collections::HashMap;
-use tenx_mcp::error::MCPError;
-use tenx_mcp::schema::{
-    Content, ServerCapabilities, TextContent, Tool, ToolInputSchema, ToolsCapability,
+use tenx_mcp::{
+    MCPServer, ToolHandler,
+    error::MCPError,
+    schema::{Content, ServerCapabilities, TextContent, Tool, ToolInputSchema, ToolsCapability},
 };
-use tenx_mcp::{MCPServer, ToolHandler};
 
 /// Test implementation of an echo tool
 struct EchoTool;

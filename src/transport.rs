@@ -1,13 +1,17 @@
 use async_trait::async_trait;
 use futures::{Sink, Stream};
-use tokio::io::{AsyncRead, AsyncWrite, BufReader};
-use tokio::net::TcpStream;
+use tokio::{
+    io::{AsyncRead, AsyncWrite, BufReader},
+    net::TcpStream,
+};
 use tokio_util::codec::Framed;
 use tracing::info;
 
-use crate::codec::JsonRpcCodec;
-use crate::error::{MCPError, Result};
-use crate::schema::JSONRPCMessage;
+use crate::{
+    codec::JsonRpcCodec,
+    error::{MCPError, Result},
+    schema::JSONRPCMessage,
+};
 
 /// Transport trait for different connection types
 #[async_trait]
@@ -147,10 +151,14 @@ pub use test_transport::TestTransport;
 
 #[cfg(test)]
 mod test_transport {
-    use super::*;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
+    use std::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
     use tokio::sync::mpsc;
+
+    use super::*;
 
     /// Test transport for unit testing
     pub struct TestTransport {
