@@ -3,7 +3,7 @@ use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::error::{MCPError, Result};
 use crate::schema;
@@ -169,13 +169,16 @@ impl MCPServer {
 
         match result_value {
             Ok(value) => {
-                // Create a successful response
+                // Create a successful response - the value should be the direct result
                 JSONRPCResponse {
                     jsonrpc: JSONRPC_VERSION.to_string(),
                     id: request.id,
                     result: schema::Result {
                         meta: None,
-                        other: {
+                        other: if let Some(obj) = value.as_object() {
+                            // TODO improve this
+                            obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+                        } else {
                             let mut map = HashMap::new();
                             map.insert("result".to_string(), value);
                             map

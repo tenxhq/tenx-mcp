@@ -95,7 +95,7 @@ impl Default for StdioTransport {
 #[async_trait]
 impl Transport for StdioTransport {
     async fn connect(&mut self) -> Result<()> {
-        // info!("Stdio transport ready");
+        info!("Stdio transport ready");
         Ok(())
     }
 
