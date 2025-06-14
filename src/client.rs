@@ -5,6 +5,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::time::timeout;
+use std::{collections::HashMap, sync::Arc};
+
+use futures::{SinkExt, StreamExt, stream::SplitSink};
+use tokio::sync::{Mutex, broadcast, mpsc, oneshot};
 use tracing::{debug, error, info, warn};
 
 use crate::{
@@ -46,6 +50,8 @@ pub struct MCPClient {
     notification_rx: Option<mpsc::Receiver<JSONRPCNotification>>,
     next_request_id: Arc<Mutex<u64>>,
     config: ClientConfig,
+    shutdown_tx: broadcast::Sender<()>,
+    shutdown_rx: Option<broadcast::Receiver<()>>,
 }
 
 impl MCPClient {
@@ -57,6 +63,7 @@ impl MCPClient {
     /// Create a new MCP client with custom configuration
     pub fn with_config(config: ClientConfig) -> Self {
         let (notification_tx, notification_rx) = mpsc::channel(100);
+        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
 
         Self {
             transport_tx: None,
@@ -65,6 +72,8 @@ impl MCPClient {
             notification_rx: Some(notification_rx),
             next_request_id: Arc::new(Mutex::new(1)),
             config,
+            shutdown_tx,
+            shutdown_rx: Some(shutdown_rx),
         }
     }
 
@@ -139,6 +148,16 @@ impl MCPClient {
         // For now, we'll just do a single request without retry
         // TODO: Implement proper retry logic that doesn't require mutable self in closure
         self.request(request).await
+    }
+
+    /// Get a shutdown receiver for listening to shutdown signals
+    pub fn shutdown_receiver(&mut self) -> Option<broadcast::Receiver<()>> {
+        self.shutdown_rx.take()
+    }
+
+    /// Signal the client to shutdown gracefully
+    pub fn shutdown(&self) {
+        let _ = self.shutdown_tx.send(());
     }
 
     /// Send a request and wait for response
@@ -266,6 +285,7 @@ impl MCPClient {
     async fn start_message_handler(&mut self, stream: Box<dyn TransportStream>) -> Result<()> {
         let pending_requests = self.pending_requests.clone();
         let notification_tx = self.notification_tx.clone();
+        let mut shutdown_rx = self.shutdown_tx.subscribe();
 
         // Split the transport stream into read and write halves
         let (tx, mut rx) = stream.split();
@@ -277,67 +297,78 @@ impl MCPClient {
         tokio::spawn(async move {
             debug!("Message handler started");
 
-            while let Some(result) = rx.next().await {
-                match result {
-                    Ok(message) => {
-                        debug!("Received message: {:?}", message);
+            loop {
+                tokio::select! {
+                    result = rx.next() => {
+                        match result {
+                            Some(Ok(message)) => {
+                                debug!("Received message: {:?}", message);
 
-                        match message {
-                            JSONRPCMessage::Response(response) => {
-                                // Extract the ID and find the corresponding request
-                                if let RequestId::String(id) = &response.id {
-                                    let mut pending = pending_requests.lock().await;
-                                    if let Some(tx) = pending.remove(id) {
-                                        // Send the response to the waiting request
-                                        let _ = tx.send(ResponseOrError::Response(response));
-                                    } else {
-                                        warn!("Received response for unknown request ID: {}", id);
+                                match message {
+                                    JSONRPCMessage::Response(response) => {
+                                        // Extract the ID and find the corresponding request
+                                        if let RequestId::String(id) = &response.id {
+                                            let mut pending = pending_requests.lock().await;
+                                            if let Some(tx) = pending.remove(id) {
+                                                // Send the response to the waiting request
+                                                let _ = tx.send(ResponseOrError::Response(response));
+                                            } else {
+                                                warn!("Received response for unknown request ID: {}", id);
+                                            }
+                                        }
+                                    }
+                                    JSONRPCMessage::Notification(notification) => {
+                                        // Forward notifications to the notification channel
+                                        if let Err(e) = notification_tx.send(notification).await {
+                                            error!("Failed to send notification: {}", e);
+                                            // If the receiver is dropped, we should stop
+                                            break;
+                                        }
+                                    }
+                                    JSONRPCMessage::Error(error) => {
+                                        // Handle JSON-RPC errors
+                                        if let RequestId::String(id) = &error.id {
+                                            let mut pending = pending_requests.lock().await;
+                                            if let Some(tx) = pending.remove(id) {
+                                                let _ = tx.send(ResponseOrError::Error(error));
+                                            } else {
+                                                warn!("Received error for unknown request ID: {}", id);
+                                            }
+                                        } else {
+                                            error!(
+                                                "Received error with non-string request ID: {:?}",
+                                                error.id
+                                            );
+                                        }
+                                    }
+                                    JSONRPCMessage::Request(_request) => {
+                                        // Clients typically don't receive requests from servers in MCP
+                                        warn!("Received unexpected request from server");
+                                    }
+                                    JSONRPCMessage::BatchRequest(_batch) => {
+                                        // Clients typically don't receive batch requests from servers
+                                        warn!("Received unexpected batch request from server");
+                                    }
+                                    JSONRPCMessage::BatchResponse(_batch) => {
+                                        // TODO: Handle batch responses if we implement batch requests
+                                        warn!(
+                                            "Received batch response - batch requests not yet implemented"
+                                        );
                                     }
                                 }
                             }
-                            JSONRPCMessage::Notification(notification) => {
-                                // Forward notifications to the notification channel
-                                if let Err(e) = notification_tx.send(notification).await {
-                                    error!("Failed to send notification: {}", e);
-                                    // If the receiver is dropped, we should stop
-                                    break;
-                                }
+                            Some(Err(e)) => {
+                                error!("Error receiving message: {}", e);
+                                break;
                             }
-                            JSONRPCMessage::Error(error) => {
-                                // Handle JSON-RPC errors
-                                if let RequestId::String(id) = &error.id {
-                                    let mut pending = pending_requests.lock().await;
-                                    if let Some(tx) = pending.remove(id) {
-                                        let _ = tx.send(ResponseOrError::Error(error));
-                                    } else {
-                                        warn!("Received error for unknown request ID: {}", id);
-                                    }
-                                } else {
-                                    error!(
-                                        "Received error with non-string request ID: {:?}",
-                                        error.id
-                                    );
-                                }
-                            }
-                            JSONRPCMessage::Request(_request) => {
-                                // Clients typically don't receive requests from servers in MCP
-                                warn!("Received unexpected request from server");
-                            }
-                            JSONRPCMessage::BatchRequest(_batch) => {
-                                // Clients typically don't receive batch requests from servers
-                                warn!("Received unexpected batch request from server");
-                            }
-                            JSONRPCMessage::BatchResponse(_batch) => {
-                                // TODO: Handle batch responses if we implement batch requests
-                                warn!(
-                                    "Received batch response - batch requests not yet implemented"
-                                );
+                            None => {
+                                debug!("Stream ended");
+                                break;
                             }
                         }
                     }
-                    Err(e) => {
-                        error!("Error receiving message: {}", e);
-                        // On error, we should probably break the loop
+                    _ = shutdown_rx.recv() => {
+                        info!("Client message handler shutdown signal received");
                         break;
                     }
                 }
