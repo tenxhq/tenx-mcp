@@ -1,15 +1,15 @@
 use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{Mutex, mpsc, oneshot};
-use tracing::{debug, info};
+use tokio::sync::{mpsc, oneshot, Mutex};
+use tracing::{debug, error, info};
 
 use crate::error::{MCPError, Result};
 use crate::schema::*;
 use crate::transport::{Transport, TransportStream};
 
 /// Type for handling either a response or error from JSON-RPC
-#[allow(dead_code)]
+#[derive(Debug)]
 enum ResponseOrError {
     Response(JSONRPCResponse),
     Error(JSONRPCError),
@@ -234,6 +234,7 @@ impl MCPClient {
                         match msg {
                             Some(json_msg) => {
                                 if let Err(e) = stream.send(json_msg).await {
+                                    error!("Failed to send message: {}", e);
                                     break;
                                 }
                             }
@@ -261,8 +262,8 @@ impl MCPClient {
                                         // Find and remove the pending request
                                         let mut pending = pending_requests.lock().await;
                                         if let Some(tx) = pending.remove(&id_str) {
-                                            if let Err(_) = tx.send(ResponseOrError::Response(response)) {
-                                                debug!("Failed to send response - receiver dropped");
+                                            if let Err(e) = tx.send(ResponseOrError::Response(response)) {
+                                                error!("Failed to send response - receiver dropped: {:?}", e);
                                             }
                                         } else {
                                             debug!("No pending request found for ID: {}", id_str);
@@ -280,8 +281,8 @@ impl MCPClient {
                                         // Find and remove the pending request
                                         let mut pending = pending_requests.lock().await;
                                         if let Some(tx) = pending.remove(&id_str) {
-                                            if let Err(_) = tx.send(ResponseOrError::Error(error)) {
-                                                debug!("Failed to send error response - receiver dropped");
+                                            if let Err(e) = tx.send(ResponseOrError::Error(error)) {
+                                                error!("Failed to send error response - receiver dropped: {:?}", e);
                                             }
                                         } else {
                                             debug!("No pending request found for error ID: {}", id_str);
@@ -290,8 +291,8 @@ impl MCPClient {
                                     JSONRPCMessage::Notification(notification) => {
                                         // Handle notification
                                         debug!("Received notification: {}", notification.notification.method);
-                                        if let Err(_) = notification_tx.send(notification).await {
-                                            debug!("Failed to send notification - receiver dropped");
+                                        if let Err(e) = notification_tx.send(notification).await {
+                                            error!("Failed to send notification: {}", e);
                                         }
                                     }
                                     _ => {

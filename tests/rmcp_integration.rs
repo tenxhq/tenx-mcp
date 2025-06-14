@@ -17,8 +17,8 @@ use tenx_mcp::schema::{
 use tenx_mcp::{MCPClient, MCPServer, ToolHandler};
 
 // Import rmcp types
-use rmcp::ServiceExt;
 use rmcp::model::{CallToolRequestParam, PaginatedRequestParam};
+use rmcp::ServiceExt;
 
 // Simple echo tool for testing
 struct EchoTool;
@@ -67,7 +67,6 @@ impl ToolHandler for EchoTool {
 }
 
 #[tokio::test]
-#[ignore = "RMCP client initialization incompatibility - needs investigation"]
 async fn test_tenx_server_with_rmcp_client() {
     // Create bidirectional streams for communication
     let (server_reader, client_writer) = tokio::io::duplex(8192);
