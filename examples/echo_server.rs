@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use tenx_mcp::{MCPServer, Result, ToolHandler, schema::*, transport::StdioTransport};
+use tenx_mcp::{schema::*, transport::StdioTransport, MCPServer, Result, ToolHandler};
 use tracing::{info, level_filters::LevelFilter};
 
 /// Simple echo tool that returns the input as output

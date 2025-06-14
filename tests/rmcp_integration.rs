@@ -13,11 +13,11 @@ use serde_json::json;
 // Import tenx-mcp types
 use tenx_mcp::error::MCPError;
 use tenx_mcp::{
-    MCPClient, MCPServer, ToolHandler,
     schema::{
         ClientCapabilities, Content, Implementation, ServerCapabilities, TextContent, Tool,
         ToolInputSchema, ToolsCapability,
     },
+    MCPClient, MCPServer, ToolHandler,
 };
 use tokio::io::{AsyncRead, AsyncWrite};
 

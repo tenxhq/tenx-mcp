@@ -11,9 +11,9 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use serde_json::json;
 use tenx_mcp::{
-    MCPServer, ToolHandler,
     error::MCPError,
     schema::{Content, ServerCapabilities, TextContent, Tool, ToolInputSchema, ToolsCapability},
+    MCPServer, ToolHandler,
 };
 
 /// Test implementation of an echo tool

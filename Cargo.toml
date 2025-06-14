@@ -25,3 +25,7 @@ path = "examples/echo_server.rs"
 [[example]]
 name = "basic_client"
 path = "examples/basic_client.rs"
+
+[[example]]
+name = "error_handling"
+path = "examples/error_handling.rs"

@@ -126,8 +126,8 @@ impl MCPServer {
     ) -> Result<()> {
         match message {
             JSONRPCMessage::Request(request) => {
-                let response = self.handle_request(request.clone()).await;
-                stream.send(JSONRPCMessage::Response(response)).await?;
+                let response_message = self.handle_request(request.clone()).await;
+                stream.send(response_message).await?;
             }
             JSONRPCMessage::Notification(notification) => {
                 self.handle_notification(notification).await?;
@@ -150,7 +150,7 @@ impl MCPServer {
     }
 
     /// Handle a request and generate a response
-    async fn handle_request(&self, request: JSONRPCRequest) -> JSONRPCResponse {
+    async fn handle_request(&self, request: JSONRPCRequest) -> JSONRPCMessage {
         // Convert RequestParams to serde_json::Value
         let params = request
             .request
@@ -170,14 +170,13 @@ impl MCPServer {
 
         match result_value {
             Ok(value) => {
-                // Create a successful response - the value should be the direct result
-                JSONRPCResponse {
+                // Create a successful response
+                JSONRPCMessage::Response(JSONRPCResponse {
                     jsonrpc: JSONRPC_VERSION.to_string(),
                     id: request.id,
                     result: schema::Result {
                         meta: None,
                         other: if let Some(obj) = value.as_object() {
-                            // TODO improve this
                             obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
                         } else {
                             let mut map = HashMap::new();
@@ -185,29 +184,25 @@ impl MCPServer {
                             map
                         },
                     },
-                }
+                })
             }
             Err(e) => {
-                // Create an error response - but we need to return JSONRPCResponse
-                // In a real implementation, you might want to return JSONRPCError instead
-                JSONRPCResponse {
+                // Create a proper JSON-RPC error response
+                let error_code = match &e {
+                    MCPError::MethodNotFound(_) => METHOD_NOT_FOUND,
+                    MCPError::InvalidParams(_) => INVALID_PARAMS,
+                    _ => INTERNAL_ERROR,
+                };
+
+                JSONRPCMessage::Error(JSONRPCError {
                     jsonrpc: JSONRPC_VERSION.to_string(),
                     id: request.id,
-                    result: schema::Result {
-                        meta: None,
-                        other: {
-                            let mut map = HashMap::new();
-                            map.insert(
-                                "error".to_string(),
-                                serde_json::json!({
-                                    "code": -32603,
-                                    "message": e.to_string()
-                                }),
-                            );
-                            map
-                        },
+                    error: ErrorObject {
+                        code: error_code,
+                        message: e.to_string(),
+                        data: None,
                     },
-                }
+                })
             }
         }
     }
