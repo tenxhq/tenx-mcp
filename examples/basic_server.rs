@@ -193,4 +193,3 @@ async fn main() -> Result<()> {
     info!("Server stopped");
     Ok(())
 }
-

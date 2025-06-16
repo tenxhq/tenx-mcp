@@ -169,12 +169,11 @@ async fn handle_message_with_connection(
 ) -> Result<()> {
     match message {
         JSONRPCMessage::Request(request) => {
-            let response_message =
-                handle_request_with_connection(connection, request.clone()).await;
+            let response_message = handle_request(connection, request.clone()).await;
             sink.send(response_message).await?;
         }
         JSONRPCMessage::Notification(notification) => {
-            handle_notification_with_connection(connection, notification).await?;
+            handle_notification(connection, notification).await?;
         }
         JSONRPCMessage::Response(_) => {
             warn!("Server received unexpected response message");
@@ -193,276 +192,14 @@ async fn handle_message_with_connection(
     Ok(())
 }
 
-/// Handle a request using the Connection trait
-async fn handle_request_with_connection(
+/// Handle a request using the Connection trait and convert result to JSONRPCMessage
+async fn handle_request(
     connection: &mut Box<dyn Connection>,
     request: JSONRPCRequest,
 ) -> JSONRPCMessage {
-    // Convert RequestParams to serde_json::Value
-    let params = request
-        .request
-        .params
-        .map(|p| serde_json::to_value(p.other))
-        .transpose()
-        .map_err(|e| {
-            error!("Failed to serialize request params: {}", e);
-            e
-        })
-        .ok()
-        .flatten();
+    let result = handle_request_inner(connection, request.clone()).await;
 
-    let result_value = match request.request.method.as_str() {
-        "initialize" => {
-            if let Some(p) = params {
-                match serde_json::from_value::<InitializeParams>(p) {
-                    Ok(params) => {
-                        match connection
-                            .initialize(
-                                params.protocol_version,
-                                params.capabilities,
-                                params.client_info,
-                            )
-                            .await
-                        {
-                            Ok(result) => match serde_json::to_value(result) {
-                                Ok(val) => Ok(val),
-                                Err(e) => Err(MCPError::Json {
-                                    message: e.to_string(),
-                                }),
-                            },
-                            Err(e) => Err(e),
-                        }
-                    }
-                    Err(e) => Err(MCPError::invalid_params("initialize", e.to_string())),
-                }
-            } else {
-                Err(MCPError::invalid_params(
-                    "initialize",
-                    "Missing required parameters",
-                ))
-            }
-        }
-        "ping" => {
-            info!("Server received ping request, sending automatic response");
-            connection.ping().await.map(|_| serde_json::json!({}))
-        }
-        "tools/list" => match connection.tools_list().await {
-            Ok(result) => match serde_json::to_value(result) {
-                Ok(val) => Ok(val),
-                Err(e) => Err(MCPError::Json {
-                    message: e.to_string(),
-                }),
-            },
-            Err(e) => Err(e),
-        },
-        "tools/call" => {
-            if let Some(p) = params {
-                match serde_json::from_value::<CallToolParams>(p) {
-                    Ok(params) => {
-                        let arguments = params
-                            .arguments
-                            .map(serde_json::to_value)
-                            .transpose()
-                            .map_err(|e| {
-                                MCPError::invalid_params(
-                                    "tools/call",
-                                    format!("Invalid arguments format: {e}"),
-                                )
-                            })
-                            .ok()
-                            .flatten();
-                        match connection.tools_call(params.name, arguments).await {
-                            Ok(result) => match serde_json::to_value(result) {
-                                Ok(val) => Ok(val),
-                                Err(e) => Err(MCPError::Json {
-                                    message: e.to_string(),
-                                }),
-                            },
-                            Err(e) => Err(e),
-                        }
-                    }
-                    Err(e) => Err(MCPError::invalid_params("tools/call", e.to_string())),
-                }
-            } else {
-                Err(MCPError::invalid_params(
-                    "tools/call",
-                    "Missing required parameters",
-                ))
-            }
-        }
-        "resources/list" => match connection.resources_list().await {
-            Ok(result) => match serde_json::to_value(result) {
-                Ok(val) => Ok(val),
-                Err(e) => Err(MCPError::Json {
-                    message: e.to_string(),
-                }),
-            },
-            Err(e) => Err(e),
-        },
-        "resources/templates/list" => match connection.resources_templates_list().await {
-            Ok(result) => match serde_json::to_value(result) {
-                Ok(val) => Ok(val),
-                Err(e) => Err(MCPError::Json {
-                    message: e.to_string(),
-                }),
-            },
-            Err(e) => Err(e),
-        },
-        "resources/read" => {
-            if let Some(p) = params {
-                match serde_json::from_value::<ReadResourceParams>(p) {
-                    Ok(params) => match connection.resources_read(params.uri).await {
-                        Ok(result) => match serde_json::to_value(result) {
-                            Ok(val) => Ok(val),
-                            Err(e) => Err(MCPError::Json {
-                                message: e.to_string(),
-                            }),
-                        },
-                        Err(e) => Err(e),
-                    },
-                    Err(e) => Err(MCPError::invalid_params("resources/read", e.to_string())),
-                }
-            } else {
-                Err(MCPError::invalid_params(
-                    "resources/read",
-                    "Missing required parameters",
-                ))
-            }
-        }
-        "resources/subscribe" => {
-            if let Some(p) = params {
-                match serde_json::from_value::<HashMap<String, String>>(p) {
-                    Ok(params) => match params.get("uri") {
-                        Some(uri) => connection
-                            .resources_subscribe(uri.clone())
-                            .await
-                            .map(|_| serde_json::json!({})),
-                        None => Err(MCPError::invalid_params(
-                            "resources/subscribe",
-                            "Missing uri parameter",
-                        )),
-                    },
-                    Err(e) => Err(MCPError::invalid_params(
-                        "resources/subscribe",
-                        e.to_string(),
-                    )),
-                }
-            } else {
-                Err(MCPError::invalid_params(
-                    "resources/subscribe",
-                    "Missing required parameters",
-                ))
-            }
-        }
-        "resources/unsubscribe" => {
-            if let Some(p) = params {
-                match serde_json::from_value::<HashMap<String, String>>(p) {
-                    Ok(params) => match params.get("uri") {
-                        Some(uri) => connection
-                            .resources_unsubscribe(uri.clone())
-                            .await
-                            .map(|_| serde_json::json!({})),
-                        None => Err(MCPError::invalid_params(
-                            "resources/unsubscribe",
-                            "Missing uri parameter",
-                        )),
-                    },
-                    Err(e) => Err(MCPError::invalid_params(
-                        "resources/unsubscribe",
-                        e.to_string(),
-                    )),
-                }
-            } else {
-                Err(MCPError::invalid_params(
-                    "resources/unsubscribe",
-                    "Missing required parameters",
-                ))
-            }
-        }
-        "prompts/list" => match connection.prompts_list().await {
-            Ok(result) => match serde_json::to_value(result) {
-                Ok(val) => Ok(val),
-                Err(e) => Err(MCPError::Json {
-                    message: e.to_string(),
-                }),
-            },
-            Err(e) => Err(e),
-        },
-        "prompts/get" => {
-            if let Some(p) = params {
-                match serde_json::from_value::<GetPromptParams>(p) {
-                    Ok(params) => match connection.prompts_get(params.name, params.arguments).await
-                    {
-                        Ok(result) => match serde_json::to_value(result) {
-                            Ok(val) => Ok(val),
-                            Err(e) => Err(MCPError::Json {
-                                message: e.to_string(),
-                            }),
-                        },
-                        Err(e) => Err(e),
-                    },
-                    Err(e) => Err(MCPError::invalid_params("prompts/get", e.to_string())),
-                }
-            } else {
-                Err(MCPError::invalid_params(
-                    "prompts/get",
-                    "Missing required parameters",
-                ))
-            }
-        }
-        "completion/complete" => {
-            if let Some(p) = params {
-                match serde_json::from_value::<CompleteParams>(p) {
-                    Ok(params) => match connection
-                        .completion_complete(params.reference, params.argument)
-                        .await
-                    {
-                        Ok(result) => match serde_json::to_value(result) {
-                            Ok(val) => Ok(val),
-                            Err(e) => Err(MCPError::Json {
-                                message: e.to_string(),
-                            }),
-                        },
-                        Err(e) => Err(e),
-                    },
-                    Err(e) => Err(MCPError::invalid_params(
-                        "completion/complete",
-                        e.to_string(),
-                    )),
-                }
-            } else {
-                Err(MCPError::invalid_params(
-                    "completion/complete",
-                    "Missing required parameters",
-                ))
-            }
-        }
-        "logging/setLevel" => {
-            if let Some(p) = params {
-                match serde_json::from_value::<HashMap<String, LoggingLevel>>(p) {
-                    Ok(params) => match params.get("level") {
-                        Some(level) => connection
-                            .logging_set_level(*level)
-                            .await
-                            .map(|_| serde_json::json!({})),
-                        None => Err(MCPError::invalid_params(
-                            "logging/setLevel",
-                            "Missing level parameter",
-                        )),
-                    },
-                    Err(e) => Err(MCPError::invalid_params("logging/setLevel", e.to_string())),
-                }
-            } else {
-                Err(MCPError::invalid_params(
-                    "logging/setLevel",
-                    "Missing required parameters",
-                ))
-            }
-        }
-        _ => Err(MCPError::MethodNotFound(request.request.method.clone())),
-    };
-
-    match result_value {
+    match result {
         Ok(value) => {
             // Create a successful response
             JSONRPCMessage::Response(JSONRPCResponse {
@@ -503,8 +240,185 @@ async fn handle_request_with_connection(
     }
 }
 
+/// Inner handler that returns Result<serde_json::Value>
+async fn handle_request_inner(
+    connection: &mut Box<dyn Connection>,
+    request: JSONRPCRequest,
+) -> Result<serde_json::Value> {
+    // Convert RequestParams to serde_json::Value
+    let params = request
+        .request
+        .params
+        .map(|p| serde_json::to_value(p.other))
+        .transpose()
+        .map_err(|e| MCPError::Json {
+            message: format!("Failed to serialize request params: {e}"),
+        })?;
+
+    match request.request.method.as_str() {
+        "initialize" => {
+            let p = params.ok_or_else(|| {
+                MCPError::invalid_params("initialize", "Missing required parameters")
+            })?;
+            let params = serde_json::from_value::<InitializeParams>(p)
+                .map_err(|e| MCPError::invalid_params("initialize", e.to_string()))?;
+            connection
+                .initialize(
+                    params.protocol_version,
+                    params.capabilities,
+                    params.client_info,
+                )
+                .await
+                .and_then(|result| {
+                    serde_json::to_value(result).map_err(|e| MCPError::Json {
+                        message: e.to_string(),
+                    })
+                })
+        }
+        "ping" => {
+            info!("Server received ping request, sending automatic response");
+            connection.ping().await.map(|_| serde_json::json!({}))
+        }
+        "tools/list" => connection.tools_list().await.and_then(|result| {
+            serde_json::to_value(result).map_err(|e| MCPError::Json {
+                message: e.to_string(),
+            })
+        }),
+        "tools/call" => {
+            let p = params.ok_or_else(|| {
+                MCPError::invalid_params("tools/call", "Missing required parameters")
+            })?;
+            let params = serde_json::from_value::<CallToolParams>(p)
+                .map_err(|e| MCPError::invalid_params("tools/call", e.to_string()))?;
+            let arguments = params
+                .arguments
+                .map(serde_json::to_value)
+                .transpose()
+                .map_err(|e| {
+                    MCPError::invalid_params("tools/call", format!("Invalid arguments format: {e}"))
+                })?;
+            connection
+                .tools_call(params.name, arguments)
+                .await
+                .and_then(|result| {
+                    serde_json::to_value(result).map_err(|e| MCPError::Json {
+                        message: e.to_string(),
+                    })
+                })
+        }
+        "resources/list" => connection.resources_list().await.and_then(|result| {
+            serde_json::to_value(result).map_err(|e| MCPError::Json {
+                message: e.to_string(),
+            })
+        }),
+        "resources/templates/list" => {
+            connection
+                .resources_templates_list()
+                .await
+                .and_then(|result| {
+                    serde_json::to_value(result).map_err(|e| MCPError::Json {
+                        message: e.to_string(),
+                    })
+                })
+        }
+        "resources/read" => {
+            let p = params.ok_or_else(|| {
+                MCPError::invalid_params("resources/read", "Missing required parameters")
+            })?;
+            let params = serde_json::from_value::<ReadResourceParams>(p)
+                .map_err(|e| MCPError::invalid_params("resources/read", e.to_string()))?;
+            connection
+                .resources_read(params.uri)
+                .await
+                .and_then(|result| {
+                    serde_json::to_value(result).map_err(|e| MCPError::Json {
+                        message: e.to_string(),
+                    })
+                })
+        }
+        "resources/subscribe" => {
+            let p = params.ok_or_else(|| {
+                MCPError::invalid_params("resources/subscribe", "Missing required parameters")
+            })?;
+            let params = serde_json::from_value::<HashMap<String, String>>(p)
+                .map_err(|e| MCPError::invalid_params("resources/subscribe", e.to_string()))?;
+            let uri = params.get("uri").ok_or_else(|| {
+                MCPError::invalid_params("resources/subscribe", "Missing uri parameter")
+            })?;
+            connection
+                .resources_subscribe(uri.clone())
+                .await
+                .map(|_| serde_json::json!({}))
+        }
+        "resources/unsubscribe" => {
+            let p = params.ok_or_else(|| {
+                MCPError::invalid_params("resources/unsubscribe", "Missing required parameters")
+            })?;
+            let params = serde_json::from_value::<HashMap<String, String>>(p)
+                .map_err(|e| MCPError::invalid_params("resources/unsubscribe", e.to_string()))?;
+            let uri = params.get("uri").ok_or_else(|| {
+                MCPError::invalid_params("resources/unsubscribe", "Missing uri parameter")
+            })?;
+            connection
+                .resources_unsubscribe(uri.clone())
+                .await
+                .map(|_| serde_json::json!({}))
+        }
+        "prompts/list" => connection.prompts_list().await.and_then(|result| {
+            serde_json::to_value(result).map_err(|e| MCPError::Json {
+                message: e.to_string(),
+            })
+        }),
+        "prompts/get" => {
+            let p = params.ok_or_else(|| {
+                MCPError::invalid_params("prompts/get", "Missing required parameters")
+            })?;
+            let params = serde_json::from_value::<GetPromptParams>(p)
+                .map_err(|e| MCPError::invalid_params("prompts/get", e.to_string()))?;
+            connection
+                .prompts_get(params.name, params.arguments)
+                .await
+                .and_then(|result| {
+                    serde_json::to_value(result).map_err(|e| MCPError::Json {
+                        message: e.to_string(),
+                    })
+                })
+        }
+        "completion/complete" => {
+            let p = params.ok_or_else(|| {
+                MCPError::invalid_params("completion/complete", "Missing required parameters")
+            })?;
+            let params = serde_json::from_value::<CompleteParams>(p)
+                .map_err(|e| MCPError::invalid_params("completion/complete", e.to_string()))?;
+            connection
+                .completion_complete(params.reference, params.argument)
+                .await
+                .and_then(|result| {
+                    serde_json::to_value(result).map_err(|e| MCPError::Json {
+                        message: e.to_string(),
+                    })
+                })
+        }
+        "logging/setLevel" => {
+            let p = params.ok_or_else(|| {
+                MCPError::invalid_params("logging/setLevel", "Missing required parameters")
+            })?;
+            let params = serde_json::from_value::<HashMap<String, LoggingLevel>>(p)
+                .map_err(|e| MCPError::invalid_params("logging/setLevel", e.to_string()))?;
+            let level = params.get("level").ok_or_else(|| {
+                MCPError::invalid_params("logging/setLevel", "Missing level parameter")
+            })?;
+            connection
+                .logging_set_level(*level)
+                .await
+                .map(|_| serde_json::json!({}))
+        }
+        _ => Err(MCPError::MethodNotFound(request.request.method.clone())),
+    }
+}
+
 /// Handle a notification using the Connection trait
-async fn handle_notification_with_connection(
+async fn handle_notification(
     _connection: &mut Box<dyn Connection>,
     notification: JSONRPCNotification,
 ) -> Result<()> {
