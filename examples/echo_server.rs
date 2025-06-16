@@ -35,10 +35,7 @@ impl Connection for EchoConnection {
             capabilities: self.capabilities.clone(),
             server_info: self.server_info.clone(),
             instructions: None,
-            result: tenx_mcp::schema::Result {
-                meta: None,
-                other: HashMap::new(),
-            },
+            meta: None,
         })
     }
 
@@ -72,10 +69,7 @@ impl Connection for EchoConnection {
             }],
             paginated: PaginatedResult {
                 next_cursor: None,
-                result: tenx_mcp::schema::Result {
-                    meta: None,
-                    other: HashMap::new(),
-                },
+                meta: None,
             },
         })
     }
@@ -107,10 +101,7 @@ impl Connection for EchoConnection {
                 annotations: None,
             })],
             is_error: Some(false),
-            result: tenx_mcp::schema::Result {
-                meta: None,
-                other: HashMap::new(),
-            },
+            meta: None,
         })
     }
 }

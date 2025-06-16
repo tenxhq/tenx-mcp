@@ -6,7 +6,6 @@
 //! - Non-retryable errors
 
 use async_trait::async_trait;
-use std::collections::HashMap;
 use std::env;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -62,10 +61,7 @@ impl Connection for TimeoutTestConnection {
             capabilities: self.capabilities.clone(),
             server_info: self.server_info.clone(),
             instructions: None,
-            result: tenx_mcp::schema::Result {
-                meta: None,
-                other: HashMap::new(),
-            },
+            meta: None,
         })
     }
 
@@ -115,10 +111,7 @@ impl Connection for TimeoutTestConnection {
             ],
             paginated: PaginatedResult {
                 next_cursor: None,
-                result: tenx_mcp::schema::Result {
-                    meta: None,
-                    other: HashMap::new(),
-                },
+                meta: None,
             },
         })
     }
@@ -148,10 +141,7 @@ impl Connection for TimeoutTestConnection {
                             annotations: None,
                         })],
                         is_error: Some(false),
-                        result: tenx_mcp::schema::Result {
-                            meta: None,
-                            other: HashMap::new(),
-                        },
+                        meta: None,
                     })
                 }
             }
@@ -169,10 +159,7 @@ impl Connection for TimeoutTestConnection {
                         annotations: None,
                     })],
                     is_error: Some(false),
-                    result: tenx_mcp::schema::Result {
-                        meta: None,
-                        other: HashMap::new(),
-                    },
+                    meta: None,
                 })
             }
             "broken_operation" => {
@@ -188,10 +175,7 @@ impl Connection for TimeoutTestConnection {
                     annotations: None,
                 })],
                 is_error: Some(false),
-                result: tenx_mcp::schema::Result {
-                    meta: None,
-                    other: HashMap::new(),
-                },
+                meta: None,
             }),
             _ => Err(MCPError::ToolExecutionFailed {
                 tool: name,

@@ -68,10 +68,7 @@ impl Connection for MyConnection {
                 version: "0.1.0".to_string(),
             },
             instructions: None,
-            result: tenx_mcp::schema::Result {
-                meta: None,
-                other: HashMap::new(),
-            },
+            meta: None,
         })
     }
 
@@ -150,10 +147,7 @@ impl Connection for MyConnection {
             tools,
             paginated: tenx_mcp::schema::PaginatedResult {
                 next_cursor: None,
-                result: tenx_mcp::schema::Result {
-                    meta: None,
-                    other: HashMap::new(),
-                },
+                meta: None,
             },
         })
     }
@@ -232,10 +226,7 @@ impl Connection for MyConnection {
         Ok(CallToolResult {
             content,
             is_error: Some(false),
-            result: tenx_mcp::schema::Result {
-                meta: None,
-                other: HashMap::new(),
-            },
+            meta: None,
         })
     }
 }

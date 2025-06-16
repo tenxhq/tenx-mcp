@@ -94,8 +94,7 @@ impl MCPClient {
             client_info,
         };
 
-        let value = self.request(request).await?;
-        let result: InitializeResult = serde_json::from_value(value)?;
+        let result: InitializeResult = self.request(request).await?;
 
         // Send the initialized notification to complete the handshake
         self.send_notification("notifications/initialized", None)
@@ -106,9 +105,7 @@ impl MCPClient {
 
     /// List available tools from the server
     pub async fn list_tools(&mut self) -> Result<ListToolsResult> {
-        let value = self.request(ClientRequest::ListTools).await?;
-        let result: ListToolsResult = serde_json::from_value(value)?;
-        Ok(result)
+        self.request(ClientRequest::ListTools).await
     }
 
     /// Call a tool on the server
@@ -126,14 +123,12 @@ impl MCPClient {
         });
 
         let request = ClientRequest::CallTool { name, arguments };
-        let value = self.request_with_retry(request).await?;
-        let result: CallToolResult = serde_json::from_value(value)?;
-        Ok(result)
+        self.request_with_retry(request).await
     }
 
     /// Send a ping to the server
     pub async fn ping(&mut self) -> Result<()> {
-        self.request(ClientRequest::Ping).await?;
+        let _: EmptyResult = self.request(ClientRequest::Ping).await?;
         Ok(())
     }
 
@@ -143,14 +138,20 @@ impl MCPClient {
     }
 
     /// Send a request with retry logic
-    async fn request_with_retry(&mut self, request: ClientRequest) -> Result<serde_json::Value> {
+    async fn request_with_retry<T>(&mut self, request: ClientRequest) -> Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
         // For now, we'll just do a single request without retry
         // TODO: Implement proper retry logic that doesn't require mutable self in closure
         self.request(request).await
     }
 
     /// Send a request and wait for response
-    async fn request(&mut self, request: ClientRequest) -> Result<serde_json::Value> {
+    async fn request<T>(&mut self, request: ClientRequest) -> Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
         let id = self.next_request_id().await;
         let (tx, rx) = oneshot::channel();
 
@@ -186,9 +187,10 @@ impl MCPClient {
             Ok(Ok(response_or_error)) => {
                 match response_or_error {
                     ResponseOrError::Response(response) => {
-                        // Extract result from the flattened Result structure
-                        // For now, we'll return the whole result as JSON
-                        Ok(serde_json::to_value(response.result)?)
+                        // Deserialize the result directly to the expected type
+                        serde_json::from_value(serde_json::to_value(response.result)?).map_err(
+                            |e| MCPError::Protocol(format!("Failed to deserialize response: {e}")),
+                        )
                     }
                     ResponseOrError::Error(error) => {
                         // Map JSON-RPC errors to appropriate MCPError variants
@@ -340,9 +342,9 @@ impl MCPClient {
                                     let response = JSONRPCResponse {
                                         jsonrpc: crate::schema::JSONRPC_VERSION.to_string(),
                                         id: request.id,
-                                        result: crate::schema::Result {
+                                        result: EmptyResult {
                                             meta: None,
-                                            other: std::collections::HashMap::new(),
+                                            other: HashMap::new(),
                                         },
                                     };
 
@@ -421,10 +423,7 @@ mod tests {
                         version: "1.0.0".to_string(),
                     },
                     instructions: None,
-                    result: crate::schema::Result {
-                        meta: None,
-                        other: std::collections::HashMap::new(),
-                    },
+                    meta: None,
                 })
             }
         }

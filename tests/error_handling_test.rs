@@ -58,10 +58,7 @@ async fn test_method_not_found() {
                     version: "1.0.0".to_string(),
                 },
                 instructions: None,
-                result: tenx_mcp::schema::Result {
-                    meta: None,
-                    other: std::collections::HashMap::new(),
-                },
+                meta: None,
             })
         }
     }
@@ -119,10 +116,7 @@ async fn test_invalid_params() {
                     version: "1.0.0".to_string(),
                 },
                 instructions: None,
-                result: tenx_mcp::schema::Result {
-                    meta: None,
-                    other: std::collections::HashMap::new(),
-                },
+                meta: None,
             })
         }
     }
@@ -183,10 +177,7 @@ async fn test_successful_response() {
                     version: "1.0.0".to_string(),
                 },
                 instructions: None,
-                result: tenx_mcp::schema::Result {
-                    meta: None,
-                    other: std::collections::HashMap::new(),
-                },
+                meta: None,
             })
         }
     }

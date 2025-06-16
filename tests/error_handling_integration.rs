@@ -35,10 +35,7 @@ impl Connection for TestConnection {
                 version: "1.0.0".to_string(),
             },
             instructions: None,
-            result: tenx_mcp::schema::Result {
-                meta: None,
-                other: HashMap::new(),
-            },
+            meta: None,
         })
     }
 
@@ -63,10 +60,7 @@ impl Connection for TestConnection {
             }],
             paginated: PaginatedResult {
                 next_cursor: None,
-                result: tenx_mcp::schema::Result {
-                    meta: None,
-                    other: HashMap::new(),
-                },
+                meta: None,
             },
         })
     }
@@ -96,10 +90,7 @@ impl Connection for TestConnection {
                 annotations: None,
             })],
             is_error: Some(false),
-            result: tenx_mcp::schema::Result {
-                meta: None,
-                other: HashMap::new(),
-            },
+            meta: None,
         })
     }
 }

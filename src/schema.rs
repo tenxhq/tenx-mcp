@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-// JSON-RPC types
+pub const LATEST_PROTOCOL_VERSION: &str = "2025-03-26";
+pub const JSONRPC_VERSION: &str = "2.0";
 
 /// Refers to any valid JSON-RPC object that can be decoded off the wire, or
 /// encoded to be sent.
@@ -37,9 +38,6 @@ pub enum JSONRPCResponseOrError {
     Response(JSONRPCResponse),
     Error(JSONRPCError),
 }
-
-pub const LATEST_PROTOCOL_VERSION: &str = "2025-03-26";
-pub const JSONRPC_VERSION: &str = "2.0";
 
 /// A progress token, used to associate progress notifications with the original
 /// request.
@@ -237,8 +235,10 @@ pub struct InitializeResult {
     /// system prompt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
-    #[serde(flatten)]
-    pub result: Result,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
+    /// to their responses.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
 }
 
 /// This notification is sent from the client to the server after initialization
@@ -381,8 +381,10 @@ pub struct PaginatedResult {
     /// returned result. If present, there may be more results available.
     #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
-    #[serde(flatten)]
-    pub result: Result,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
+    /// to their responses.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
 }
 
 // Resources
@@ -415,8 +417,10 @@ pub struct ReadResourceParams {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadResourceResult {
     pub contents: Vec<ResourceContents>,
-    #[serde(flatten)]
-    pub result: Result,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
+    /// to their responses.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
 }
 
 /// An optional notification from the server to the client, informing it that
@@ -550,8 +554,10 @@ pub struct GetPromptResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub messages: Vec<PromptMessage>,
-    #[serde(flatten)]
-    pub result: Result,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
+    /// to their responses.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
 }
 
 /// A prompt or prompt template that the server offers.
@@ -655,8 +661,10 @@ pub struct CallToolResult {
     /// If not set, this is assumed to be false (the call was successful).
     #[serde(rename = "isError", skip_serializing_if = "Option::is_none")]
     pub is_error: Option<bool>,
-    #[serde(flatten)]
-    pub result: Result,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
+    /// to their responses.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
 }
 
 /// An optional notification from the server to the client, informing it that
@@ -862,8 +870,10 @@ pub struct CreateMessageResult {
     /// The reason why sampling stopped, if known.
     #[serde(rename = "stopReason", skip_serializing_if = "Option::is_none")]
     pub stop_reason: Option<StopReason>,
-    #[serde(flatten)]
-    pub result: Result,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
+    /// to their responses.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1052,8 +1062,10 @@ pub struct PromptReference {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompleteResult {
     pub completion: CompletionInfo,
-    #[serde(flatten)]
-    pub result: Result,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
+    /// to their responses.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1079,8 +1091,10 @@ pub struct CompletionInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListRootsResult {
     pub roots: Vec<Root>,
-    #[serde(flatten)]
-    pub result: Result,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
+    /// to their responses.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
 }
 
 /// Represents a root directory or file that the server can operate on.

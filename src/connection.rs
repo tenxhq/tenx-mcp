@@ -60,10 +60,7 @@ pub trait Connection: Send + Sync {
             tools: vec![],
             paginated: crate::schema::PaginatedResult {
                 next_cursor: None,
-                result: crate::schema::Result {
-                    meta: None,
-                    other: std::collections::HashMap::new(),
-                },
+                meta: None,
             },
         })
     }
@@ -86,10 +83,7 @@ pub trait Connection: Send + Sync {
             resources: vec![],
             paginated: crate::schema::PaginatedResult {
                 next_cursor: None,
-                result: crate::schema::Result {
-                    meta: None,
-                    other: std::collections::HashMap::new(),
-                },
+                meta: None,
             },
         })
     }
@@ -100,10 +94,7 @@ pub trait Connection: Send + Sync {
             resource_templates: vec![],
             paginated: crate::schema::PaginatedResult {
                 next_cursor: None,
-                result: crate::schema::Result {
-                    meta: None,
-                    other: std::collections::HashMap::new(),
-                },
+                meta: None,
             },
         })
     }
@@ -129,10 +120,7 @@ pub trait Connection: Send + Sync {
             prompts: vec![],
             paginated: crate::schema::PaginatedResult {
                 next_cursor: None,
-                result: crate::schema::Result {
-                    meta: None,
-                    other: std::collections::HashMap::new(),
-                },
+                meta: None,
             },
         })
     }
@@ -161,10 +149,7 @@ pub trait Connection: Send + Sync {
                 total: None,
                 has_more: None,
             },
-            result: crate::schema::Result {
-                meta: None,
-                other: std::collections::HashMap::new(),
-            },
+            meta: None,
         })
     }
 
@@ -177,10 +162,7 @@ pub trait Connection: Send + Sync {
     async fn roots_list(&mut self) -> Result<ListRootsResult> {
         Ok(ListRootsResult {
             roots: vec![],
-            result: crate::schema::Result {
-                meta: None,
-                other: std::collections::HashMap::new(),
-            },
+            meta: None,
         })
     }
 
