@@ -55,21 +55,8 @@ impl Connection for MyConnection {
 
         self.request_count += 1;
 
-        Ok(InitializeResult {
-            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-            capabilities: ServerCapabilities {
-                tools: Some(ToolsCapability {
-                    list_changed: Some(true),
-                }),
-                ..ServerCapabilities::default()
-            },
-            server_info: tenx_mcp::schema::Implementation {
-                name: "connection-example-server".to_string(),
-                version: "0.1.0".to_string(),
-            },
-            instructions: None,
-            meta: None,
-        })
+        Ok(InitializeResult::new("connection-example-server", "0.1.0")
+            .with_tools(true))
     }
 
     async fn ping(&mut self) -> Result<()> {

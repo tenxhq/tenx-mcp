@@ -428,16 +428,7 @@ mod tests {
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
             ) -> Result<InitializeResult> {
-                Ok(InitializeResult {
-                    protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-                    capabilities: ServerCapabilities::default(),
-                    server_info: Implementation {
-                        name: "test-server".to_string(),
-                        version: "1.0.0".to_string(),
-                    },
-                    instructions: None,
-                    meta: None,
-                })
+                Ok(InitializeResult::new("test-server", "1.0.0"))
             }
         }
 

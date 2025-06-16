@@ -241,6 +241,71 @@ pub struct InitializeResult {
     pub meta: Option<HashMap<String, Value>>,
 }
 
+impl InitializeResult {
+    /// Create a new InitializeResult with the latest protocol version
+    pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
+        Self {
+            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
+            capabilities: ServerCapabilities::default(),
+            server_info: Implementation {
+                name: name.into(),
+                version: version.into(),
+            },
+            instructions: None,
+            meta: None,
+        }
+    }
+
+    /// Set the instructions for the server
+    pub fn with_instructions(mut self, instructions: impl Into<String>) -> Self {
+        self.instructions = Some(instructions.into());
+        self
+    }
+
+    /// Set the server capabilities
+    pub fn with_capabilities(mut self, capabilities: ServerCapabilities) -> Self {
+        self.capabilities = capabilities;
+        self
+    }
+
+    /// Enable logging capability
+    pub fn with_logging(mut self) -> Self {
+        self.capabilities.logging = Some(serde_json::Value::Object(serde_json::Map::new()));
+        self
+    }
+
+    /// Enable prompts capability
+    pub fn with_prompts(mut self, list_changed: bool) -> Self {
+        self.capabilities.prompts = Some(PromptsCapability {
+            list_changed: Some(list_changed),
+        });
+        self
+    }
+
+    /// Enable resources capability
+    pub fn with_resources(mut self, subscribe: bool, list_changed: bool) -> Self {
+        self.capabilities.resources = Some(ResourcesCapability {
+            subscribe: Some(subscribe),
+            list_changed: Some(list_changed),
+        });
+        self
+    }
+
+    /// Enable tools capability
+    pub fn with_tools(mut self, list_changed: bool) -> Self {
+        self.capabilities.tools = Some(ToolsCapability {
+            list_changed: Some(list_changed),
+        });
+        self
+    }
+
+    /// Enable completions capability
+    pub fn with_completions(mut self) -> Self {
+        self.capabilities.completions = Some(serde_json::Value::Object(serde_json::Map::new()));
+        self
+    }
+}
+
 /// This notification is sent from the client to the server after initialization
 /// has finished.
 #[derive(Debug, Clone, Serialize, Deserialize)]

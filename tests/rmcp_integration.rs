@@ -26,25 +26,8 @@ impl Connection for EchoConnection {
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
     ) -> Result<InitializeResult> {
-        Ok(InitializeResult {
-            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-            capabilities: ServerCapabilities {
-                tools: Some(ToolsCapability {
-                    list_changed: Some(true),
-                }),
-                resources: None,
-                prompts: None,
-                logging: None,
-                completions: None,
-                experimental: None,
-            },
-            server_info: Implementation {
-                name: "test-server".to_string(),
-                version: "0.1.0".to_string(),
-            },
-            instructions: None,
-            meta: None,
-        })
+        Ok(InitializeResult::new("test-server", "0.1.0")
+            .with_tools(true))
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
