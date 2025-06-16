@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::env;
 use tenx_mcp::{
     schema::{
-        CallToolResult, Content, InitializeResult, ListToolsResult, ServerCapabilities,
-        TextContent, Tool, ToolInputSchema, ToolsCapability, LATEST_PROTOCOL_VERSION,
+        CallToolResult, Content, InitializeResult, ListToolsResult,
+        TextContent, Tool, ToolInputSchema,
     },
     Connection, ConnectionContext, MCPServer, MCPServerHandle, Result,
 };
@@ -132,10 +132,7 @@ impl Connection for MyConnection {
 
         Ok(ListToolsResult {
             tools,
-            paginated: tenx_mcp::schema::PaginatedResult {
-                next_cursor: None,
-                meta: None,
-            },
+            next_cursor: None,
         })
     }
 

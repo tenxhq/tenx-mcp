@@ -58,10 +58,7 @@ pub trait Connection: Send + Sync {
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
         Ok(ListToolsResult {
             tools: vec![],
-            paginated: crate::schema::PaginatedResult {
-                next_cursor: None,
-                meta: None,
-            },
+            next_cursor: None,
         })
     }
 
@@ -81,10 +78,7 @@ pub trait Connection: Send + Sync {
     async fn resources_list(&mut self) -> Result<ListResourcesResult> {
         Ok(ListResourcesResult {
             resources: vec![],
-            paginated: crate::schema::PaginatedResult {
-                next_cursor: None,
-                meta: None,
-            },
+            next_cursor: None,
         })
     }
 
@@ -92,10 +86,7 @@ pub trait Connection: Send + Sync {
     async fn resources_templates_list(&mut self) -> Result<ListResourceTemplatesResult> {
         Ok(ListResourceTemplatesResult {
             resource_templates: vec![],
-            paginated: crate::schema::PaginatedResult {
-                next_cursor: None,
-                meta: None,
-            },
+            next_cursor: None,
         })
     }
 
@@ -118,10 +109,7 @@ pub trait Connection: Send + Sync {
     async fn prompts_list(&mut self) -> Result<ListPromptsResult> {
         Ok(ListPromptsResult {
             prompts: vec![],
-            paginated: crate::schema::PaginatedResult {
-                next_cursor: None,
-                meta: None,
-            },
+            next_cursor: None,
         })
     }
 

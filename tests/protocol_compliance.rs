@@ -114,10 +114,7 @@ impl Connection for TestConnection {
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
         Ok(ListToolsResult {
             tools: self.tools.values().cloned().collect(),
-            paginated: PaginatedResult {
-                next_cursor: None,
-                meta: None,
-            },
+            next_cursor: None,
         })
     }
 

@@ -58,10 +58,7 @@ impl Connection for TestConnection {
                 },
                 annotations: None,
             }],
-            paginated: PaginatedResult {
-                next_cursor: None,
-                meta: None,
-            },
+            next_cursor: None,
         })
     }
 

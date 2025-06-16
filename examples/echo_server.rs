@@ -62,10 +62,7 @@ impl Connection for EchoConnection {
                     open_world_hint: Some(false),
                 }),
             }],
-            paginated: PaginatedResult {
-                next_cursor: None,
-                meta: None,
-            },
+            next_cursor: None,
         })
     }
 

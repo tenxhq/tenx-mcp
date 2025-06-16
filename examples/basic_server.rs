@@ -67,10 +67,7 @@ impl Connection for BasicConnection {
                 },
                 annotations: None,
             }],
-            paginated: PaginatedResult {
-                next_cursor: None,
-                meta: None,
-            },
+            next_cursor: None,
         })
     }
 

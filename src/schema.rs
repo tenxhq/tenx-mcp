@@ -422,44 +422,14 @@ pub struct ProgressParams {
     pub message: Option<String>,
 }
 
-// Pagination
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaginatedRequest {
-    #[serde(flatten)]
-    pub request: Request,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaginatedParams {
-    /// An opaque token representing the current pagination position.
-    /// If provided, the server should return results starting after this
-    /// cursor.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cursor: Option<Cursor>,
-    #[serde(flatten)]
-    pub other: HashMap<String, Value>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaginatedResult {
-    /// An opaque token representing the pagination position after the last
-    /// returned result. If present, there may be more results available.
-    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
-    pub next_cursor: Option<Cursor>,
-    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
-    /// to their responses.
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
-}
-
-// Resources
-
 /// The server's response to a resources/list request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListResourcesResult {
     pub resources: Vec<Resource>,
-    #[serde(flatten)]
-    pub paginated: PaginatedResult,
+    /// An opaque token representing the pagination position after the last
+    /// returned result. If present, there may be more results available.
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<Cursor>,
 }
 
 /// The server's response to a resources/templates/list request from the client.
@@ -467,8 +437,10 @@ pub struct ListResourcesResult {
 pub struct ListResourceTemplatesResult {
     #[serde(rename = "resourceTemplates")]
     pub resource_templates: Vec<ResourceTemplate>,
-    #[serde(flatten)]
-    pub paginated: PaginatedResult,
+    /// An opaque token representing the pagination position after the last
+    /// returned result. If present, there may be more results available.
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<Cursor>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -608,8 +580,10 @@ pub struct BlobResourceContents {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListPromptsResult {
     pub prompts: Vec<Prompt>,
-    #[serde(flatten)]
-    pub paginated: PaginatedResult,
+    /// An opaque token representing the pagination position after the last
+    /// returned result. If present, there may be more results available.
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<Cursor>,
 }
 
 /// The server's response to a prompts/get request from the client.
@@ -704,8 +678,10 @@ pub struct PromptListChangedNotification {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListToolsResult {
     pub tools: Vec<Tool>,
-    #[serde(flatten)]
-    pub paginated: PaginatedResult,
+    /// An opaque token representing the pagination position after the last
+    /// returned result. If present, there may be more results available.
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<Cursor>,
 }
 
 /// The server's response to a tool call.
