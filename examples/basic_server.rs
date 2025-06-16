@@ -21,15 +21,11 @@ use tracing::{error, info};
 /// Basic server connection that provides an echo tool
 struct BasicConnection {
     server_info: Implementation,
-    capabilities: ServerCapabilities,
 }
 
 impl BasicConnection {
-    fn new(server_info: Implementation, capabilities: ServerCapabilities) -> Self {
-        Self {
-            server_info,
-            capabilities,
-        }
+    fn new(server_info: Implementation) -> Self {
+        Self { server_info }
     }
 }
 
@@ -43,7 +39,7 @@ impl Connection for BasicConnection {
     ) -> Result<InitializeResult> {
         Ok(
             InitializeResult::new(&self.server_info.name, &self.server_info.version)
-                .with_capabilities(self.capabilities.clone()),
+                .with_capabilities(ServerCapabilities::default().with_tools(None)),
         )
     }
 
@@ -146,11 +142,9 @@ async fn main() -> Result<()> {
                             version: "0.1.0".to_string(),
                         };
 
-                        let capabilities = ServerCapabilities::default();
-
                         let server = MCPServer::default()
                             .with_connection_factory(move || {
-                                Box::new(BasicConnection::new(server_info.clone(), capabilities.clone()))
+                                Box::new(BasicConnection::new(server_info.clone()))
                             });
 
                         // Create transport from the accepted connection

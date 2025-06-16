@@ -361,6 +361,47 @@ pub struct ServerCapabilities {
     pub tools: Option<ToolsCapability>,
 }
 
+impl ServerCapabilities {
+    /// Enable experimental capabilities
+    pub fn with_experimental(mut self, experimental: HashMap<String, Value>) -> Self {
+        self.experimental = Some(experimental);
+        self
+    }
+
+    /// Enable logging capability
+    pub fn with_logging(mut self) -> Self {
+        self.logging = Some(Value::Object(serde_json::Map::new()));
+        self
+    }
+
+    /// Enable completions capability
+    pub fn with_completions(mut self) -> Self {
+        self.completions = Some(Value::Object(serde_json::Map::new()));
+        self
+    }
+
+    /// Enable prompts capability with optional list_changed support
+    pub fn with_prompts(mut self, list_changed: Option<bool>) -> Self {
+        self.prompts = Some(PromptsCapability { list_changed });
+        self
+    }
+
+    /// Enable resources capability with optional subscribe and list_changed support
+    pub fn with_resources(mut self, subscribe: Option<bool>, list_changed: Option<bool>) -> Self {
+        self.resources = Some(ResourcesCapability {
+            subscribe,
+            list_changed,
+        });
+        self
+    }
+
+    /// Enable tools capability with optional list_changed support
+    pub fn with_tools(mut self, list_changed: Option<bool>) -> Self {
+        self.tools = Some(ToolsCapability { list_changed });
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptsCapability {
     /// Whether this server supports notifications for changes to the prompt
