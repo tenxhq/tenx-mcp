@@ -6,85 +6,135 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use tenx_mcp::{
+    connection::Connection,
     error::{MCPError, Result},
     schema::*,
-    server::{MCPServer, ToolHandler},
+    server::MCPServer,
     transport::{StdioTransport, Transport},
 };
 use tracing::info;
 
-/// A tool that always fails to demonstrate error handling
-struct FailingTool;
+/// Connection that demonstrates error handling
+struct ErrorHandlingConnection {
+    server_info: Implementation,
+    capabilities: ServerCapabilities,
+}
 
-#[async_trait]
-impl ToolHandler for FailingTool {
-    fn metadata(&self) -> Tool {
-        Tool {
-            name: "always_fail".to_string(),
-            description: Some("A tool that always fails for testing".to_string()),
-            input_schema: ToolInputSchema {
-                schema_type: "object".to_string(),
-                properties: None,
-                required: None,
-            },
-            annotations: None,
+impl ErrorHandlingConnection {
+    fn new(server_info: Implementation, capabilities: ServerCapabilities) -> Self {
+        Self {
+            server_info,
+            capabilities,
         }
-    }
-
-    async fn execute(&self, _arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
-        Err(MCPError::tool_execution_failed(
-            "always_fail",
-            "This tool always fails for testing purposes",
-        ))
     }
 }
 
-/// A tool that requires specific parameters
-struct StrictTool;
-
 #[async_trait]
-impl ToolHandler for StrictTool {
-    fn metadata(&self) -> Tool {
-        Tool {
-            name: "strict_tool".to_string(),
-            description: Some("A tool that requires specific parameters".to_string()),
-            input_schema: ToolInputSchema {
-                schema_type: "object".to_string(),
-                properties: Some({
-                    let mut props = HashMap::new();
-                    props.insert(
-                        "required_field".to_string(),
-                        serde_json::json!({
-                            "type": "string",
-                            "description": "This field is required"
-                        }),
-                    );
-                    props
-                }),
-                required: Some(vec!["required_field".to_string()]),
+impl Connection for ErrorHandlingConnection {
+    async fn initialize(
+        &mut self,
+        _protocol_version: String,
+        _capabilities: ClientCapabilities,
+        _client_info: Implementation,
+    ) -> Result<InitializeResult> {
+        Ok(InitializeResult {
+            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
+            capabilities: self.capabilities.clone(),
+            server_info: self.server_info.clone(),
+            instructions: None,
+            result: tenx_mcp::schema::Result {
+                meta: None,
+                other: HashMap::new(),
             },
-            annotations: None,
-        }
+        })
     }
 
-    async fn execute(&self, arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
-        let args = arguments
-            .ok_or_else(|| MCPError::invalid_params("strict_tool", "Missing arguments object"))?;
+    async fn tools_list(&mut self) -> Result<ListToolsResult> {
+        Ok(ListToolsResult {
+            tools: vec![
+                Tool {
+                    name: "always_fail".to_string(),
+                    description: Some("A tool that always fails for testing".to_string()),
+                    input_schema: ToolInputSchema {
+                        schema_type: "object".to_string(),
+                        properties: None,
+                        required: None,
+                    },
+                    annotations: None,
+                },
+                Tool {
+                    name: "strict_tool".to_string(),
+                    description: Some("A tool that requires specific parameters".to_string()),
+                    input_schema: ToolInputSchema {
+                        schema_type: "object".to_string(),
+                        properties: Some({
+                            let mut props = HashMap::new();
+                            props.insert(
+                                "required_field".to_string(),
+                                serde_json::json!({
+                                    "type": "string",
+                                    "description": "This field is required"
+                                }),
+                            );
+                            props
+                        }),
+                        required: Some(vec!["required_field".to_string()]),
+                    },
+                    annotations: None,
+                },
+            ],
+            paginated: PaginatedResult {
+                next_cursor: None,
+                result: tenx_mcp::schema::Result {
+                    meta: None,
+                    other: HashMap::new(),
+                },
+            },
+        })
+    }
 
-        let required_field = args
-            .get("required_field")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                MCPError::invalid_params(
-                    "strict_tool",
-                    "Missing or invalid 'required_field' parameter",
-                )
-            })?;
+    async fn tools_call(
+        &mut self,
+        name: String,
+        arguments: Option<serde_json::Value>,
+    ) -> Result<CallToolResult> {
+        match name.as_str() {
+            "always_fail" => Err(MCPError::tool_execution_failed(
+                "always_fail",
+                "This tool always fails for testing purposes",
+            )),
+            "strict_tool" => {
+                let args = arguments.ok_or_else(|| {
+                    MCPError::invalid_params("strict_tool", "Missing arguments object")
+                })?;
 
-        Ok(vec![Content::Text(TextContent {
-            text: format!("Received: {required_field}"),
-            annotations: None,
-        })])
+                let required_field = args
+                    .get("required_field")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        MCPError::invalid_params(
+                            "strict_tool",
+                            "Missing or invalid 'required_field' parameter",
+                        )
+                    })?;
+
+                Ok(CallToolResult {
+                    content: vec![Content::Text(TextContent {
+                        text: format!("Received: {required_field}"),
+                        annotations: None,
+                    })],
+                    is_error: Some(false),
+                    result: tenx_mcp::schema::Result {
+                        meta: None,
+                        other: HashMap::new(),
+                    },
+                })
+            }
+            _ => Err(MCPError::ToolExecutionFailed {
+                tool: name,
+                message: "Tool not found".to_string(),
+            }),
+        }
     }
 }
 
@@ -94,17 +144,26 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().with_target(false).init();
 
     // Create server with error-prone tools
-    let mut server = MCPServer::new("error-example-server".to_string(), "0.1.0".to_string())
-        .with_capabilities(ServerCapabilities {
-            tools: Some(ToolsCapability {
-                list_changed: Some(true),
-            }),
-            ..Default::default()
-        });
+    let capabilities = ServerCapabilities {
+        tools: Some(ToolsCapability {
+            list_changed: Some(true),
+        }),
+        ..Default::default()
+    };
 
-    // Register tools
-    server.register_tool(Box::new(FailingTool));
-    server.register_tool(Box::new(StrictTool));
+    let server_info = Implementation {
+        name: "error-example-server".to_string(),
+        version: "0.1.0".to_string(),
+    };
+
+    let server = MCPServer::default()
+        .with_capabilities(capabilities.clone())
+        .with_connection_factory(move || {
+            Box::new(ErrorHandlingConnection::new(
+                server_info.clone(),
+                capabilities.clone(),
+            ))
+        });
 
     info!("Starting MCP server with error handling examples...");
     info!("Try these requests to see error handling:");

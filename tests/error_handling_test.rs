@@ -39,7 +39,34 @@ use test_helpers::TestTransport;
 
 #[tokio::test]
 async fn test_method_not_found() {
-    let server = MCPServer::new("test".to_string(), "1.0".to_string());
+    // Create a minimal test connection
+    struct TestConnection;
+
+    #[async_trait::async_trait]
+    impl tenx_mcp::connection::Connection for TestConnection {
+        async fn initialize(
+            &mut self,
+            _protocol_version: String,
+            _capabilities: tenx_mcp::schema::ClientCapabilities,
+            _client_info: tenx_mcp::schema::Implementation,
+        ) -> tenx_mcp::Result<tenx_mcp::schema::InitializeResult> {
+            Ok(InitializeResult {
+                protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
+                capabilities: ServerCapabilities::default(),
+                server_info: Implementation {
+                    name: "test-server".to_string(),
+                    version: "1.0.0".to_string(),
+                },
+                instructions: None,
+                result: tenx_mcp::schema::Result {
+                    meta: None,
+                    other: std::collections::HashMap::new(),
+                },
+            })
+        }
+    }
+
+    let server = MCPServer::default().with_connection_factory(|| Box::new(TestConnection));
     let (client, server_stream) = tokio::io::duplex(8192);
 
     let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
@@ -73,13 +100,41 @@ async fn test_method_not_found() {
 
 #[tokio::test]
 async fn test_invalid_params() {
-    let server = MCPServer::new("test".to_string(), "1.0".to_string());
+    // Create a minimal test connection
+    struct TestConnection;
+
+    #[async_trait::async_trait]
+    impl tenx_mcp::connection::Connection for TestConnection {
+        async fn initialize(
+            &mut self,
+            _protocol_version: String,
+            _capabilities: tenx_mcp::schema::ClientCapabilities,
+            _client_info: tenx_mcp::schema::Implementation,
+        ) -> tenx_mcp::Result<tenx_mcp::schema::InitializeResult> {
+            Ok(InitializeResult {
+                protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
+                capabilities: ServerCapabilities::default(),
+                server_info: Implementation {
+                    name: "test-server".to_string(),
+                    version: "1.0.0".to_string(),
+                },
+                instructions: None,
+                result: tenx_mcp::schema::Result {
+                    meta: None,
+                    other: std::collections::HashMap::new(),
+                },
+            })
+        }
+    }
+
+    let server = MCPServer::default().with_connection_factory(|| Box::new(TestConnection));
     let (client, server_stream) = tokio::io::duplex(8192);
 
     let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
     let server_handle = MCPServerHandle::new(server, transport).await.unwrap();
 
-    let transport = Box::new(TestTransport::new(client));
+    let mut transport = Box::new(TestTransport::new(client));
+    transport.connect().await.unwrap();
     let mut stream = transport.framed().unwrap();
 
     stream
@@ -106,12 +161,42 @@ async fn test_invalid_params() {
 
 #[tokio::test]
 async fn test_successful_response() {
-    let server = MCPServer::new("test".to_string(), "1.0".to_string()).with_capabilities(
-        ServerCapabilities {
+    // Create a minimal test connection
+    struct TestConnection;
+
+    #[async_trait::async_trait]
+    impl tenx_mcp::connection::Connection for TestConnection {
+        async fn initialize(
+            &mut self,
+            _protocol_version: String,
+            _capabilities: tenx_mcp::schema::ClientCapabilities,
+            _client_info: tenx_mcp::schema::Implementation,
+        ) -> tenx_mcp::Result<tenx_mcp::schema::InitializeResult> {
+            Ok(InitializeResult {
+                protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
+                capabilities: ServerCapabilities {
+                    tools: Some(ToolsCapability { list_changed: None }),
+                    ..Default::default()
+                },
+                server_info: Implementation {
+                    name: "test-server".to_string(),
+                    version: "1.0.0".to_string(),
+                },
+                instructions: None,
+                result: tenx_mcp::schema::Result {
+                    meta: None,
+                    other: std::collections::HashMap::new(),
+                },
+            })
+        }
+    }
+
+    let server = MCPServer::default()
+        .with_connection_factory(|| Box::new(TestConnection))
+        .with_capabilities(ServerCapabilities {
             tools: Some(ToolsCapability { list_changed: None }),
             ..Default::default()
-        },
-    );
+        });
 
     let (client_stream, server_stream) = tokio::io::duplex(8192);
 
@@ -120,7 +205,8 @@ async fn test_successful_response() {
         .await
         .unwrap();
 
-    let client_transport = Box::new(TestTransport::new(client_stream));
+    let mut client_transport = Box::new(TestTransport::new(client_stream));
+    client_transport.connect().await.unwrap();
     let mut stream = client_transport.framed().unwrap();
 
     stream

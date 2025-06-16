@@ -4,38 +4,85 @@ use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use tenx_mcp::{
+    connection::Connection,
     error::{MCPError, Result},
     schema::*,
-    server::{MCPServer, ToolHandler},
+    server::MCPServer,
     transport::Transport,
 };
 
-/// Simple tool for testing error handling
-struct TestTool;
+/// Simple connection for testing error handling
+struct TestConnection;
 
 #[async_trait]
-impl ToolHandler for TestTool {
-    fn metadata(&self) -> Tool {
-        Tool {
-            name: "test".to_string(),
-            description: Some("Test tool".to_string()),
-            input_schema: ToolInputSchema {
-                schema_type: "object".to_string(),
-                properties: Some({
-                    let mut props = HashMap::new();
-                    props.insert(
-                        "required_field".to_string(),
-                        serde_json::json!({"type": "string"}),
-                    );
-                    props
+impl Connection for TestConnection {
+    async fn initialize(
+        &mut self,
+        _protocol_version: String,
+        _capabilities: ClientCapabilities,
+        _client_info: Implementation,
+    ) -> Result<InitializeResult> {
+        Ok(InitializeResult {
+            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
+            capabilities: ServerCapabilities {
+                tools: Some(ToolsCapability {
+                    list_changed: Some(true),
                 }),
-                required: Some(vec!["required_field".to_string()]),
+                ..Default::default()
             },
-            annotations: None,
-        }
+            server_info: Implementation {
+                name: "test-server".to_string(),
+                version: "1.0.0".to_string(),
+            },
+            instructions: None,
+            result: tenx_mcp::schema::Result {
+                meta: None,
+                other: HashMap::new(),
+            },
+        })
     }
 
-    async fn execute(&self, arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
+    async fn tools_list(&mut self) -> Result<ListToolsResult> {
+        Ok(ListToolsResult {
+            tools: vec![Tool {
+                name: "test".to_string(),
+                description: Some("Test tool".to_string()),
+                input_schema: ToolInputSchema {
+                    schema_type: "object".to_string(),
+                    properties: Some({
+                        let mut props = HashMap::new();
+                        props.insert(
+                            "required_field".to_string(),
+                            serde_json::json!({"type": "string"}),
+                        );
+                        props
+                    }),
+                    required: Some(vec!["required_field".to_string()]),
+                },
+                annotations: None,
+            }],
+            paginated: PaginatedResult {
+                next_cursor: None,
+                result: tenx_mcp::schema::Result {
+                    meta: None,
+                    other: HashMap::new(),
+                },
+            },
+        })
+    }
+
+    async fn tools_call(
+        &mut self,
+        name: String,
+        arguments: Option<serde_json::Value>,
+    ) -> Result<CallToolResult> {
+        if name != "test" {
+            return Err(MCPError::ToolExecutionFailed {
+                tool: name,
+                message: "Tool not found".to_string(),
+            });
+        }
+
         let args = arguments
             .ok_or_else(|| MCPError::invalid_params("strict_params", "Missing arguments"))?;
 
@@ -43,10 +90,17 @@ impl ToolHandler for TestTool {
             .get("required_field")
             .ok_or_else(|| MCPError::invalid_params("strict_params", "Missing required_field"))?;
 
-        Ok(vec![Content::Text(TextContent {
-            text: "Success".to_string(),
-            annotations: None,
-        })])
+        Ok(CallToolResult {
+            content: vec![Content::Text(TextContent {
+                text: "Success".to_string(),
+                annotations: None,
+            })],
+            is_error: Some(false),
+            result: tenx_mcp::schema::Result {
+                meta: None,
+                other: HashMap::new(),
+            },
+        })
     }
 }
 
@@ -87,8 +141,7 @@ use test_transport::TestTransport;
 #[tokio::test]
 async fn test_error_responses() {
     // Setup server
-    let mut server = MCPServer::new("test-server".to_string(), "0.1.0".to_string());
-    server.register_tool(Box::new(TestTool));
+    let server = MCPServer::default().with_connection_factory(|| Box::new(TestConnection));
 
     // Create streams
     let (client_stream, server_stream) = tokio::io::duplex(8192);

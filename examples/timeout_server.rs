@@ -6,14 +6,16 @@
 //! - Non-retryable errors
 
 use async_trait::async_trait;
+use std::collections::HashMap;
 use std::env;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tenx_mcp::{
+    connection::Connection,
     error::{MCPError, Result},
     schema::*,
-    server::{MCPServer, ToolHandler},
+    server::MCPServer,
     transport::TcpServerTransport,
 };
 use tokio::net::TcpListener;
@@ -21,148 +23,181 @@ use tokio::signal;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
-/// A tool that fails a configurable number of times before succeeding
-struct FlakeyTool {
-    fail_count: Arc<AtomicU32>,
+/// Connection that demonstrates various timeout and retry scenarios
+struct TimeoutTestConnection {
+    server_info: Implementation,
+    capabilities: ServerCapabilities,
+    flakey_fail_count: Arc<AtomicU32>,
     failures_before_success: u32,
+    slow_delay_seconds: u64,
 }
 
-impl FlakeyTool {
-    fn new(failures_before_success: u32) -> Self {
+impl TimeoutTestConnection {
+    fn new(
+        server_info: Implementation,
+        capabilities: ServerCapabilities,
+        failures_before_success: u32,
+        slow_delay_seconds: u64,
+    ) -> Self {
         Self {
-            fail_count: Arc::new(AtomicU32::new(0)),
+            server_info,
+            capabilities,
+            flakey_fail_count: Arc::new(AtomicU32::new(0)),
             failures_before_success,
+            slow_delay_seconds,
         }
     }
 }
 
 #[async_trait]
-impl ToolHandler for FlakeyTool {
-    fn metadata(&self) -> Tool {
-        Tool {
-            name: "flakey_operation".to_string(),
-            description: Some("Simulates a flaky network operation".to_string()),
-            input_schema: ToolInputSchema {
-                schema_type: "object".to_string(),
-                properties: None,
-                required: None,
+impl Connection for TimeoutTestConnection {
+    async fn initialize(
+        &mut self,
+        _protocol_version: String,
+        _capabilities: ClientCapabilities,
+        _client_info: Implementation,
+    ) -> Result<InitializeResult> {
+        Ok(InitializeResult {
+            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
+            capabilities: self.capabilities.clone(),
+            server_info: self.server_info.clone(),
+            instructions: None,
+            result: tenx_mcp::schema::Result {
+                meta: None,
+                other: HashMap::new(),
             },
-            annotations: None,
-        }
-    }
-
-    async fn execute(&self, _arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
-        let count = self.fail_count.fetch_add(1, Ordering::SeqCst);
-
-        if count < self.failures_before_success {
-            warn!("FlakeyTool failing (attempt {})", count + 1);
-            // Simulate a transient network error
-            Err(MCPError::ConnectionClosed)
-        } else {
-            info!("FlakeyTool succeeding (attempt {})", count + 1);
-            // Reset counter for next invocation
-            if count >= self.failures_before_success {
-                self.fail_count.store(0, Ordering::SeqCst);
-            }
-            Ok(vec![Content::Text(TextContent {
-                text: format!("Success after {} attempts", count + 1),
-                annotations: None,
-            })])
-        }
-    }
-}
-
-/// A tool that takes too long to execute
-struct SlowTool {
-    delay_seconds: u64,
-}
-
-impl SlowTool {
-    fn new(delay_seconds: u64) -> Self {
-        Self { delay_seconds }
-    }
-}
-
-#[async_trait]
-impl ToolHandler for SlowTool {
-    fn metadata(&self) -> Tool {
-        Tool {
-            name: "slow_operation".to_string(),
-            description: Some("Simulates a slow operation that may timeout".to_string()),
-            input_schema: ToolInputSchema {
-                schema_type: "object".to_string(),
-                properties: None,
-                required: None,
-            },
-            annotations: None,
-        }
-    }
-
-    async fn execute(&self, _arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
-        info!(
-            "SlowTool starting execution (will take {} seconds)...",
-            self.delay_seconds
-        );
-        sleep(Duration::from_secs(self.delay_seconds)).await;
-        info!("SlowTool completed");
-
-        Ok(vec![Content::Text(TextContent {
-            text: "Operation completed successfully".to_string(),
-            annotations: None,
-        })])
-    }
-}
-
-/// A tool that always fails with a non-retryable error
-struct BrokenTool;
-
-#[async_trait]
-impl ToolHandler for BrokenTool {
-    fn metadata(&self) -> Tool {
-        Tool {
-            name: "broken_operation".to_string(),
-            description: Some("Always fails with a non-retryable error".to_string()),
-            input_schema: ToolInputSchema {
-                schema_type: "object".to_string(),
-                properties: None,
-                required: None,
-            },
-            annotations: None,
-        }
-    }
-
-    async fn execute(&self, _arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
-        // Return an error that is not retryable
-        Err(MCPError::InvalidParams {
-            method: "broken_operation".to_string(),
-            message: "This operation is permanently broken".to_string(),
         })
     }
-}
 
-/// A tool that works reliably
-struct ReliableTool;
-
-#[async_trait]
-impl ToolHandler for ReliableTool {
-    fn metadata(&self) -> Tool {
-        Tool {
-            name: "reliable_operation".to_string(),
-            description: Some("Always succeeds immediately".to_string()),
-            input_schema: ToolInputSchema {
-                schema_type: "object".to_string(),
-                properties: None,
-                required: None,
+    async fn tools_list(&mut self) -> Result<ListToolsResult> {
+        Ok(ListToolsResult {
+            tools: vec![
+                Tool {
+                    name: "flakey_operation".to_string(),
+                    description: Some("Simulates a flaky network operation".to_string()),
+                    input_schema: ToolInputSchema {
+                        schema_type: "object".to_string(),
+                        properties: None,
+                        required: None,
+                    },
+                    annotations: None,
+                },
+                Tool {
+                    name: "slow_operation".to_string(),
+                    description: Some("Simulates a slow operation that may timeout".to_string()),
+                    input_schema: ToolInputSchema {
+                        schema_type: "object".to_string(),
+                        properties: None,
+                        required: None,
+                    },
+                    annotations: None,
+                },
+                Tool {
+                    name: "broken_operation".to_string(),
+                    description: Some("Always fails with a non-retryable error".to_string()),
+                    input_schema: ToolInputSchema {
+                        schema_type: "object".to_string(),
+                        properties: None,
+                        required: None,
+                    },
+                    annotations: None,
+                },
+                Tool {
+                    name: "reliable_operation".to_string(),
+                    description: Some("Always succeeds immediately".to_string()),
+                    input_schema: ToolInputSchema {
+                        schema_type: "object".to_string(),
+                        properties: None,
+                        required: None,
+                    },
+                    annotations: None,
+                },
+            ],
+            paginated: PaginatedResult {
+                next_cursor: None,
+                result: tenx_mcp::schema::Result {
+                    meta: None,
+                    other: HashMap::new(),
+                },
             },
-            annotations: None,
-        }
+        })
     }
 
-    async fn execute(&self, _arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
-        Ok(vec![Content::Text(TextContent {
-            text: "Reliable operation completed".to_string(),
-            annotations: None,
-        })])
+    async fn tools_call(
+        &mut self,
+        name: String,
+        _arguments: Option<serde_json::Value>,
+    ) -> Result<CallToolResult> {
+        match name.as_str() {
+            "flakey_operation" => {
+                let count = self.flakey_fail_count.fetch_add(1, Ordering::SeqCst);
+
+                if count < self.failures_before_success {
+                    warn!("FlakeyTool failing (attempt {})", count + 1);
+                    // Simulate a transient network error
+                    Err(MCPError::ConnectionClosed)
+                } else {
+                    info!("FlakeyTool succeeding (attempt {})", count + 1);
+                    // Reset counter for next invocation
+                    if count >= self.failures_before_success {
+                        self.flakey_fail_count.store(0, Ordering::SeqCst);
+                    }
+                    Ok(CallToolResult {
+                        content: vec![Content::Text(TextContent {
+                            text: format!("Success after {} attempts", count + 1),
+                            annotations: None,
+                        })],
+                        is_error: Some(false),
+                        result: tenx_mcp::schema::Result {
+                            meta: None,
+                            other: HashMap::new(),
+                        },
+                    })
+                }
+            }
+            "slow_operation" => {
+                info!(
+                    "SlowTool starting execution (will take {} seconds)...",
+                    self.slow_delay_seconds
+                );
+                sleep(Duration::from_secs(self.slow_delay_seconds)).await;
+                info!("SlowTool completed");
+
+                Ok(CallToolResult {
+                    content: vec![Content::Text(TextContent {
+                        text: "Operation completed successfully".to_string(),
+                        annotations: None,
+                    })],
+                    is_error: Some(false),
+                    result: tenx_mcp::schema::Result {
+                        meta: None,
+                        other: HashMap::new(),
+                    },
+                })
+            }
+            "broken_operation" => {
+                // Return an error that is not retryable
+                Err(MCPError::InvalidParams {
+                    method: "broken_operation".to_string(),
+                    message: "This operation is permanently broken".to_string(),
+                })
+            }
+            "reliable_operation" => Ok(CallToolResult {
+                content: vec![Content::Text(TextContent {
+                    text: "Reliable operation completed".to_string(),
+                    annotations: None,
+                })],
+                is_error: Some(false),
+                result: tenx_mcp::schema::Result {
+                    meta: None,
+                    other: HashMap::new(),
+                },
+            }),
+            _ => Err(MCPError::ToolExecutionFailed {
+                tool: name,
+                message: "Tool not found".to_string(),
+            }),
+        }
     }
 }
 
@@ -204,16 +239,22 @@ async fn main() -> Result<()> {
                         info!("New connection from {}", peer_addr);
 
                         // Create a new server instance for each connection
-                        let mut server = MCPServer::new(
-                            "timeout-test-server".to_string(),
-                            "1.0.0".to_string(),
-                        );
+                        let server_info = Implementation {
+                            name: "timeout-test-server".to_string(),
+                            version: "1.0.0".to_string(),
+                        };
 
-                        // Register tools with different behaviors
-                        server.register_tool(Box::new(FlakeyTool::new(2))); // Fails first 2 attempts
-                        server.register_tool(Box::new(SlowTool::new(5))); // Takes 5 seconds
-                        server.register_tool(Box::new(BrokenTool));
-                        server.register_tool(Box::new(ReliableTool));
+                        let capabilities = ServerCapabilities::default();
+
+                        let server = MCPServer::default()
+                            .with_connection_factory(move || {
+                                Box::new(TimeoutTestConnection::new(
+                                    server_info.clone(),
+                                    capabilities.clone(),
+                                    2, // Fails first 2 attempts
+                                    5, // Takes 5 seconds
+                                ))
+                            });
 
                         info!("Registered tools for {}:", peer_addr);
                         info!("  - flakey_operation: Fails 2 times before succeeding");

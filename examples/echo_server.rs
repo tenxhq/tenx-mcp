@@ -2,46 +2,96 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use tenx_mcp::{
-    error::MCPError, schema::*, transport::StdioTransport, MCPServer, MCPServerHandle, Result,
-    ToolHandler,
+    connection::Connection, error::MCPError, schema::*, transport::StdioTransport, MCPServer,
+    MCPServerHandle, Result,
 };
 use tracing::{info, level_filters::LevelFilter};
 
-/// Simple echo tool that returns the input as output
-struct EchoTool;
+/// Simple echo connection that provides an echo tool
+struct EchoConnection {
+    server_info: Implementation,
+    capabilities: ServerCapabilities,
+}
 
-#[async_trait]
-impl ToolHandler for EchoTool {
-    fn metadata(&self) -> Tool {
-        Tool {
-            name: "echo".to_string(),
-            description: Some("Echoes back the input message".to_string()),
-            input_schema: ToolInputSchema {
-                schema_type: "object".to_string(),
-                properties: Some({
-                    let mut props = HashMap::new();
-                    props.insert(
-                        "message".to_string(),
-                        serde_json::json!({
-                            "type": "string",
-                            "description": "The message to echo"
-                        }),
-                    );
-                    props
-                }),
-                required: Some(vec!["message".to_string()]),
-            },
-            annotations: Some(ToolAnnotations {
-                title: Some("Echo Tool".to_string()),
-                read_only_hint: Some(true),
-                destructive_hint: Some(false),
-                idempotent_hint: Some(true),
-                open_world_hint: Some(false),
-            }),
+impl EchoConnection {
+    fn new(server_info: Implementation, capabilities: ServerCapabilities) -> Self {
+        Self {
+            server_info,
+            capabilities,
         }
     }
+}
 
-    async fn execute(&self, arguments: Option<serde_json::Value>) -> Result<Vec<Content>> {
+#[async_trait]
+impl Connection for EchoConnection {
+    async fn initialize(
+        &mut self,
+        _protocol_version: String,
+        _capabilities: ClientCapabilities,
+        _client_info: Implementation,
+    ) -> Result<InitializeResult> {
+        Ok(InitializeResult {
+            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
+            capabilities: self.capabilities.clone(),
+            server_info: self.server_info.clone(),
+            instructions: None,
+            result: tenx_mcp::schema::Result {
+                meta: None,
+                other: HashMap::new(),
+            },
+        })
+    }
+
+    async fn tools_list(&mut self) -> Result<ListToolsResult> {
+        Ok(ListToolsResult {
+            tools: vec![Tool {
+                name: "echo".to_string(),
+                description: Some("Echoes back the input message".to_string()),
+                input_schema: ToolInputSchema {
+                    schema_type: "object".to_string(),
+                    properties: Some({
+                        let mut props = HashMap::new();
+                        props.insert(
+                            "message".to_string(),
+                            serde_json::json!({
+                                "type": "string",
+                                "description": "The message to echo"
+                            }),
+                        );
+                        props
+                    }),
+                    required: Some(vec!["message".to_string()]),
+                },
+                annotations: Some(ToolAnnotations {
+                    title: Some("Echo Tool".to_string()),
+                    read_only_hint: Some(true),
+                    destructive_hint: Some(false),
+                    idempotent_hint: Some(true),
+                    open_world_hint: Some(false),
+                }),
+            }],
+            paginated: PaginatedResult {
+                next_cursor: None,
+                result: tenx_mcp::schema::Result {
+                    meta: None,
+                    other: HashMap::new(),
+                },
+            },
+        })
+    }
+
+    async fn tools_call(
+        &mut self,
+        name: String,
+        arguments: Option<serde_json::Value>,
+    ) -> Result<CallToolResult> {
+        if name != "echo" {
+            return Err(MCPError::ToolExecutionFailed {
+                tool: name,
+                message: "Tool not found".to_string(),
+            });
+        }
+
         let message = if let Some(args) = arguments {
             args.get("message")
                 .and_then(|v| v.as_str())
@@ -51,10 +101,17 @@ impl ToolHandler for EchoTool {
             "No arguments provided".to_string()
         };
 
-        Ok(vec![Content::Text(TextContent {
-            text: format!("Echo: {message}"),
-            annotations: None,
-        })])
+        Ok(CallToolResult {
+            content: vec![Content::Text(TextContent {
+                text: format!("Echo: {message}"),
+                annotations: None,
+            })],
+            is_error: Some(false),
+            result: tenx_mcp::schema::Result {
+                meta: None,
+                other: HashMap::new(),
+            },
+        })
     }
 }
 
@@ -69,22 +126,32 @@ async fn main() -> Result<()> {
     info!("Starting echo MCP server example");
 
     // Create server
-    let mut server = MCPServer::new("echo-server".to_string(), "1.0.0".to_string())
-        .with_capabilities(ServerCapabilities {
-            tools: Some(ToolsCapability {
-                list_changed: Some(false),
-            }),
-            resources: None,
-            prompts: None,
-            logging: None,
-            completions: None,
-            experimental: None,
+    let capabilities = ServerCapabilities {
+        tools: Some(ToolsCapability {
+            list_changed: Some(false),
+        }),
+        resources: None,
+        prompts: None,
+        logging: None,
+        completions: None,
+        experimental: None,
+    };
+
+    let server_info = Implementation {
+        name: "echo-server".to_string(),
+        version: "1.0.0".to_string(),
+    };
+
+    let server = MCPServer::default()
+        .with_capabilities(capabilities.clone())
+        .with_connection_factory(move || {
+            Box::new(EchoConnection::new(
+                server_info.clone(),
+                capabilities.clone(),
+            ))
         });
 
-    // Register the echo tool
-    server.register_tool(Box::new(EchoTool));
-
-    info!("Echo tool registered");
+    info!("Echo connection configured");
 
     // Create stdio transport and start serving
     let transport = StdioTransport::new();

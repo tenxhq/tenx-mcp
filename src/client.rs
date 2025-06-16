@@ -402,7 +402,34 @@ mod tests {
     async fn setup_client_server() -> (MCPClient, MCPServerHandle) {
         let (client_transport, server_transport) = TestTransport::create_pair();
 
-        let server = MCPServer::new("test-server".to_string(), "1.0.0".to_string());
+        // Create a minimal test connection
+        struct TestConnection;
+
+        #[async_trait::async_trait]
+        impl crate::connection::Connection for TestConnection {
+            async fn initialize(
+                &mut self,
+                _protocol_version: String,
+                _capabilities: ClientCapabilities,
+                _client_info: Implementation,
+            ) -> Result<InitializeResult> {
+                Ok(InitializeResult {
+                    protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
+                    capabilities: ServerCapabilities::default(),
+                    server_info: Implementation {
+                        name: "test-server".to_string(),
+                        version: "1.0.0".to_string(),
+                    },
+                    instructions: None,
+                    result: crate::schema::Result {
+                        meta: None,
+                        other: std::collections::HashMap::new(),
+                    },
+                })
+            }
+        }
+
+        let server = MCPServer::default().with_connection_factory(|| Box::new(TestConnection));
         let server_handle = MCPServerHandle::new(server, server_transport)
             .await
             .expect("Failed to start server");

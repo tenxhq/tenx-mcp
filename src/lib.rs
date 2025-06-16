@@ -1,5 +1,6 @@
 pub mod client;
 pub mod codec;
+pub mod connection;
 pub mod error;
 pub mod retry;
 pub mod schema;
@@ -8,12 +9,13 @@ pub mod transport;
 
 // Re-export commonly used types
 pub use client::MCPClient;
+pub use connection::{Connection, ConnectionContext};
 pub use error::{MCPError, Result};
 pub use schema::{
     ClientCapabilities, Content, Implementation, JSONRPCNotification, ResourceContents,
     ToolsCapability,
 };
-pub use server::{MCPServer, MCPServerHandle, PromptHandler, ResourceHandler, ToolHandler};
+pub use server::{MCPServer, MCPServerHandle};
 pub use transport::{StdioTransport, TcpServerTransport, TcpTransport};
 
 #[cfg(test)]
