@@ -250,10 +250,7 @@ async fn handle_request_inner(
         .request
         .params
         .map(|p| serde_json::to_value(p.other))
-        .transpose()
-        .map_err(|e| MCPError::Json {
-            message: format!("Failed to serialize request params: {e}"),
-        })?;
+        .transpose()?;
 
     match request.request.method.as_str() {
         "initialize" => {
@@ -269,21 +266,16 @@ async fn handle_request_inner(
                     params.client_info,
                 )
                 .await
-                .and_then(|result| {
-                    serde_json::to_value(result).map_err(|e| MCPError::Json {
-                        message: e.to_string(),
-                    })
-                })
+                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
         "ping" => {
             info!("Server received ping request, sending automatic response");
             connection.ping().await.map(|_| serde_json::json!({}))
         }
-        "tools/list" => connection.tools_list().await.and_then(|result| {
-            serde_json::to_value(result).map_err(|e| MCPError::Json {
-                message: e.to_string(),
-            })
-        }),
+        "tools/list" => connection
+            .tools_list()
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         "tools/call" => {
             let p = params.ok_or_else(|| {
                 MCPError::invalid_params("tools/call", "Missing required parameters")
@@ -300,26 +292,17 @@ async fn handle_request_inner(
             connection
                 .tools_call(params.name, arguments)
                 .await
-                .and_then(|result| {
-                    serde_json::to_value(result).map_err(|e| MCPError::Json {
-                        message: e.to_string(),
-                    })
-                })
+                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
-        "resources/list" => connection.resources_list().await.and_then(|result| {
-            serde_json::to_value(result).map_err(|e| MCPError::Json {
-                message: e.to_string(),
-            })
-        }),
+        "resources/list" => connection
+            .resources_list()
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         "resources/templates/list" => {
             connection
                 .resources_templates_list()
                 .await
-                .and_then(|result| {
-                    serde_json::to_value(result).map_err(|e| MCPError::Json {
-                        message: e.to_string(),
-                    })
-                })
+                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
         "resources/read" => {
             let p = params.ok_or_else(|| {
@@ -330,11 +313,7 @@ async fn handle_request_inner(
             connection
                 .resources_read(params.uri)
                 .await
-                .and_then(|result| {
-                    serde_json::to_value(result).map_err(|e| MCPError::Json {
-                        message: e.to_string(),
-                    })
-                })
+                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
         "resources/subscribe" => {
             let p = params.ok_or_else(|| {
@@ -364,11 +343,10 @@ async fn handle_request_inner(
                 .await
                 .map(|_| serde_json::json!({}))
         }
-        "prompts/list" => connection.prompts_list().await.and_then(|result| {
-            serde_json::to_value(result).map_err(|e| MCPError::Json {
-                message: e.to_string(),
-            })
-        }),
+        "prompts/list" => connection
+            .prompts_list()
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         "prompts/get" => {
             let p = params.ok_or_else(|| {
                 MCPError::invalid_params("prompts/get", "Missing required parameters")
@@ -378,11 +356,7 @@ async fn handle_request_inner(
             connection
                 .prompts_get(params.name, params.arguments)
                 .await
-                .and_then(|result| {
-                    serde_json::to_value(result).map_err(|e| MCPError::Json {
-                        message: e.to_string(),
-                    })
-                })
+                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
         "completion/complete" => {
             let p = params.ok_or_else(|| {
@@ -393,11 +367,7 @@ async fn handle_request_inner(
             connection
                 .completion_complete(params.reference, params.argument)
                 .await
-                .and_then(|result| {
-                    serde_json::to_value(result).map_err(|e| MCPError::Json {
-                        message: e.to_string(),
-                    })
-                })
+                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
         "logging/setLevel" => {
             let p = params.ok_or_else(|| {
