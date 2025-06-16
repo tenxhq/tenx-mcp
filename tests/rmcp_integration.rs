@@ -86,7 +86,6 @@ impl Connection for EchoConnection {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore] // TODO: Fix integration with rmcp client
 async fn test_tenx_server_with_rmcp_client() {
     // Create bidirectional streams for communication
     let (server_reader, client_writer) = tokio::io::duplex(8192);
@@ -157,7 +156,7 @@ async fn test_tenx_server_with_rmcp_client() {
     }
 
     // Cleanup
-    let _ = server_handle.stop().await;
+    server_handle.handle.abort();
 }
 
 #[tokio::test]
