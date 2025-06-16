@@ -65,6 +65,9 @@ pub enum MCPError {
 
     #[error("Codec error: {message}")]
     CodecError { message: String },
+
+    #[error("Tool not found: {0}")]
+    ToolNotFound(String),
 }
 
 impl MCPError {

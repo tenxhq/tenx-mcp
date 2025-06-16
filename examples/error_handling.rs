@@ -103,8 +103,8 @@ async fn main() -> Result<()> {
         });
 
     // Register tools
-    server.register_tool(Box::new(FailingTool)).await;
-    server.register_tool(Box::new(StrictTool)).await;
+    server.register_tool(Box::new(FailingTool));
+    server.register_tool(Box::new(StrictTool));
 
     info!("Starting MCP server with error handling examples...");
     info!("Try these requests to see error handling:");
@@ -120,5 +120,10 @@ async fn main() -> Result<()> {
 
     // Create and run transport
     let transport: Box<dyn Transport> = Box::new(StdioTransport::new());
-    server.serve(transport).await
+    let server_handle = tenx_mcp::MCPServerHandle::new(server, transport).await?;
+    server_handle
+        .handle
+        .await
+        .map_err(|e| MCPError::InternalError(format!("Server task failed: {}", e)))?;
+    Ok(())
 }

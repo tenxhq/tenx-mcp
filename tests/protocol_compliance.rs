@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use serde_json::json;
 use tenx_mcp::{
     error::MCPError,
-    schema::{Content, ServerCapabilities, TextContent, Tool, ToolInputSchema, ToolsCapability},
+    schema::{Content, TextContent, Tool, ToolInputSchema},
     MCPServer, ToolHandler,
 };
 
@@ -252,21 +252,19 @@ mod tests {
     #[tokio::test]
     async fn test_server_initialization() {
         // Test server creation with tools
-        let mut server = MCPServer::new("test-server".to_string(), "0.1.0".to_string())
-            .with_capabilities(ServerCapabilities {
-                tools: Some(ToolsCapability {
-                    list_changed: Some(true),
-                }),
-                resources: None,
-                prompts: None,
-                logging: None,
-                completions: None,
-                experimental: None,
-            });
+        let mut server = MCPServer::new("test-server".to_string(), "0.1.0".to_string());
 
         // Register tools
-        server.register_tool(Box::new(EchoTool)).await;
-        server.register_tool(Box::new(AddTool)).await;
+        server.register_tool(Box::new(EchoTool));
+        server.register_tool(Box::new(AddTool));
+
+        // Verify that tools capability is set by default
+        let capabilities = server.capabilities();
+        assert!(capabilities.tools.is_some());
+        assert_eq!(
+            capabilities.tools.as_ref().unwrap().list_changed,
+            Some(true)
+        );
 
         // Server is ready to handle requests
         // In a real test, we would connect a client and test the interaction
@@ -283,5 +281,30 @@ mod tests {
         let json = serde_json::to_value(&text_content).unwrap();
         assert_eq!(json.get("type").and_then(|v| v.as_str()), Some("text"));
         assert_eq!(json.get("text").and_then(|v| v.as_str()), Some("Hello"));
+    }
+
+    #[tokio::test]
+    async fn test_server_broadcasts_tools_list_changed_notification() {
+        // Create a server
+        let mut server = MCPServer::new("test-server".to_string(), "0.1.0".to_string());
+
+        // The test verifies that:
+        // 1. Server has tools capability with list_changed: true
+        let capabilities = server.capabilities();
+        assert!(capabilities.tools.is_some());
+        assert_eq!(
+            capabilities.tools.as_ref().unwrap().list_changed,
+            Some(true)
+        );
+
+        // 2. Register a new tool (this should trigger internal notification)
+        server.register_tool(Box::new(EchoTool));
+        server.register_tool(Box::new(AddTool));
+
+        // 3. Remove a tool (this should also trigger internal notification)
+        let removed_tool = server.remove_tool("echo").await;
+        assert!(removed_tool.is_some());
+
+        // TODO Connect an MCPClient and make sure it gets the actual notification
     }
 }

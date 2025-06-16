@@ -152,8 +152,8 @@ async fn main() -> Result<()> {
                             "0.1.0".to_string(),
                         );
 
-                        server.register_tool(Box::new(EchoToolHandler)).await;
-                        server.register_tool(Box::new(AddToolHandler)).await;
+                        server.register_tool(Box::new(EchoToolHandler));
+                        server.register_tool(Box::new(AddToolHandler));
 
                         // Create transport from the accepted connection
                         let transport = Box::new(tenx_mcp::transport::TcpServerTransport::new(stream));
@@ -161,9 +161,16 @@ async fn main() -> Result<()> {
                         // Handle the connection in a separate task
                         tokio::spawn(async move {
                             info!("Handling connection from {}", peer_addr);
-                            match server.serve(transport).await {
-                                Ok(()) => info!("Connection from {} closed", peer_addr),
-                                Err(e) => error!("Error handling connection from {}: {}", peer_addr, e),
+                            match tenx_mcp::MCPServerHandle::new(server, transport).await {
+                                Ok(server_handle) => {
+                                    info!("Server handle created for {}", peer_addr);
+                                    if let Err(e) = server_handle.handle.await {
+                                        error!("Server task failed for {}: {}", peer_addr, e);
+                                    } else {
+                                        info!("Connection from {} closed", peer_addr);
+                                    }
+                                },
+                                Err(e) => error!("Error creating server handle for {}: {}", peer_addr, e),
                             }
                         });
                     }

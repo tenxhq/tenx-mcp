@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use tenx_mcp::{schema::*, transport::StdioTransport, MCPServer, Result, ToolHandler};
+use tenx_mcp::{
+    error::MCPError, schema::*, transport::StdioTransport, MCPServer, MCPServerHandle, Result,
+    ToolHandler,
+};
 use tracing::{info, level_filters::LevelFilter};
 
 /// Simple echo tool that returns the input as output
@@ -79,7 +82,7 @@ async fn main() -> Result<()> {
         });
 
     // Register the echo tool
-    server.register_tool(Box::new(EchoTool)).await;
+    server.register_tool(Box::new(EchoTool));
 
     info!("Echo tool registered");
 
@@ -88,5 +91,10 @@ async fn main() -> Result<()> {
 
     info!("Server ready, starting to serve on stdio");
 
-    server.serve(Box::new(transport)).await
+    let server_handle = MCPServerHandle::new(server, Box::new(transport)).await?;
+    server_handle
+        .handle
+        .await
+        .map_err(|e| MCPError::InternalError(format!("Server task failed: {}", e)))?;
+    Ok(())
 }

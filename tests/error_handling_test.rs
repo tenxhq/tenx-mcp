@@ -1,7 +1,7 @@
 //! Unit tests for JSON-RPC error handling
 
 use futures::{SinkExt, StreamExt};
-use tenx_mcp::{schema::*, server::MCPServer, transport::Transport};
+use tenx_mcp::{schema::*, server::MCPServer, transport::Transport, MCPServerHandle};
 
 // Reuse test transport from integration test
 mod test_helpers {
@@ -42,10 +42,8 @@ async fn test_method_not_found() {
     let server = MCPServer::new("test".to_string(), "1.0".to_string());
     let (client, server_stream) = tokio::io::duplex(8192);
 
-    let server_handle = tokio::spawn(async move {
-        let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
-        server.serve(transport).await
-    });
+    let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
+    let server_handle = MCPServerHandle::new(server, transport).await.unwrap();
 
     let mut transport = Box::new(TestTransport::new(client));
     transport.connect().await.unwrap();
@@ -70,7 +68,7 @@ async fn test_method_not_found() {
     ));
 
     drop(stream);
-    server_handle.abort();
+    server_handle.stop().await.unwrap();
 }
 
 #[tokio::test]
@@ -78,13 +76,10 @@ async fn test_invalid_params() {
     let server = MCPServer::new("test".to_string(), "1.0".to_string());
     let (client, server_stream) = tokio::io::duplex(8192);
 
-    let server_handle = tokio::spawn(async move {
-        let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
-        server.serve(transport).await
-    });
+    let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
+    let server_handle = MCPServerHandle::new(server, transport).await.unwrap();
 
-    let mut transport = Box::new(TestTransport::new(client));
-    transport.connect().await.unwrap();
+    let transport = Box::new(TestTransport::new(client));
     let mut stream = transport.framed().unwrap();
 
     stream
@@ -106,7 +101,7 @@ async fn test_invalid_params() {
     ));
 
     drop(stream);
-    server_handle.abort();
+    server_handle.stop().await.unwrap();
 }
 
 #[tokio::test]
@@ -118,16 +113,15 @@ async fn test_successful_response() {
         },
     );
 
-    let (client, server_stream) = tokio::io::duplex(8192);
+    let (client_stream, server_stream) = tokio::io::duplex(8192);
 
-    let server_handle = tokio::spawn(async move {
-        let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
-        server.serve(transport).await
-    });
+    let server_transport = Box::new(TestTransport::new(server_stream));
+    let server_handle = MCPServerHandle::new(server, server_transport)
+        .await
+        .unwrap();
 
-    let mut transport = Box::new(TestTransport::new(client));
-    transport.connect().await.unwrap();
-    let mut stream = transport.framed().unwrap();
+    let client_transport = Box::new(TestTransport::new(client_stream));
+    let mut stream = client_transport.framed().unwrap();
 
     stream
         .send(JSONRPCMessage::Request(JSONRPCRequest {
@@ -145,5 +139,5 @@ async fn test_successful_response() {
     assert!(matches!(response, JSONRPCMessage::Response(_)));
 
     drop(stream);
-    server_handle.abort();
+    server_handle.stop().await.unwrap();
 }
