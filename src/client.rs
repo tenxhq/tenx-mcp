@@ -40,7 +40,7 @@ impl Default for ClientConfig {
 
 /// MCP Client implementation
 pub struct MCPClient {
-    transport_tx: Option<SplitSink<Box<dyn TransportStream>, JSONRPCMessage>>,
+    transport_tx: Option<Arc<Mutex<SplitSink<Box<dyn TransportStream>, JSONRPCMessage>>>>,
     pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<ResponseOrError>>>>,
     notification_tx: mpsc::Sender<JSONRPCNotification>,
     notification_rx: Option<mpsc::Receiver<JSONRPCNotification>>,
@@ -225,8 +225,9 @@ impl MCPClient {
 
     /// Send a message through the transport
     async fn send_message(&mut self, message: JSONRPCMessage) -> Result<()> {
-        if let Some(transport_tx) = &mut self.transport_tx {
-            transport_tx.send(message).await?;
+        if let Some(transport_tx) = &self.transport_tx {
+            let mut tx = transport_tx.lock().await;
+            tx.send(message).await?;
             Ok(())
         } else {
             Err(MCPError::Transport("Not connected".to_string()))
@@ -276,8 +277,11 @@ impl MCPClient {
         // Split the transport stream into read and write halves
         let (tx, mut rx) = stream.split();
 
+        // Wrap the sink in an Arc<Mutex> for sharing
+        let tx = Arc::new(Mutex::new(tx));
+
         // Store the sender half for sending messages
-        self.transport_tx = Some(tx);
+        self.transport_tx = Some(tx.clone());
 
         // Spawn a task to handle incoming messages
         tokio::spawn(async move {
@@ -325,9 +329,34 @@ impl MCPClient {
                                     );
                                 }
                             }
-                            JSONRPCMessage::Request(_request) => {
-                                // Clients typically don't receive requests from servers in MCP
-                                warn!("Received unexpected request from server");
+                            JSONRPCMessage::Request(request) => {
+                                // Handle ping requests from server
+                                if request.request.method == "ping" {
+                                    info!("Received ping request from server with id: {:?}, sending response", request.id);
+
+                                    // Create a response with empty result
+                                    let response = JSONRPCResponse {
+                                        jsonrpc: crate::schema::JSONRPC_VERSION.to_string(),
+                                        id: request.id,
+                                        result: crate::schema::Result {
+                                            meta: None,
+                                            other: std::collections::HashMap::new(),
+                                        },
+                                    };
+
+                                    // Send the response back through the transport
+                                    let mut sink = tx.lock().await;
+                                    match sink.send(JSONRPCMessage::Response(response)).await {
+                                        Ok(_) => info!("Successfully sent ping response to server"),
+                                        Err(e) => error!("Failed to send ping response: {}", e),
+                                    }
+                                } else {
+                                    // Other requests are unexpected
+                                    warn!(
+                                        "Received unexpected request from server: {}",
+                                        request.request.method
+                                    );
+                                }
                             }
                             JSONRPCMessage::BatchRequest(_batch) => {
                                 // Clients typically don't receive batch requests from servers
@@ -365,6 +394,34 @@ impl Default for MCPClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::server::{MCPServer, MCPServerHandle};
+    use crate::transport::TestTransport;
+
+    async fn setup_client_server() -> (MCPClient, MCPServerHandle) {
+        let (client_transport, server_transport) = TestTransport::create_pair();
+
+        let server = MCPServer::new("test-server".to_string(), "1.0.0".to_string());
+        let server_handle = MCPServerHandle::new(server, server_transport)
+            .await
+            .expect("Failed to start server");
+
+        let mut client = MCPClient::new();
+        client
+            .connect(client_transport)
+            .await
+            .expect("Failed to connect");
+
+        let client_info = Implementation {
+            name: "test-client".to_string(),
+            version: "1.0.0".to_string(),
+        };
+        client
+            .initialize(client_info, ClientCapabilities::default())
+            .await
+            .expect("Failed to initialize");
+
+        (client, server_handle)
+    }
 
     #[test]
     fn test_client_creation() {
@@ -375,10 +432,47 @@ mod tests {
     #[tokio::test]
     async fn test_next_request_id() {
         let client = MCPClient::new();
-        let id1 = client.next_request_id().await;
-        let id2 = client.next_request_id().await;
+        assert_eq!(client.next_request_id().await, "req-1");
+        assert_eq!(client.next_request_id().await, "req-2");
+    }
 
-        assert_eq!(id1, "req-1");
-        assert_eq!(id2, "req-2");
+    #[tokio::test]
+    async fn test_client_ping_server() {
+        let (mut client, _server) = setup_client_server().await;
+        client.ping().await.expect("Ping failed");
+    }
+
+    #[tokio::test]
+    async fn test_multiple_client_pings() {
+        let (mut client, _server) = setup_client_server().await;
+        for i in 0..20 {
+            client
+                .ping()
+                .await
+                .unwrap_or_else(|_| panic!("Ping {} failed", i));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ping_performance() {
+        let (mut client, _server) = setup_client_server().await;
+
+        let start = std::time::Instant::now();
+        let num_pings = 50;
+        for _ in 0..num_pings {
+            client.ping().await.expect("Ping failed");
+        }
+
+        let duration = start.elapsed();
+        let pings_per_second = num_pings as f64 / duration.as_secs_f64();
+        println!(
+            "Client->Server: {} pings in {:?} ({:.1} pings/sec)",
+            num_pings, duration, pings_per_second
+        );
+        assert!(
+            pings_per_second > 50.0,
+            "Too slow: {:.1} pings/sec",
+            pings_per_second
+        );
     }
 }

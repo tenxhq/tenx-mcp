@@ -352,7 +352,10 @@ impl MCPServer {
 
         let result_value = match request.request.method.as_str() {
             "initialize" => self.handle_initialize(params).await,
-            "ping" => Ok(serde_json::json!({})),
+            "ping" => {
+                info!("Server received ping request, sending automatic response");
+                Ok(serde_json::json!({}))
+            }
             "tools/list" => self.handle_list_tools().await,
             "tools/call" => self.handle_call_tool(params).await,
             "resources/list" => self.handle_list_resources().await,
@@ -841,5 +844,60 @@ mod tests {
         // Clean up
         drop(client);
         let _ = server_handle.stop().await;
+    }
+
+    async fn setup_test_client_server() -> (crate::client::MCPClient, MCPServerHandle) {
+        use crate::client::MCPClient;
+        use crate::schema::{ClientCapabilities, Implementation};
+        use crate::transport::TestTransport;
+
+        let (client_transport, server_transport) = TestTransport::create_pair();
+
+        let server = MCPServer::new("test-server".to_string(), "1.0.0".to_string());
+        let server_handle = MCPServerHandle::new(server, server_transport)
+            .await
+            .expect("Failed to start server");
+
+        let mut client = MCPClient::new();
+        client
+            .connect(client_transport)
+            .await
+            .expect("Failed to connect");
+
+        let client_info = Implementation {
+            name: "test-client".to_string(),
+            version: "1.0.0".to_string(),
+        };
+        client
+            .initialize(client_info, ClientCapabilities::default())
+            .await
+            .expect("Failed to initialize");
+
+        (client, server_handle)
+    }
+
+    #[tokio::test]
+    async fn test_server_ping_response() {
+        let (mut client, _server) = setup_test_client_server().await;
+        client.ping().await.expect("Server should respond to ping");
+    }
+
+    #[tokio::test]
+    async fn test_bidirectional_ping_sequence() {
+        let (mut client, _server) = setup_test_client_server().await;
+
+        for i in 0..10 {
+            client
+                .ping()
+                .await
+                .unwrap_or_else(|_| panic!("Ping {} failed", i));
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_server_handles_numeric_request_id() {
+        let (mut client, _server) = setup_test_client_server().await;
+        client.ping().await.expect("Server should handle ping");
     }
 }
