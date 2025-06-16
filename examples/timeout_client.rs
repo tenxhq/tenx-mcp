@@ -97,7 +97,7 @@ async fn test_broken_operation(client: &mut MCPClient) -> Result<()> {
 async fn test_custom_retry_config(host: &str, port: u16) -> Result<()> {
     info!("\n=== Testing Custom Retry Configuration ===");
     info!("Creating a client with very short timeouts and few retries...");
-    
+
     // Create a new client with custom configuration
     let config = ClientConfig {
         retry: RetryConfig {
@@ -109,19 +109,21 @@ async fn test_custom_retry_config(host: &str, port: u16) -> Result<()> {
         },
         request_timeout: Duration::from_secs(1),
     };
-    
+
     let mut client = MCPClient::with_config(config);
     let transport = TcpTransport::new(format!("{host}:{port}"));
-    
+
     client.connect(Box::new(transport)).await?;
-    client.initialize(
-        Implementation {
-            name: "timeout-test-client-custom".to_string(),
-            version: "1.0.0".to_string(),
-        },
-        ClientCapabilities::default(),
-    ).await?;
-    
+    client
+        .initialize(
+            Implementation {
+                name: "timeout-test-client-custom".to_string(),
+                version: "1.0.0".to_string(),
+            },
+            ClientCapabilities::default(),
+        )
+        .await?;
+
     // This should timeout very quickly
     match client.call_tool("slow_operation".to_string(), None).await {
         Ok(_) => {
@@ -131,7 +133,7 @@ async fn test_custom_retry_config(host: &str, port: u16) -> Result<()> {
             info!("✓ Quick timeout as expected: {}", e);
         }
     }
-    
+
     Ok(())
 }
 
@@ -214,15 +216,15 @@ async fn main() -> Result<()> {
     if let Err(e) = test_reliable_operation(&mut client).await {
         error!("Reliable operation test failed: {}", e);
     }
-    
+
     if let Err(e) = test_flakey_operation(&mut client).await {
         error!("Flakey operation test failed: {}", e);
     }
-    
+
     if let Err(e) = test_slow_operation(&mut client).await {
         error!("Slow operation test failed: {}", e);
     }
-    
+
     if let Err(e) = test_broken_operation(&mut client).await {
         error!("Broken operation test failed: {}", e);
     }
