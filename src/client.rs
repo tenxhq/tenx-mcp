@@ -187,10 +187,22 @@ impl MCPClient {
             Ok(Ok(response_or_error)) => {
                 match response_or_error {
                     ResponseOrError::Response(response) => {
-                        // Deserialize the result directly to the expected type
-                        serde_json::from_value(serde_json::to_value(response.result)?).map_err(
-                            |e| MCPError::Protocol(format!("Failed to deserialize response: {e}")),
-                        )
+                        // Create a combined Value from the result's fields
+                        let mut result_value = serde_json::Map::new();
+                        
+                        // Add metadata if present
+                        if let Some(meta) = response.result.meta {
+                            result_value.insert("_meta".to_string(), serde_json::to_value(meta)?);
+                        }
+                        
+                        // Add all other fields
+                        for (key, value) in response.result.other {
+                            result_value.insert(key, value);
+                        }
+                        
+                        // Deserialize directly from the combined map
+                        serde_json::from_value(serde_json::Value::Object(result_value))
+                            .map_err(|e| MCPError::Protocol(format!("Failed to deserialize response: {e}")))
                     }
                     ResponseOrError::Error(error) => {
                         // Map JSON-RPC errors to appropriate MCPError variants
