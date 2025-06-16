@@ -105,7 +105,70 @@ impl MCPClient {
 
     /// List available tools from the server
     pub async fn list_tools(&mut self) -> Result<ListToolsResult> {
-        self.request(ClientRequest::ListTools).await
+        self.request(ClientRequest::ListTools { cursor: None })
+            .await
+    }
+
+    /// List available tools from the server with pagination cursor
+    pub async fn list_tools_with_cursor(
+        &mut self,
+        cursor: impl Into<String>,
+    ) -> Result<ListToolsResult> {
+        self.request(ClientRequest::ListTools {
+            cursor: Some(cursor.into()),
+        })
+        .await
+    }
+
+    /// List available resources from the server
+    pub async fn list_resources(&mut self) -> Result<ListResourcesResult> {
+        self.request(ClientRequest::ListResources { cursor: None })
+            .await
+    }
+
+    /// List available resources from the server with pagination cursor
+    pub async fn list_resources_with_cursor(
+        &mut self,
+        cursor: impl Into<String>,
+    ) -> Result<ListResourcesResult> {
+        self.request(ClientRequest::ListResources {
+            cursor: Some(cursor.into()),
+        })
+        .await
+    }
+
+    /// List available resource templates from the server
+    pub async fn list_resource_templates(&mut self) -> Result<ListResourceTemplatesResult> {
+        self.request(ClientRequest::ListResourceTemplates { cursor: None })
+            .await
+    }
+
+    /// List available resource templates from the server with pagination cursor
+    pub async fn list_resource_templates_with_cursor(
+        &mut self,
+        cursor: impl Into<String>,
+    ) -> Result<ListResourceTemplatesResult> {
+        self.request(ClientRequest::ListResourceTemplates {
+            cursor: Some(cursor.into()),
+        })
+        .await
+    }
+
+    /// List available prompts from the server
+    pub async fn list_prompts(&mut self) -> Result<ListPromptsResult> {
+        self.request(ClientRequest::ListPrompts { cursor: None })
+            .await
+    }
+
+    /// List available prompts from the server with pagination cursor
+    pub async fn list_prompts_with_cursor(
+        &mut self,
+        cursor: impl Into<String>,
+    ) -> Result<ListPromptsResult> {
+        self.request(ClientRequest::ListPrompts {
+            cursor: Some(cursor.into()),
+        })
+        .await
     }
 
     /// Call a tool on the server
@@ -411,6 +474,47 @@ impl Default for MCPClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_pagination_api() {
+        // This test just verifies the API is ergonomic - it doesn't run async code
+        let mut client = MCPClient::new();
+
+        // These should all compile cleanly
+        let _ = async {
+            // Simple calls without cursors
+            client.list_tools().await.unwrap();
+            client.list_resources().await.unwrap();
+            client.list_prompts().await.unwrap();
+            client.list_resource_templates().await.unwrap();
+
+            // Calls with cursor as &str
+            client.list_tools_with_cursor("cursor").await.unwrap();
+            client.list_resources_with_cursor("cursor").await.unwrap();
+            client.list_prompts_with_cursor("cursor").await.unwrap();
+            client
+                .list_resource_templates_with_cursor("cursor")
+                .await
+                .unwrap();
+
+            // Calls with cursor as String
+            let cursor = "next_page".to_string();
+            client.list_tools_with_cursor(cursor.clone()).await.unwrap();
+            client
+                .list_resources_with_cursor(cursor.clone())
+                .await
+                .unwrap();
+            client
+                .list_prompts_with_cursor(cursor.clone())
+                .await
+                .unwrap();
+            client
+                .list_resource_templates_with_cursor(cursor)
+                .await
+                .unwrap();
+        };
+    }
+
     use crate::server::{MCPServer, MCPServerHandle};
     use crate::transport::TestTransport;
 

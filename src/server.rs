@@ -298,12 +298,10 @@ async fn handle_request_inner(
             .resources_list()
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
-        "resources/templates/list" => {
-            connection
-                .resources_templates_list()
-                .await
-                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
-        }
+        "resources/templates/list" => connection
+            .resources_templates_list()
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         "resources/read" => {
             let p = params.ok_or_else(|| {
                 MCPError::invalid_params("resources/read", "Missing required parameters")

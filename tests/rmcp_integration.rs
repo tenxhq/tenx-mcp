@@ -26,8 +26,7 @@ impl Connection for EchoConnection {
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
     ) -> Result<InitializeResult> {
-        Ok(InitializeResult::new("test-server", "0.1.0")
-            .with_tools(true))
+        Ok(InitializeResult::new("test-server", "0.1.0").with_tools(true))
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {

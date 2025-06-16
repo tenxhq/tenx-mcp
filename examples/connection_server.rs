@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::env;
 use tenx_mcp::{
     schema::{
-        CallToolResult, Content, InitializeResult, ListToolsResult,
-        TextContent, Tool, ToolInputSchema,
+        CallToolResult, Content, InitializeResult, ListToolsResult, TextContent, Tool,
+        ToolInputSchema,
     },
     Connection, ConnectionContext, MCPServer, MCPServerHandle, Result,
 };
@@ -55,8 +55,7 @@ impl Connection for MyConnection {
 
         self.request_count += 1;
 
-        Ok(InitializeResult::new("connection-example-server", "0.1.0")
-            .with_tools(true))
+        Ok(InitializeResult::new("connection-example-server", "0.1.0").with_tools(true))
     }
 
     async fn ping(&mut self) -> Result<()> {

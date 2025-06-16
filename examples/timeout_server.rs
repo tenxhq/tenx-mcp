@@ -56,8 +56,10 @@ impl Connection for TimeoutTestConnection {
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
     ) -> Result<InitializeResult> {
-        Ok(InitializeResult::new(&self.server_info.name, &self.server_info.version)
-            .with_capabilities(self.capabilities.clone()))
+        Ok(
+            InitializeResult::new(&self.server_info.name, &self.server_info.version)
+                .with_capabilities(self.capabilities.clone()),
+        )
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {

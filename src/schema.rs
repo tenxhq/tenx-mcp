@@ -1198,11 +1198,26 @@ pub enum ClientRequest {
         arguments: Option<HashMap<String, String>>,
     },
     #[serde(rename = "prompts/list")]
-    ListPrompts,
+    ListPrompts {
+        /// An opaque token representing the current pagination position.
+        /// If provided, the server should return results starting after this cursor.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cursor: Option<Cursor>,
+    },
     #[serde(rename = "resources/list")]
-    ListResources,
+    ListResources {
+        /// An opaque token representing the current pagination position.
+        /// If provided, the server should return results starting after this cursor.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cursor: Option<Cursor>,
+    },
     #[serde(rename = "resources/templates/list")]
-    ListResourceTemplates,
+    ListResourceTemplates {
+        /// An opaque token representing the current pagination position.
+        /// If provided, the server should return results starting after this cursor.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cursor: Option<Cursor>,
+    },
     #[serde(rename = "resources/read")]
     ReadResource {
         /// The URI of the resource to read.
@@ -1225,7 +1240,12 @@ pub enum ClientRequest {
         arguments: Option<HashMap<String, Value>>,
     },
     #[serde(rename = "tools/list")]
-    ListTools,
+    ListTools {
+        /// An opaque token representing the current pagination position.
+        /// If provided, the server should return results starting after this cursor.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cursor: Option<Cursor>,
+    },
 }
 
 impl ClientRequest {
@@ -1237,15 +1257,61 @@ impl ClientRequest {
             ClientRequest::Complete { .. } => "completion/complete",
             ClientRequest::SetLevel { .. } => "logging/setLevel",
             ClientRequest::GetPrompt { .. } => "prompts/get",
-            ClientRequest::ListPrompts => "prompts/list",
-            ClientRequest::ListResources => "resources/list",
-            ClientRequest::ListResourceTemplates => "resources/templates/list",
+            ClientRequest::ListPrompts { .. } => "prompts/list",
+            ClientRequest::ListResources { .. } => "resources/list",
+            ClientRequest::ListResourceTemplates { .. } => "resources/templates/list",
             ClientRequest::ReadResource { .. } => "resources/read",
             ClientRequest::Subscribe { .. } => "resources/subscribe",
             ClientRequest::Unsubscribe { .. } => "resources/unsubscribe",
             ClientRequest::CallTool { .. } => "tools/call",
-            ClientRequest::ListTools => "tools/list",
+            ClientRequest::ListTools { .. } => "tools/list",
         }
+    }
+}
+
+#[cfg(test)]
+mod pagination_tests {
+    use super::*;
+
+    #[test]
+    fn test_paginated_request_serialization() {
+        // Test ListTools with cursor
+        let request = ClientRequest::ListTools {
+            cursor: Some("test-cursor".to_string()),
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["method"], "tools/list");
+        assert_eq!(json["cursor"], "test-cursor");
+
+        // Test ListTools without cursor
+        let request = ClientRequest::ListTools { cursor: None };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["method"], "tools/list");
+        assert!(!json.as_object().unwrap().contains_key("cursor"));
+
+        // Test ListResources with cursor
+        let request = ClientRequest::ListResources {
+            cursor: Some("res-cursor".to_string()),
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["method"], "resources/list");
+        assert_eq!(json["cursor"], "res-cursor");
+
+        // Test ListPrompts with cursor
+        let request = ClientRequest::ListPrompts {
+            cursor: Some("prompt-cursor".to_string()),
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["method"], "prompts/list");
+        assert_eq!(json["cursor"], "prompt-cursor");
+
+        // Test ListResourceTemplates with cursor
+        let request = ClientRequest::ListResourceTemplates {
+            cursor: Some("template-cursor".to_string()),
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["method"], "resources/templates/list");
+        assert_eq!(json["cursor"], "template-cursor");
     }
 }
 
