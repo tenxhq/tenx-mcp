@@ -5,6 +5,14 @@
 
 A Rust implementation of the Model Context Protocol (MCP) for building AI-integrated applications.
 
+--- 
+
+## Community
+
+Want to contribute? Have ideas or feature requests? Come tell us about it on
+[Discord](https://discord.gg/fHmRmuBDxF). 
+
+
 ---
 
 ## Overview

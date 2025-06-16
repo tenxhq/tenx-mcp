@@ -129,6 +129,12 @@ impl MCPClient {
         Ok(result)
     }
 
+    /// Send a ping to the server
+    pub async fn ping(&mut self) -> Result<()> {
+        self.request(ClientRequest::Ping).await?;
+        Ok(())
+    }
+
     /// Take the notification receiver channel
     pub fn take_notification_receiver(&mut self) -> Option<mpsc::Receiver<JSONRPCNotification>> {
         self.notification_rx.take()

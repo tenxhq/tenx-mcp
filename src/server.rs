@@ -166,6 +166,7 @@ impl MCPServer {
 
         let result_value = match request.request.method.as_str() {
             "initialize" => self.handle_initialize(params).await,
+            "ping" => Ok(serde_json::json!({})),
             "tools/list" => self.handle_list_tools().await,
             "tools/call" => self.handle_call_tool(params).await,
             "resources/list" => self.handle_list_resources().await,
