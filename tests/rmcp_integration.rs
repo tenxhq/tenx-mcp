@@ -86,16 +86,16 @@ async fn test_tenx_server_with_rmcp_client() {
             experimental: None,
         });
 
-    server.register_tool(Box::new(EchoTool)).await;
+    server.register_tool(Box::new(EchoTool));
 
     // Start tenx-mcp server in background
-    let server_handle = tokio::spawn(async move {
-        let transport = Box::new(transport_helpers::TransportAdapter::new(
-            server_reader,
-            server_writer,
-        ));
-        server.serve(transport).await
-    });
+    let transport = Box::new(transport_helpers::TransportAdapter::new(
+        server_reader,
+        server_writer,
+    ));
+    let server_handle = tenx_mcp::MCPServerHandle::new(server, transport)
+        .await
+        .expect("Failed to start server");
 
     // Give server time to start
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -133,7 +133,7 @@ async fn test_tenx_server_with_rmcp_client() {
     }
 
     // Cleanup
-    server_handle.abort();
+    let _ = server_handle.stop().await;
 }
 
 #[tokio::test]

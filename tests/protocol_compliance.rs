@@ -255,8 +255,8 @@ mod tests {
         let mut server = MCPServer::new("test-server".to_string(), "0.1.0".to_string());
 
         // Register tools
-        server.register_tool(Box::new(EchoTool)).await;
-        server.register_tool(Box::new(AddTool)).await;
+        server.register_tool(Box::new(EchoTool));
+        server.register_tool(Box::new(AddTool));
 
         // Verify that tools capability is set by default
         let capabilities = server.capabilities();
@@ -298,8 +298,8 @@ mod tests {
         );
 
         // 2. Register a new tool (this should trigger internal notification)
-        server.register_tool(Box::new(EchoTool)).await;
-        server.register_tool(Box::new(AddTool)).await;
+        server.register_tool(Box::new(EchoTool));
+        server.register_tool(Box::new(AddTool));
 
         // 3. Remove a tool (this should also trigger internal notification)
         let removed_tool = server.remove_tool("echo").await;

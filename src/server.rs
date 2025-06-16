@@ -1,8 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
-use std::sync::atomic::{AtomicBool, Ordering};
 use async_trait::async_trait;
 use futures::{stream::SplitSink, SinkExt, StreamExt};
-use tokio::sync::{broadcast, Mutex};
+use std::collections::HashMap;
+use tokio::sync::{broadcast, mpsc};
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 use crate::{
@@ -44,35 +44,42 @@ pub trait PromptHandler: Send + Sync {
     ) -> Result<Vec<PromptMessage>>;
 }
 
+/// Commands sent to the server for runtime registration
+enum ServerCommand {
+    RegisterTool(Box<dyn ToolHandler>),
+    RemoveTool(String),
+}
+type CommandTuple = (ServerCommand, tokio::sync::oneshot::Sender<Result<()>>);
+
 /// MCP Server implementation
 pub struct MCPServer {
     server_info: Implementation,
     capabilities: ServerCapabilities,
-    tools: Arc<Mutex<HashMap<String, Box<dyn ToolHandler>>>>,
-    resources: Arc<Mutex<HashMap<String, Box<dyn ResourceHandler>>>>,
-    prompts: Arc<Mutex<HashMap<String, Box<dyn PromptHandler>>>>,
+    tools: HashMap<String, Box<dyn ToolHandler>>,
+    resources: HashMap<String, Box<dyn ResourceHandler>>,
+    prompts: HashMap<String, Box<dyn PromptHandler>>,
+}
+
+pub struct MCPServerHandle {
+    pub handle: JoinHandle<()>,
+    command_tx: mpsc::Sender<CommandTuple>,
     notification_tx: broadcast::Sender<ServerNotification>,
-    is_running: AtomicBool,
 }
 
 impl MCPServer {
     /// Create a new MCP server
     pub fn new(name: String, version: String) -> Self {
-        let (notification_tx, _) = broadcast::channel(100);
-
         Self {
             server_info: Implementation { name, version },
             capabilities: ServerCapabilities {
                 tools: Some(ToolsCapability {
                     list_changed: Some(true),
                 }),
-                ..Default::default()
+                ..ServerCapabilities::default()
             },
-            tools: Arc::new(Mutex::new(HashMap::new())),
-            resources: Arc::new(Mutex::new(HashMap::new())),
-            prompts: Arc::new(Mutex::new(HashMap::new())),
-            notification_tx,
-            is_running: AtomicBool::new(false)
+            tools: HashMap::new(),
+            resources: HashMap::new(),
+            prompts: HashMap::new(),
         }
     }
 
@@ -88,166 +95,215 @@ impl MCPServer {
     }
 
     /// Register a tool handler
-    pub async fn register_tool(&mut self, handler: Box<dyn ToolHandler>) {
+    pub fn register_tool(&mut self, handler: Box<dyn ToolHandler>) {
         let metadata = handler.metadata();
         let name = metadata.name.clone();
-        self.tools.lock().await.insert(name, handler);
-
-        self.send_server_notification(ServerNotification::ToolListChanged);
+        self.tools.insert(name, handler);
     }
 
     /// Register a resource handler
-    pub async fn register_resource(&mut self, handler: Box<dyn ResourceHandler>) {
+    pub fn register_resource(&mut self, handler: Box<dyn ResourceHandler>) {
         let metadata = handler.metadata();
         let uri = metadata.uri.clone();
-        self.resources.lock().await.insert(uri, handler);
+        self.resources.insert(uri, handler);
     }
 
     /// Register a prompt handler
-    pub async fn register_prompt(&mut self, handler: Box<dyn PromptHandler>) {
+    pub fn register_prompt(&mut self, handler: Box<dyn PromptHandler>) {
         let metadata = handler.metadata();
         let name = metadata.name.clone();
-        self.prompts.lock().await.insert(name, handler);
+        self.prompts.insert(name, handler);
     }
 
     /// Remove a tool handler
     pub async fn remove_tool(&mut self, name: &str) -> Option<Box<dyn ToolHandler>> {
-        let result = self.tools.lock().await.remove(name);
-        if result.is_some() {
-            self.send_server_notification(ServerNotification::ToolListChanged);
-        }
-        result
+        self.tools.remove(name)
     }
 
-    /// Send a server notification
-    fn send_server_notification(&self, notification: ServerNotification) {
+    /// Send a server notification - used internally by the server loop
+    fn send_server_notification(
+        &self,
+        notification_tx: &broadcast::Sender<ServerNotification>,
+        notification: ServerNotification,
+    ) {
         // TODO Skip sending notifications if specific server capabilities are not enabled
-        if self.is_running.load(Ordering::Relaxed) {
-            if let Err(e) = self.notification_tx.send(notification.clone()) {
-                error!( "Failed to send server notification {:?}: {}", notification, e );
-            }
-        } else {
-            debug!("Skipped sending server notification until server is serving: {:?}", notification)
+        if let Err(e) = notification_tx.send(notification.clone()) {
+            error!(
+                "Failed to send server notification {:?}: {}",
+                notification, e
+            );
         }
     }
+}
 
-    /// Start serving connections using the provided transport
-    pub async fn serve(&self, mut transport: Box<dyn Transport>) -> Result<()> {
+impl MCPServerHandle {
+    /// Start serving connections using the provided transport, returning a handle for runtime operations
+    pub async fn new(mut server: MCPServer, mut transport: Box<dyn Transport>) -> Result<Self> {
         transport.connect().await?;
         let stream = transport.framed()?;
         let (mut sink_tx, mut stream_rx) = stream.split();
-        let mut notification_rx = self.notification_tx.subscribe();
 
         info!("MCP server started");
-        self.is_running.store(true, Ordering::Relaxed);
+        let (notification_tx, mut notification_rx) = broadcast::channel(100);
+        let (command_tx, mut command_rx) = mpsc::channel::<CommandTuple>(100);
 
-        loop {
-            tokio::select! {
-                // Handle incoming messages from client
-                result = stream_rx.next() => {
-                    match result {
-                        Some(Ok(message)) => {
-                            if let Err(e) = self.handle_message(message, &mut sink_tx).await {
-                                error!("Error handling message: {}", e);
+        // Clone notification_tx for the handle
+        let notification_tx_handle = notification_tx.clone();
+
+        // Start the main server loop in a background task
+        let handle = tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    // Handle incoming messages from client
+                    result = stream_rx.next() => {
+                        match result {
+                            Some(Ok(message)) => {
+                                if let Err(e) = server.handle_message(message, &mut sink_tx).await {
+                                    error!("Error handling message: {}", e);
+                                }
                             }
-                        }
-                        Some(Err(e)) => {
-                            error!("Error reading message: {}", e);
-                            break;
-                        }
-                        None => {
-                            info!("Client disconnected");
-                            break;
-                        }
-                    }
-                }
-                // Forward internal notifications to client
-                result = notification_rx.recv() => {
-                    match result {
-                        Ok(notification) => {
-                            let jsonrpc_notification = JSONRPCNotification {
-                                jsonrpc: JSONRPC_VERSION.to_string(),
-                                notification: Notification {
-                                    method: match notification {
-                                        ServerNotification::ToolListChanged => "notifications/tools/list_changed",
-                                        ServerNotification::ResourceListChanged => "notifications/resources/list_changed",
-                                        ServerNotification::PromptListChanged => "notifications/prompts/list_changed",
-                                        ServerNotification::ResourceUpdated { .. } => "notifications/resources/updated",
-                                        ServerNotification::LoggingMessage { .. } => "notifications/message",
-                                        ServerNotification::Progress { .. } => "notifications/progress",
-                                        ServerNotification::Cancelled { .. } => "notifications/cancelled",
-                                    }.to_string(),
-                                    params: match notification {
-                                        ServerNotification::ToolListChanged |
-                                        ServerNotification::ResourceListChanged |
-                                        ServerNotification::PromptListChanged => None,
-                                        ServerNotification::ResourceUpdated { uri } => {
-                                            let mut params = HashMap::new();
-                                            params.insert("uri".to_string(), serde_json::Value::String(uri));
-                                            Some(NotificationParams {
-                                                meta: None,
-                                                other: params,
-                                            })
-                                        },
-                                        ServerNotification::LoggingMessage { level, logger, data } => {
-                                            let mut params = HashMap::new();
-                                            params.insert("level".to_string(), serde_json::to_value(level).unwrap());
-                                            if let Some(logger) = logger {
-                                                params.insert("logger".to_string(), serde_json::Value::String(logger));
-                                            }
-                                            params.insert("data".to_string(), data);
-                                            Some(NotificationParams {
-                                                meta: None,
-                                                other: params,
-                                            })
-                                        },
-                                        ServerNotification::Progress { progress_token, progress, total, message } => {
-                                            let mut params = HashMap::new();
-                                            params.insert("progressToken".to_string(), serde_json::to_value(progress_token).unwrap());
-                                            params.insert("progress".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(progress).unwrap()));
-                                            if let Some(total) = total {
-                                                params.insert("total".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(total).unwrap()));
-                                            }
-                                            if let Some(message) = message {
-                                                params.insert("message".to_string(), serde_json::Value::String(message));
-                                            }
-                                            Some(NotificationParams {
-                                                meta: None,
-                                                other: params,
-                                            })
-                                        },
-                                        ServerNotification::Cancelled { request_id, reason } => {
-                                            let mut params = HashMap::new();
-                                            params.insert("requestId".to_string(), serde_json::to_value(request_id).unwrap());
-                                            if let Some(reason) = reason {
-                                                params.insert("reason".to_string(), serde_json::Value::String(reason));
-                                            }
-                                            Some(NotificationParams {
-                                                meta: None,
-                                                other: params,
-                                            })
-                                        },
-                                    },
-                                },
-                            };
-                            if let Err(e) = sink_tx.send(JSONRPCMessage::Notification(jsonrpc_notification)).await {
-                                error!("Error sending notification to client: {}", e);
+                            Some(Err(e)) => {
+                                error!("Error reading message: {}", e);
+                                break;
+                            }
+                            None => {
+                                info!("Client disconnected");
                                 break;
                             }
                         }
-                        Err(e) => {
-                            debug!("Notification channel closed: {}", e);
-                            // This is expected when the server shuts down
+                    }
+
+                    // Handle runtime registration commands
+                    command_tuple = command_rx.recv() => {
+                        match command_tuple {
+                            None => {
+                                info!("Command channel closed, stopping server");
+                                break;
+                            }
+                            Some((command, tx)) => {
+                                match command {
+                                    ServerCommand::RegisterTool(handler) => {
+                                        let metadata = handler.metadata();
+                                        let name = metadata.name.clone();
+                                        server.tools.insert(name, handler);
+                                        server.send_server_notification(&notification_tx, ServerNotification::ToolListChanged);
+                                        // info!("Tool '{:?}' registered successfully", name);
+                                        if let Err(e) = tx.send(Ok(())) {
+                                            error!("Failed to send response for tool registration: {:?}", e);
+                                        }
+                                    }
+                                    ServerCommand::RemoveTool(name) => {
+                                        let result = server.tools.remove(&name);
+                                        if result.is_some() {
+                                            server.send_server_notification(&notification_tx, ServerNotification::ToolListChanged);
+                                            info!("Tool '{}' removed successfully", name);
+                                        } else {
+                                            warn!("Tool '{}' not found for removal", name);
+                                        }
+                                        // Always return Ok, regardless of whether tool existed
+                                        if let Err(e) = tx.send(Ok(())) {
+                                            error!("Failed to send response for tool removal: {:?}", e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Forward internal notifications to client
+                    result = notification_rx.recv() => {
+                        match result {
+                            Ok(notification) => {
+                                let jsonrpc_notification = JSONRPCNotification {
+                                    jsonrpc: JSONRPC_VERSION.to_string(),
+                                    notification: Notification {
+                                        method: match notification {
+                                            ServerNotification::ToolListChanged => "notifications/tools/list_changed",
+                                            ServerNotification::ResourceListChanged => "notifications/resources/list_changed",
+                                            ServerNotification::PromptListChanged => "notifications/prompts/list_changed",
+                                            ServerNotification::ResourceUpdated { .. } => "notifications/resources/updated",
+                                            ServerNotification::LoggingMessage { .. } => "notifications/message",
+                                            ServerNotification::Progress { .. } => "notifications/progress",
+                                            ServerNotification::Cancelled { .. } => "notifications/cancelled",
+                                        }.to_string(),
+                                        params: match notification {
+                                            ServerNotification::ToolListChanged |
+                                            ServerNotification::ResourceListChanged |
+                                            ServerNotification::PromptListChanged => None,
+                                            ServerNotification::ResourceUpdated { uri } => {
+                                                let mut params = HashMap::new();
+                                                params.insert("uri".to_string(), serde_json::Value::String(uri));
+                                                Some(NotificationParams {
+                                                    meta: None,
+                                                    other: params,
+                                                })
+                                            },
+                                            ServerNotification::LoggingMessage { level, logger, data } => {
+                                                let mut params = HashMap::new();
+                                                params.insert("level".to_string(), serde_json::to_value(level).unwrap());
+                                                if let Some(logger) = logger {
+                                                    params.insert("logger".to_string(), serde_json::Value::String(logger));
+                                                }
+                                                params.insert("data".to_string(), data);
+                                                Some(NotificationParams {
+                                                    meta: None,
+                                                    other: params,
+                                                })
+                                            },
+                                            ServerNotification::Progress { progress_token, progress, total, message } => {
+                                                let mut params = HashMap::new();
+                                                params.insert("progressToken".to_string(), serde_json::to_value(progress_token).unwrap());
+                                                params.insert("progress".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(progress).unwrap()));
+                                                if let Some(total) = total {
+                                                    params.insert("total".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(total).unwrap()));
+                                                }
+                                                if let Some(message) = message {
+                                                    params.insert("message".to_string(), serde_json::Value::String(message));
+                                                }
+                                                Some(NotificationParams {
+                                                    meta: None,
+                                                    other: params,
+                                                })
+                                            },
+                                            ServerNotification::Cancelled { request_id, reason } => {
+                                                let mut params = HashMap::new();
+                                                params.insert("requestId".to_string(), serde_json::to_value(request_id).unwrap());
+                                                if let Some(reason) = reason {
+                                                    params.insert("reason".to_string(), serde_json::Value::String(reason));
+                                                }
+                                                Some(NotificationParams {
+                                                    meta: None,
+                                                    other: params,
+                                                })
+                                            },
+                                        },
+                                    },
+                                };
+                                if let Err(e) = sink_tx.send(JSONRPCMessage::Notification(jsonrpc_notification)).await {
+                                    error!("Error sending notification to client: {}", e);
+                                    break;
+                                }
+                            }
+                            Err(e) => {
+                                debug!("Notification channel closed: {}", e);
+                                // This is expected when the server shuts down
+                            }
                         }
                     }
                 }
             }
-        }
+            info!("MCP server stopped");
+        });
 
-        info!("MCP server stopped");
-        Ok(())
+        Ok(MCPServerHandle {
+            handle,
+            command_tx,
+            notification_tx: notification_tx_handle,
+        })
     }
+}
 
+impl MCPServer {
     /// Handle an incoming message
     async fn handle_message(
         &self,
@@ -386,8 +442,7 @@ impl MCPServer {
 
     /// Handle list tools request
     async fn handle_list_tools(&self) -> Result<serde_json::Value> {
-        let tools = self.tools.lock().await;
-        let tool_list: Vec<Tool> = tools.values().map(|h| h.metadata()).collect();
+        let tool_list: Vec<Tool> = self.tools.values().map(|h| h.metadata()).collect();
 
         let result = ListToolsResult {
             tools: tool_list,
@@ -417,13 +472,13 @@ impl MCPServer {
             ));
         };
 
-        let tools = self.tools.lock().await;
-        let handler = tools
-            .get(&params.name)
-            .ok_or_else(|| MCPError::ToolExecutionFailed {
-                tool: params.name.clone(),
-                message: "Tool not found".to_string(),
-            })?;
+        let handler =
+            self.tools
+                .get(&params.name)
+                .ok_or_else(|| MCPError::ToolExecutionFailed {
+                    tool: params.name.clone(),
+                    message: "Tool not found".to_string(),
+                })?;
 
         let tool_name = params.name.clone();
         let content = handler
@@ -460,8 +515,7 @@ impl MCPServer {
 
     /// Handle list resources request
     async fn handle_list_resources(&self) -> Result<serde_json::Value> {
-        let resources = self.resources.lock().await;
-        let resource_list: Vec<Resource> = resources.values().map(|h| h.metadata()).collect();
+        let resource_list: Vec<Resource> = self.resources.values().map(|h| h.metadata()).collect();
 
         let result = ListResourcesResult {
             resources: resource_list,
@@ -491,12 +545,12 @@ impl MCPServer {
             ));
         };
 
-        let resources = self.resources.lock().await;
-        let handler = resources
-            .get(&params.uri)
-            .ok_or_else(|| MCPError::ResourceNotFound {
-                uri: params.uri.clone(),
-            })?;
+        let handler =
+            self.resources
+                .get(&params.uri)
+                .ok_or_else(|| MCPError::ResourceNotFound {
+                    uri: params.uri.clone(),
+                })?;
 
         let uri = params.uri.clone();
         let contents = handler.read(params.uri).await.map_err(|e| match e {
@@ -517,8 +571,7 @@ impl MCPServer {
 
     /// Handle list prompts request
     async fn handle_list_prompts(&self) -> Result<serde_json::Value> {
-        let prompts = self.prompts.lock().await;
-        let prompt_list: Vec<Prompt> = prompts.values().map(|h| h.metadata()).collect();
+        let prompt_list: Vec<Prompt> = self.prompts.values().map(|h| h.metadata()).collect();
 
         let result = ListPromptsResult {
             prompts: prompt_list,
@@ -548,8 +601,7 @@ impl MCPServer {
             ));
         };
 
-        let prompts = self.prompts.lock().await;
-        let handler = prompts.get(&params.name).ok_or_else(|| {
+        let handler = self.prompts.get(&params.name).ok_or_else(|| {
             MCPError::handler_error("prompt", format!("Prompt '{}' not found", params.name))
         })?;
 
@@ -588,10 +640,58 @@ impl MCPServer {
     }
 }
 
+impl MCPServerHandle {
+    /// Register a tool handler at runtime
+    pub async fn register_tool(&self, handler: Box<dyn ToolHandler>) -> Result<()> {
+        self.send_command(ServerCommand::RegisterTool(handler))
+            .await
+    }
+
+    /// Remove a tool handler at runtime
+    pub async fn remove_tool(&self, name: &str) -> Result<()> {
+        self.send_command(ServerCommand::RemoveTool(name.to_string()))
+            .await
+    }
+
+    async fn send_command(&self, command: ServerCommand) -> Result<()> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.command_tx.send((command, tx)).await.map_err(|e| {
+            MCPError::InternalError(format!("Failed to send command to server: {}", e))
+        })?;
+        rx.await.map_err(|e| {
+            MCPError::InternalError(format!("Failed to receive command response: {}", e))
+        })?
+    }
+
+    pub async fn stop(self) -> Result<()> {
+        // Signal the server to stop by dropping the command channel
+        drop(self.command_tx);
+
+        // Wait for the server task to complete
+        self.handle
+            .await
+            .map_err(|e| MCPError::InternalError(format!("Server task failed: {}", e)))?;
+        Ok(())
+    }
+
+    /// Send a server notification
+    pub fn send_server_notification(&self, notification: ServerNotification) {
+        // TODO Skip sending notifications if specific server capabilities are not enabled
+        if let Err(e) = self.notification_tx.send(notification.clone()) {
+            error!(
+                "Failed to send server notification {:?}: {}",
+                notification, e
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::{timeout, Duration};
+    use tokio::io::DuplexStream;
+    use tokio::time::timeout;
+    use tokio::time::Duration;
 
     // Mock tool handler for testing
     struct MockToolHandler {
@@ -621,6 +721,34 @@ mod tests {
         }
     }
 
+    // Simple test transport for unit tests
+    struct SimpleTestTransport {
+        stream: Option<DuplexStream>,
+    }
+
+    impl SimpleTestTransport {
+        fn new(stream: DuplexStream) -> Self {
+            Self {
+                stream: Some(stream),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl crate::transport::Transport for SimpleTestTransport {
+        async fn connect(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn framed(mut self: Box<Self>) -> Result<Box<dyn crate::transport::TransportStream>> {
+            let stream = self.stream.take().unwrap();
+            Ok(Box::new(tokio_util::codec::Framed::new(
+                stream,
+                crate::codec::JsonRpcCodec::new(),
+            )))
+        }
+    }
+
     #[test]
     fn test_server_creation() {
         let server = MCPServer::new("test-server".to_string(), "1.0.0".to_string());
@@ -630,14 +758,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_registration_sends_notification() {
-        let mut server = MCPServer::new("test-server".to_string(), "1.0.0".to_string());
-        let mut notification_rx = server.notification_tx.subscribe();
+        let server = MCPServer::new("test-server".to_string(), "1.0.0".to_string());
+        let (client, server_stream) = tokio::io::duplex(1024);
+        let transport = Box::new(SimpleTestTransport::new(server_stream));
+
+        let server_handle = MCPServerHandle::new(server, transport).await.unwrap();
+        let mut notification_rx = server_handle.notification_tx.subscribe();
 
         // Register a tool
         let tool_handler = Box::new(MockToolHandler {
             name: "test-tool".to_string(),
         });
-        server.register_tool(tool_handler).await;
+        let registered = server_handle.register_tool(tool_handler).await;
+        assert!(registered.is_ok());
 
         // Check that we received a notification
         let notification = timeout(Duration::from_millis(100), notification_rx.recv())
@@ -646,25 +779,31 @@ mod tests {
             .expect("Should receive notification successfully");
 
         assert!(matches!(notification, ServerNotification::ToolListChanged));
+
+        // Clean up
+        drop(client);
+        let _ = server_handle.stop().await;
     }
 
     #[tokio::test]
     async fn test_tool_removal_sends_notification() {
         let mut server = MCPServer::new("test-server".to_string(), "1.0.0".to_string());
-        let mut notification_rx = server.notification_tx.subscribe();
 
         // First register a tool
         let tool_handler = Box::new(MockToolHandler {
             name: "test-tool".to_string(),
         });
-        server.register_tool(tool_handler).await;
+        server.register_tool(tool_handler);
 
-        // Drain the first notification
-        let _ = notification_rx.recv().await;
+        // Run the server
+        let (client, server_stream) = tokio::io::duplex(1024);
+        let transport = Box::new(SimpleTestTransport::new(server_stream));
+        let server_handle = MCPServerHandle::new(server, transport).await.unwrap();
+        let mut notification_rx = server_handle.notification_tx.subscribe();
 
-        // Remove the tool
-        let removed = server.remove_tool("test-tool").await;
-        assert!(removed.is_some());
+        // Remove the tool during runtime
+        let removed = server_handle.remove_tool("test-tool").await;
+        assert!(removed.is_ok());
 
         // Check that we received another notification
         let notification = timeout(Duration::from_millis(100), notification_rx.recv())
@@ -673,16 +812,23 @@ mod tests {
             .expect("Should receive notification successfully");
 
         assert!(matches!(notification, ServerNotification::ToolListChanged));
+
+        // Clean up
+        drop(client);
+        let _ = server_handle.stop().await;
     }
 
     #[tokio::test]
     async fn test_remove_nonexistent_tool_no_notification() {
-        let mut server = MCPServer::new("test-server".to_string(), "1.0.0".to_string());
-        let mut notification_rx = server.notification_tx.subscribe();
+        let server = MCPServer::new("test-server".to_string(), "1.0.0".to_string());
+        let (client, server_stream) = tokio::io::duplex(1024);
+        let transport = Box::new(SimpleTestTransport::new(server_stream));
+        let server_handle = MCPServerHandle::new(server, transport).await.unwrap();
+        let mut notification_rx = server_handle.notification_tx.subscribe();
 
         // Try to remove a tool that doesn't exist
-        let removed = server.remove_tool("nonexistent-tool").await;
-        assert!(removed.is_none());
+        let removed = server_handle.remove_tool("nonexistent-tool").await;
+        assert!(removed.is_ok());
 
         // Check that we don't receive any notification
         let result = timeout(Duration::from_millis(100), notification_rx.recv()).await;
@@ -690,63 +836,9 @@ mod tests {
             result.is_err(),
             "Should not receive notification for nonexistent tool removal"
         );
-    }
 
-    #[tokio::test]
-    async fn test_client_receives_tools_list_changed_notification() {
-        // This test verifies that when a server registers or removes tools,
-        // the notification is properly sent through the notification broadcast system.
-        // We test this by simulating the client-server notification flow.
-
-        let mut server = MCPServer::new("test-server".to_string(), "0.1.0".to_string());
-        let mut notification_rx = server.notification_tx.subscribe();
-
-        // Register initial tool (this triggers first notification)
-        server
-            .register_tool(Box::new(MockToolHandler {
-                name: "echo".to_string(),
-            }))
-            .await;
-
-        // Verify first notification
-        let notification = timeout(Duration::from_millis(100), notification_rx.recv())
-            .await
-            .expect("Should receive notification for tool registration")
-            .expect("Notification should be received successfully");
-
-        assert!(matches!(notification, ServerNotification::ToolListChanged));
-
-        // Register another tool (this triggers second notification)
-        server
-            .register_tool(Box::new(MockToolHandler {
-                name: "add".to_string(),
-            }))
-            .await;
-
-        // Verify second notification
-        let notification = timeout(Duration::from_millis(100), notification_rx.recv())
-            .await
-            .expect("Should receive notification for second tool registration")
-            .expect("Second notification should be received successfully");
-
-        assert!(matches!(notification, ServerNotification::ToolListChanged));
-
-        // Remove a tool (this triggers third notification)
-        let removed = server.remove_tool("echo").await;
-        assert!(removed.is_some());
-
-        // Verify third notification
-        let notification = timeout(Duration::from_millis(100), notification_rx.recv())
-            .await
-            .expect("Should receive notification for tool removal")
-            .expect("Third notification should be received successfully");
-
-        assert!(matches!(notification, ServerNotification::ToolListChanged));
-
-        // This test demonstrates that:
-        // 1. The server broadcasts "notifications/tools/list_changed" when tools are added
-        // 2. The server broadcasts "notifications/tools/list_changed" when tools are removed
-        // 3. In a real client-server setup, connected clients would receive these notifications
-        //    through the server's serve() method which forwards notifications to client connections
+        // Clean up
+        drop(client);
+        let _ = server_handle.stop().await;
     }
 }

@@ -210,10 +210,10 @@ async fn main() -> Result<()> {
                         );
 
                         // Register tools with different behaviors
-                        server.register_tool(Box::new(FlakeyTool::new(2))).await; // Fails first 2 attempts
-                        server.register_tool(Box::new(SlowTool::new(5))).await; // Takes 5 seconds
-                        server.register_tool(Box::new(BrokenTool)).await;
-                        server.register_tool(Box::new(ReliableTool)).await;
+                        server.register_tool(Box::new(FlakeyTool::new(2))); // Fails first 2 attempts
+                        server.register_tool(Box::new(SlowTool::new(5))); // Takes 5 seconds
+                        server.register_tool(Box::new(BrokenTool));
+                        server.register_tool(Box::new(ReliableTool));
 
                         info!("Registered tools for {}:", peer_addr);
                         info!("  - flakey_operation: Fails 2 times before succeeding");
@@ -227,9 +227,16 @@ async fn main() -> Result<()> {
                         // Handle the connection in a separate task
                         tokio::spawn(async move {
                             info!("Handling connection from {}", peer_addr);
-                            match server.serve(transport).await {
-                                Ok(()) => info!("Connection from {} closed", peer_addr),
-                                Err(e) => error!("Error handling connection from {}: {}", peer_addr, e),
+                            match tenx_mcp::MCPServerHandle::new(server, transport).await {
+                                Ok(server_handle) => {
+                                    info!("Server handle created for {}", peer_addr);
+                                    if let Err(e) = server_handle.handle.await {
+                                        error!("Server task failed for {}: {}", peer_addr, e);
+                                    } else {
+                                        info!("Connection from {} closed", peer_addr);
+                                    }
+                                },
+                                Err(e) => error!("Error creating server handle for {}: {}", peer_addr, e),
                             }
                         });
                     }

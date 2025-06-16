@@ -177,7 +177,7 @@ impl Transport for TcpServerTransport {
 pub use test_transport::TestTransport;
 
 #[cfg(test)]
-mod test_transport {
+pub(crate) mod test_transport {
     use std::{
         pin::Pin,
         task::{Context, Poll},

@@ -13,7 +13,7 @@ pub use schema::{
     ClientCapabilities, Content, Implementation, JSONRPCNotification, ResourceContents,
     ToolsCapability,
 };
-pub use server::{MCPServer, PromptHandler, ResourceHandler, ToolHandler};
+pub use server::{MCPServer, MCPServerHandle, PromptHandler, ResourceHandler, ToolHandler};
 pub use transport::{StdioTransport, TcpServerTransport, TcpTransport};
 
 #[cfg(test)]
