@@ -660,10 +660,10 @@ impl MCPServerHandle {
     async fn send_command(&self, command: ServerCommand) -> Result<()> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.command_tx.send((command, tx)).await.map_err(|e| {
-            MCPError::InternalError(format!("Failed to send command to server: {}", e))
+            MCPError::InternalError(format!("Failed to send command to server: {e}"))
         })?;
         rx.await.map_err(|e| {
-            MCPError::InternalError(format!("Failed to receive command response: {}", e))
+            MCPError::InternalError(format!("Failed to receive command response: {e}"))
         })?
     }
 
@@ -674,7 +674,7 @@ impl MCPServerHandle {
         // Wait for the server task to complete
         self.handle
             .await
-            .map_err(|e| MCPError::InternalError(format!("Server task failed: {}", e)))?;
+            .map_err(|e| MCPError::InternalError(format!("Server task failed: {e}")))?;
         Ok(())
     }
 
@@ -890,7 +890,7 @@ mod tests {
             client
                 .ping()
                 .await
-                .unwrap_or_else(|_| panic!("Ping {} failed", i));
+                .unwrap_or_else(|_| panic!("Ping {i} failed"));
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
     }

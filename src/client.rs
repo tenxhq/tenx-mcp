@@ -38,9 +38,11 @@ impl Default for ClientConfig {
     }
 }
 
+type TransportSink = Arc<Mutex<SplitSink<Box<dyn TransportStream>, JSONRPCMessage>>>;
+
 /// MCP Client implementation
 pub struct MCPClient {
-    transport_tx: Option<Arc<Mutex<SplitSink<Box<dyn TransportStream>, JSONRPCMessage>>>>,
+    transport_tx: Option<TransportSink>,
     pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<ResponseOrError>>>>,
     notification_tx: mpsc::Sender<JSONRPCNotification>,
     notification_rx: Option<mpsc::Receiver<JSONRPCNotification>>,
@@ -449,7 +451,7 @@ mod tests {
             client
                 .ping()
                 .await
-                .unwrap_or_else(|_| panic!("Ping {} failed", i));
+                .unwrap_or_else(|_| panic!("Ping {i} failed"));
         }
     }
 
@@ -466,13 +468,11 @@ mod tests {
         let duration = start.elapsed();
         let pings_per_second = num_pings as f64 / duration.as_secs_f64();
         println!(
-            "Client->Server: {} pings in {:?} ({:.1} pings/sec)",
-            num_pings, duration, pings_per_second
+            "Client->Server: {num_pings} pings in {duration:?} ({pings_per_second:.1} pings/sec)"
         );
         assert!(
             pings_per_second > 50.0,
-            "Too slow: {:.1} pings/sec",
-            pings_per_second
+            "Too slow: {pings_per_second:.1} pings/sec"
         );
     }
 }

@@ -108,7 +108,7 @@ async fn test_error_responses() {
     let mut stream = transport.framed().unwrap();
 
     // Test 1: Unknown method
-    if let Err(_) = stream
+    if stream
         .send(JSONRPCMessage::Request(JSONRPCRequest {
             jsonrpc: JSONRPC_VERSION.to_string(),
             id: RequestId::Number(1),
@@ -118,6 +118,7 @@ async fn test_error_responses() {
             },
         }))
         .await
+        .is_err()
     {
         // Connection closed, which is expected behavior
         server_handle.abort();

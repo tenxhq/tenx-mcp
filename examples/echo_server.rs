@@ -95,6 +95,6 @@ async fn main() -> Result<()> {
     server_handle
         .handle
         .await
-        .map_err(|e| MCPError::InternalError(format!("Server task failed: {}", e)))?;
+        .map_err(|e| MCPError::InternalError(format!("Server task failed: {e}")))?;
     Ok(())
 }
