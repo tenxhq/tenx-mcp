@@ -11,7 +11,7 @@ use crate::{
     error::{Error, Result},
     retry::RetryConfig,
     schema::*,
-    transport::{Transport, TransportStream},
+    transport::{StdioTransport, TcpClientTransport, Transport, TransportStream},
 };
 
 /// Type for handling either a response or error from JSON-RPC
@@ -68,6 +68,39 @@ impl Client {
             next_request_id: Arc::new(Mutex::new(1)),
             config,
         }
+    }
+
+    /// Set the retry configuration
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use tenx_mcp::{Client, retry::RetryConfig};
+    /// # use std::time::Duration;
+    /// let client = Client::new()
+    ///     .with_retry(RetryConfig {
+    ///         max_attempts: 5,
+    ///         initial_delay: Duration::from_millis(100),
+    ///         max_delay: Duration::from_secs(10),
+    ///         ..Default::default()
+    ///     });
+    /// ```
+    pub fn with_retry(mut self, retry: RetryConfig) -> Self {
+        self.config.retry = retry;
+        self
+    }
+
+    /// Set the request timeout
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use tenx_mcp::Client;
+    /// # use std::time::Duration;
+    /// let client = Client::new()
+    ///     .with_request_timeout(Duration::from_secs(60));
+    /// ```
+    pub fn with_request_timeout(mut self, timeout: Duration) -> Self {
+        self.config.request_timeout = timeout;
+        self
     }
 
     /// Connect using the provided transport
@@ -201,6 +234,107 @@ impl Client {
     /// Take the notification receiver channel
     pub fn take_notification_receiver(&mut self) -> Option<mpsc::Receiver<JSONRPCNotification>> {
         self.notification_rx.take()
+    }
+
+    /// Connect to a TCP server and initialize the connection
+    ///
+    /// This is a convenience method that creates a TCP transport,
+    /// connects to the server, and performs the initialization handshake.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use tenx_mcp::{Client, ClientCapabilities, Implementation, Result};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// let mut client = Client::new();
+    /// let server_info = client
+    ///     .connect_tcp("127.0.0.1:3000", "my-client", "1.0.0")
+    ///     .await?;
+    /// println!("Connected to: {}", server_info.server_info.name);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn connect_tcp(
+        &mut self,
+        addr: impl Into<String>,
+        client_name: impl Into<String>,
+        client_version: impl Into<String>,
+    ) -> Result<InitializeResult> {
+        self.connect_tcp_with_capabilities(
+            addr,
+            client_name,
+            client_version,
+            ClientCapabilities::default(),
+        )
+        .await
+    }
+
+    /// Connect to a TCP server with custom capabilities
+    pub async fn connect_tcp_with_capabilities(
+        &mut self,
+        addr: impl Into<String>,
+        client_name: impl Into<String>,
+        client_version: impl Into<String>,
+        capabilities: ClientCapabilities,
+    ) -> Result<InitializeResult> {
+        let transport = Box::new(TcpClientTransport::new(addr));
+        self.connect(transport).await?;
+
+        let client_info = Implementation {
+            name: client_name.into(),
+            version: client_version.into(),
+        };
+
+        self.initialize(client_info, capabilities).await
+    }
+
+    /// Connect via stdio and initialize the connection
+    ///
+    /// This is a convenience method that creates a stdio transport,
+    /// connects to the server, and performs the initialization handshake.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use tenx_mcp::{Client, ClientCapabilities, Result};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// let mut client = Client::new();
+    /// let server_info = client
+    ///     .connect_stdio("my-client", "1.0.0")
+    ///     .await?;
+    /// println!("Connected to: {}", server_info.server_info.name);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn connect_stdio(
+        &mut self,
+        client_name: impl Into<String>,
+        client_version: impl Into<String>,
+    ) -> Result<InitializeResult> {
+        self.connect_stdio_with_capabilities(
+            client_name,
+            client_version,
+            ClientCapabilities::default(),
+        )
+        .await
+    }
+
+    /// Connect via stdio with custom capabilities
+    pub async fn connect_stdio_with_capabilities(
+        &mut self,
+        client_name: impl Into<String>,
+        client_version: impl Into<String>,
+        capabilities: ClientCapabilities,
+    ) -> Result<InitializeResult> {
+        let transport = Box::new(StdioTransport::new());
+        self.connect(transport).await?;
+
+        let client_info = Implementation {
+            name: client_name.into(),
+            version: client_version.into(),
+        };
+
+        self.initialize(client_info, capabilities).await
     }
 
     /// Send a request with retry logic

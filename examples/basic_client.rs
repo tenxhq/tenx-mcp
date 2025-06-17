@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
-use tenx_mcp::{
-    schemars, Client, ClientCapabilities, Content, Implementation, Result, TcpClientTransport,
-};
+use tenx_mcp::{schemars, Client, Content, Result};
 use tracing::info;
 
 /// Echo tool input parameters - must match the server definition
@@ -27,21 +25,10 @@ async fn main() -> Result<()> {
 
     info!("Connecting to MCP server at {}", addr);
 
-    // Create client and connect
+    // Create client and connect using the new convenience method
     let mut client = Client::new();
-    let transport = Box::new(TcpClientTransport::new(addr));
-    client.connect(transport).await?;
-
-    // Initialize the connection
-    let client_info = Implementation {
-        name: "example-client".to_string(),
-        version: "0.1.0".to_string(),
-    };
-
-    let capabilities = ClientCapabilities::default();
-
-    let init_result = client.initialize(client_info, capabilities).await?;
-    info!("Connected to server: {}", init_result.server_info.name);
+    let server_info = client.connect_tcp(&addr, "example-client", "0.1.0").await?;
+    info!("Connected to server: {}", server_info.server_info.name);
 
     // List available tools
     let tools = client.list_tools().await?;
