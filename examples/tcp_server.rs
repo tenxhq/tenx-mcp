@@ -38,58 +38,50 @@ impl Connection for TcpExampleConnection {
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
-        Ok(ListToolsResult {
-            tools: vec![
-                Tool {
-                    name: "echo".to_string(),
-                    description: Some("Echoes back the provided message".to_string()),
-                    input_schema: ToolInputSchema {
-                        schema_type: "object".to_string(),
-                        properties: Some({
-                            let mut props = HashMap::new();
-                            props.insert(
-                                "message".to_string(),
-                                serde_json::json!({
-                                    "type": "string",
-                                    "description": "The message to echo back"
-                                }),
-                            );
-                            props
-                        }),
-                        required: Some(vec!["message".to_string()]),
-                    },
-                    annotations: None,
-                },
-                Tool {
-                    name: "add".to_string(),
-                    description: Some("Adds two numbers together".to_string()),
-                    input_schema: ToolInputSchema {
-                        schema_type: "object".to_string(),
-                        properties: Some({
-                            let mut props = HashMap::new();
-                            props.insert(
-                                "a".to_string(),
-                                serde_json::json!({
-                                    "type": "number",
-                                    "description": "First number"
-                                }),
-                            );
-                            props.insert(
-                                "b".to_string(),
-                                serde_json::json!({
-                                    "type": "number",
-                                    "description": "Second number"
-                                }),
-                            );
-                            props
-                        }),
-                        required: Some(vec!["a".to_string(), "b".to_string()]),
-                    },
-                    annotations: None,
-                },
-            ],
-            next_cursor: None,
-        })
+        let echo_schema = ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: Some({
+                let mut props = HashMap::new();
+                props.insert(
+                    "message".to_string(),
+                    serde_json::json!({
+                        "type": "string",
+                        "description": "The message to echo back"
+                    }),
+                );
+                props
+            }),
+            required: Some(vec!["message".to_string()]),
+        };
+
+        let add_schema = ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: Some({
+                let mut props = HashMap::new();
+                props.insert(
+                    "a".to_string(),
+                    serde_json::json!({
+                        "type": "number",
+                        "description": "First number"
+                    }),
+                );
+                props.insert(
+                    "b".to_string(),
+                    serde_json::json!({
+                        "type": "number",
+                        "description": "Second number"
+                    }),
+                );
+                props
+            }),
+            required: Some(vec!["a".to_string(), "b".to_string()]),
+        };
+
+        Ok(ListToolsResult::new()
+            .with_tool(
+                Tool::new("echo", echo_schema).with_description("Echoes back the provided message"),
+            )
+            .with_tool(Tool::new("add", add_schema).with_description("Adds two numbers together")))
     }
 
     async fn tools_call(

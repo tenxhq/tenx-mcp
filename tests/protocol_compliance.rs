@@ -26,60 +26,54 @@ impl TestConnection {
         let mut tools = HashMap::new();
 
         // Echo tool
+        let echo_schema = ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: Some({
+                let mut props = HashMap::new();
+                props.insert(
+                    "message".to_string(),
+                    json!({
+                        "type": "string",
+                        "description": "The message to echo"
+                    }),
+                );
+                props
+            }),
+            required: Some(vec!["message".to_string()]),
+        };
+
         tools.insert(
             "echo".to_string(),
-            Tool {
-                name: "echo".to_string(),
-                description: Some("Echoes the input message".to_string()),
-                input_schema: ToolInputSchema {
-                    schema_type: "object".to_string(),
-                    properties: Some({
-                        let mut props = HashMap::new();
-                        props.insert(
-                            "message".to_string(),
-                            json!({
-                                "type": "string",
-                                "description": "The message to echo"
-                            }),
-                        );
-                        props
-                    }),
-                    required: Some(vec!["message".to_string()]),
-                },
-                annotations: None,
-            },
+            Tool::new("echo", echo_schema).with_description("Echoes the input message"),
         );
 
         // Add tool
+        let add_schema = ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: Some({
+                let mut props = HashMap::new();
+                props.insert(
+                    "a".to_string(),
+                    json!({
+                        "type": "number",
+                        "description": "First number"
+                    }),
+                );
+                props.insert(
+                    "b".to_string(),
+                    json!({
+                        "type": "number",
+                        "description": "Second number"
+                    }),
+                );
+                props
+            }),
+            required: Some(vec!["a".to_string(), "b".to_string()]),
+        };
+
         tools.insert(
             "add".to_string(),
-            Tool {
-                name: "add".to_string(),
-                description: Some("Adds two numbers".to_string()),
-                input_schema: ToolInputSchema {
-                    schema_type: "object".to_string(),
-                    properties: Some({
-                        let mut props = HashMap::new();
-                        props.insert(
-                            "a".to_string(),
-                            json!({
-                                "type": "number",
-                                "description": "First number"
-                            }),
-                        );
-                        props.insert(
-                            "b".to_string(),
-                            json!({
-                                "type": "number",
-                                "description": "Second number"
-                            }),
-                        );
-                        props
-                    }),
-                    required: Some(vec!["a".to_string(), "b".to_string()]),
-                },
-                annotations: None,
-            },
+            Tool::new("add", add_schema).with_description("Adds two numbers"),
         );
 
         Self { tools }
@@ -112,10 +106,11 @@ impl Connection for TestConnection {
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
-        Ok(ListToolsResult {
-            tools: self.tools.values().cloned().collect(),
-            next_cursor: None,
-        })
+        let mut result = ListToolsResult::new();
+        for tool in self.tools.values() {
+            result = result.with_tool(tool.clone());
+        }
+        Ok(result)
     }
 
     async fn tools_call(

@@ -56,10 +56,7 @@ pub trait Connection: Send + Sync {
 
     /// List available tools
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
-        Ok(ListToolsResult {
-            tools: vec![],
-            next_cursor: None,
-        })
+        Ok(ListToolsResult::default())
     }
 
     /// Call a tool

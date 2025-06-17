@@ -60,51 +60,29 @@ impl Connection for TimeoutTestConnection {
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
-        Ok(ListToolsResult {
-            tools: vec![
-                Tool {
-                    name: "flakey_operation".to_string(),
-                    description: Some("Simulates a flaky network operation".to_string()),
-                    input_schema: ToolInputSchema {
-                        schema_type: "object".to_string(),
-                        properties: None,
-                        required: None,
-                    },
-                    annotations: None,
-                },
-                Tool {
-                    name: "slow_operation".to_string(),
-                    description: Some("Simulates a slow operation that may timeout".to_string()),
-                    input_schema: ToolInputSchema {
-                        schema_type: "object".to_string(),
-                        properties: None,
-                        required: None,
-                    },
-                    annotations: None,
-                },
-                Tool {
-                    name: "broken_operation".to_string(),
-                    description: Some("Always fails with a non-retryable error".to_string()),
-                    input_schema: ToolInputSchema {
-                        schema_type: "object".to_string(),
-                        properties: None,
-                        required: None,
-                    },
-                    annotations: None,
-                },
-                Tool {
-                    name: "reliable_operation".to_string(),
-                    description: Some("Always succeeds immediately".to_string()),
-                    input_schema: ToolInputSchema {
-                        schema_type: "object".to_string(),
-                        properties: None,
-                        required: None,
-                    },
-                    annotations: None,
-                },
-            ],
-            next_cursor: None,
-        })
+        let object_schema = ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: None,
+            required: None,
+        };
+
+        Ok(ListToolsResult::new()
+            .with_tool(
+                Tool::new("flakey_operation", object_schema.clone())
+                    .with_description("Simulates a flaky network operation"),
+            )
+            .with_tool(
+                Tool::new("slow_operation", object_schema.clone())
+                    .with_description("Simulates a slow operation that may timeout"),
+            )
+            .with_tool(
+                Tool::new("broken_operation", object_schema.clone())
+                    .with_description("Always fails with a non-retryable error"),
+            )
+            .with_tool(
+                Tool::new("reliable_operation", object_schema)
+                    .with_description("Always succeeds immediately"),
+            ))
     }
 
     async fn tools_call(

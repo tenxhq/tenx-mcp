@@ -43,26 +43,21 @@ impl Connection for TestConnection {
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
-        Ok(ListToolsResult {
-            tools: vec![Tool {
-                name: "test".to_string(),
-                description: Some("Test tool".to_string()),
-                input_schema: ToolInputSchema {
-                    schema_type: "object".to_string(),
-                    properties: Some({
-                        let mut props = HashMap::new();
-                        props.insert(
-                            "required_field".to_string(),
-                            serde_json::json!({"type": "string"}),
-                        );
-                        props
-                    }),
-                    required: Some(vec!["required_field".to_string()]),
-                },
-                annotations: None,
-            }],
-            next_cursor: None,
-        })
+        let schema = ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: Some({
+                let mut props = HashMap::new();
+                props.insert(
+                    "required_field".to_string(),
+                    serde_json::json!({"type": "string"}),
+                );
+                props
+            }),
+            required: Some(vec!["required_field".to_string()]),
+        };
+
+        Ok(ListToolsResult::new()
+            .with_tool(Tool::new("test", schema).with_description("Test tool")))
     }
 
     async fn tools_call(

@@ -29,29 +29,24 @@ impl Connection for EchoConnection {
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
-        Ok(ListToolsResult {
-            tools: vec![Tool {
-                name: "echo".to_string(),
-                description: Some("Echoes the input message".to_string()),
-                input_schema: ToolInputSchema {
-                    schema_type: "object".to_string(),
-                    properties: Some({
-                        let mut props = HashMap::new();
-                        props.insert(
-                            "message".to_string(),
-                            json!({
-                                "type": "string",
-                                "description": "The message to echo"
-                            }),
-                        );
-                        props
+        let schema = ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: Some({
+                let mut props = HashMap::new();
+                props.insert(
+                    "message".to_string(),
+                    json!({
+                        "type": "string",
+                        "description": "The message to echo"
                     }),
-                    required: Some(vec!["message".to_string()]),
-                },
-                annotations: None,
-            }],
-            next_cursor: None,
-        })
+                );
+                props
+            }),
+            required: Some(vec!["message".to_string()]),
+        };
+
+        Ok(ListToolsResult::new()
+            .with_tool(Tool::new("echo", schema).with_description("Echoes the input message")))
     }
 
     async fn tools_call(
