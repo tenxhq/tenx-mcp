@@ -125,27 +125,29 @@ impl Connection for TestConnection {
     ) -> Result<CallToolResult> {
         match name.as_str() {
             "echo" => {
-                let args =
-                    arguments.ok_or_else(|| Error::invalid_params("echo", "Missing arguments"))?;
+                let args = arguments
+                    .ok_or_else(|| Error::InvalidParams("echo: Missing arguments".to_string()))?;
                 let message = args
                     .get("message")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| Error::invalid_params("echo", "Missing message parameter"))?;
+                    .ok_or_else(|| {
+                        Error::InvalidParams("echo: Missing message parameter".to_string())
+                    })?;
 
                 Ok(CallToolResult::new()
                     .with_text_content(message.to_string())
                     .is_error(false))
             }
             "add" => {
-                let args =
-                    arguments.ok_or_else(|| Error::invalid_params("add", "Missing arguments"))?;
+                let args = arguments
+                    .ok_or_else(|| Error::InvalidParams("add: Missing arguments".to_string()))?;
 
                 let a = args.get("a").and_then(|v| v.as_f64()).ok_or_else(|| {
-                    Error::invalid_params("add", "Missing or invalid 'a' parameter")
+                    Error::InvalidParams("add: Missing or invalid 'a' parameter".to_string())
                 })?;
 
                 let b = args.get("b").and_then(|v| v.as_f64()).ok_or_else(|| {
-                    Error::invalid_params("add", "Missing or invalid 'b' parameter")
+                    Error::InvalidParams("add: Missing or invalid 'b' parameter".to_string())
                 })?;
 
                 Ok(CallToolResult::new()
@@ -196,7 +198,7 @@ mod tests {
         // Test error on missing arguments
         let error = conn.tools_call("echo".to_string(), None).await.unwrap_err();
         match error {
-            Error::InvalidParams { .. } => {}
+            Error::InvalidParams(_) => {}
             _ => panic!("Expected InvalidParams error"),
         }
 
@@ -206,7 +208,7 @@ mod tests {
             .await
             .unwrap_err();
         match error {
-            Error::InvalidParams { .. } => {}
+            Error::InvalidParams(_) => {}
             _ => panic!("Expected InvalidParams error"),
         }
     }
@@ -257,7 +259,7 @@ mod tests {
         // Test error on missing arguments
         let error = conn.tools_call("add".to_string(), None).await.unwrap_err();
         match error {
-            Error::InvalidParams { .. } => {}
+            Error::InvalidParams(_) => {}
             _ => panic!("Expected InvalidParams error"),
         }
 
@@ -267,7 +269,7 @@ mod tests {
             .await
             .unwrap_err();
         match error {
-            Error::InvalidParams { .. } => {}
+            Error::InvalidParams(_) => {}
             _ => panic!("Expected InvalidParams error"),
         }
 
@@ -277,7 +279,7 @@ mod tests {
             .await
             .unwrap_err();
         match error {
-            Error::InvalidParams { .. } => {}
+            Error::InvalidParams(_) => {}
             _ => panic!("Expected InvalidParams error"),
         }
     }

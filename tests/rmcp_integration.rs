@@ -67,11 +67,12 @@ impl Connection for EchoConnection {
             });
         }
 
-        let args = arguments.ok_or_else(|| Error::invalid_params("echo", "Missing arguments"))?;
+        let args =
+            arguments.ok_or_else(|| Error::InvalidParams("echo: Missing arguments".to_string()))?;
         let message = args
             .get("message")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| Error::invalid_params("echo", "Missing message parameter"))?;
+            .ok_or_else(|| Error::InvalidParams("echo: Missing message parameter".to_string()))?;
 
         Ok(CallToolResult {
             content: vec![Content::Text(TextContent {
@@ -229,7 +230,9 @@ async fn test_rmcp_server_with_tenx_client() {
                     .as_ref()
                     .and_then(|args| args.get("text"))
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| rmcp::Error::invalid_params("Missing text parameter", None))?;
+                    .ok_or_else(|| {
+                        rmcp::Error::invalid_params("reverse: Missing text parameter", None)
+                    })?;
 
                 let reversed = text.chars().rev().collect::<String>();
 

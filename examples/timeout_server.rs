@@ -148,10 +148,9 @@ impl Connection for TimeoutTestConnection {
             }
             "broken_operation" => {
                 // Return an error that is not retryable
-                Err(Error::InvalidParams {
-                    method: "broken_operation".to_string(),
-                    message: "This operation is permanently broken".to_string(),
-                })
+                Err(Error::InvalidParams(
+                    "broken_operation: This operation is permanently broken".to_string(),
+                ))
             }
             "reliable_operation" => Ok(CallToolResult::new()
                 .with_text_content("Reliable operation completed")

@@ -59,13 +59,10 @@ impl Connection for BasicConnection {
         if name != "echo" {
             return Err(Error::ToolNotFound(name));
         }
-
         let params = match arguments {
-            Some(args) => serde_json::from_value::<EchoParams>(args)
-                .map_err(|e| Error::invalid_params("echo", format!("Invalid parameters: {e}")))?,
-            None => return Err(Error::invalid_params("echo", "No arguments provided")),
+            Some(args) => serde_json::from_value::<EchoParams>(args)?,
+            None => return Err(Error::InvalidParams("No arguments provided".to_string())),
         };
-
         Ok(CallToolResult::new()
             .with_text_content(params.message)
             .is_error(false))

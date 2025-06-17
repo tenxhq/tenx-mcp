@@ -272,9 +272,11 @@ impl MCPClient {
                         // Map JSON-RPC errors to appropriate MCPError variants
                         match error.error.code {
                             METHOD_NOT_FOUND => Err(Error::MethodNotFound(error.error.message)),
-                            INVALID_PARAMS => {
-                                Err(Error::invalid_params(request.method(), error.error.message))
-                            }
+                            INVALID_PARAMS => Err(Error::InvalidParams(format!(
+                                "{}: {}",
+                                request.method(),
+                                error.error.message
+                            ))),
                             _ => Err(Error::Protocol(format!(
                                 "JSON-RPC error {}: {}",
                                 error.error.code, error.error.message

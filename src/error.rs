@@ -11,7 +11,7 @@ pub enum Error {
     Io { message: String },
 
     #[error("JSON serialization error: {message}")]
-    Json { message: String },
+    JsonParse { message: String },
 
     #[error("Transport error: {0}")]
     Transport(String),
@@ -31,8 +31,8 @@ pub enum Error {
     #[error("Method not found: {0}")]
     MethodNotFound(String),
 
-    #[error("Invalid parameters for method '{method}': {message}")]
-    InvalidParams { method: String, message: String },
+    #[error("Invalid parameters: {0}")]
+    InvalidParams(String),
 
     #[error("Internal error: {0}")]
     InternalError(String),
@@ -69,14 +69,6 @@ pub enum Error {
 }
 
 impl Error {
-    /// Create an InvalidParams error with method context
-    pub fn invalid_params(method: impl Into<String>, message: impl Into<String>) -> Self {
-        Self::InvalidParams {
-            method: method.into(),
-            message: message.into(),
-        }
-    }
-
     /// Create a Timeout error with duration and request context
     pub fn timeout(duration: Duration, request_id: impl Into<String>) -> Self {
         Self::Timeout {
@@ -122,12 +114,13 @@ impl Error {
             Self::MethodNotFound(method_name) => {
                 (METHOD_NOT_FOUND, format!("Method not found: {method_name}"))
             }
-            Self::InvalidParams { method, message } => (
-                INVALID_PARAMS,
-                format!("Invalid parameters for method '{method}': {message}"),
-            ),
+            Self::InvalidParams(message) => {
+                (INVALID_PARAMS, format!("Invalid parameters: {message}"))
+            }
             Self::InvalidRequest(msg) => (INVALID_REQUEST, format!("Invalid request: {msg}")),
-            Self::Json { message } => (PARSE_ERROR, format!("JSON serialization error: {message}")),
+            Self::JsonParse { message } => {
+                (PARSE_ERROR, format!("JSON serialization error: {message}"))
+            }
             Self::InvalidMessageFormat { message } => {
                 (PARSE_ERROR, format!("Invalid message format: {message}"))
             }
@@ -157,7 +150,7 @@ impl From<std::io::Error> for Error {
 
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
-        Self::Json {
+        Self::JsonParse {
             message: err.to_string(),
         }
     }

@@ -74,12 +74,12 @@ impl Connection for TestConnection {
             });
         }
 
-        let args =
-            arguments.ok_or_else(|| Error::invalid_params("strict_params", "Missing arguments"))?;
+        let args = arguments
+            .ok_or_else(|| Error::InvalidParams("strict_params: Missing arguments".to_string()))?;
 
-        let _field = args
-            .get("required_field")
-            .ok_or_else(|| Error::invalid_params("strict_params", "Missing required_field"))?;
+        let _field = args.get("required_field").ok_or_else(|| {
+            Error::InvalidParams("strict_params: Missing required_field".to_string())
+        })?;
 
         Ok(CallToolResult::new()
             .with_text_content("Success")

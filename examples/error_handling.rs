@@ -93,16 +93,16 @@ impl Connection for ErrorHandlingConnection {
             )),
             "strict_tool" => {
                 let args = arguments.ok_or_else(|| {
-                    Error::invalid_params("strict_tool", "Missing arguments object")
+                    Error::InvalidParams("strict_tool: Missing arguments object".to_string())
                 })?;
 
                 let required_field = args
                     .get("required_field")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        Error::invalid_params(
-                            "strict_tool",
-                            "Missing or invalid 'required_field' parameter",
+                        Error::InvalidParams(
+                            "strict_tool: Missing or invalid 'required_field' parameter"
+                                .to_string(),
                         )
                     })?;
 
