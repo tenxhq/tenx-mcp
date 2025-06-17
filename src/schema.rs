@@ -1022,6 +1022,51 @@ impl ToolInputSchema {
         required.extend(names.into_iter().map(|n| n.into()));
         self
     }
+
+    /// Create a ToolInputSchema from a type that implements schemars::JsonSchema
+    pub fn from_json_schema<T: schemars::JsonSchema>() -> Self {
+        let root_schema = schemars::schema_for!(T);
+
+        // Convert the root schema to JSON
+        let schema_json = serde_json::to_value(&root_schema).unwrap_or_default();
+
+        // Extract the schema object
+        let schema_obj = schema_json.get("schema").unwrap_or(&schema_json);
+
+        // Extract type
+        let schema_type = schema_obj
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("object")
+            .to_string();
+
+        // Extract properties
+        let properties = schema_obj
+            .get("properties")
+            .and_then(|v| v.as_object())
+            .map(|props| {
+                props
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<HashMap<_, _>>()
+            });
+
+        // Extract required fields
+        let required = schema_obj
+            .get("required")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect::<Vec<_>>()
+            });
+
+        Self {
+            schema_type,
+            properties,
+            required,
+        }
+    }
 }
 
 // Logging
@@ -1644,4 +1689,68 @@ pub enum ServerResult {
     ReadResource(ReadResourceResult),
     CallTool(CallToolResult),
     ListTools(ListToolsResult),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use schemars::JsonSchema;
+
+    #[derive(JsonSchema, Serialize)]
+    struct TestInput {
+        name: String,
+        age: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        email: Option<String>,
+    }
+
+    #[test]
+    fn test_tool_input_schema_from_json_schema() {
+        let schema = ToolInputSchema::from_json_schema::<TestInput>();
+
+        assert_eq!(schema.schema_type, "object");
+
+        let properties = schema.properties.expect("Should have properties");
+        assert!(properties.contains_key("name"));
+        assert!(properties.contains_key("age"));
+        assert!(properties.contains_key("email"));
+
+        let required = schema.required.expect("Should have required fields");
+        assert!(required.contains(&"name".to_string()));
+        assert!(required.contains(&"age".to_string()));
+        assert!(!required.contains(&"email".to_string()));
+    }
+
+    #[derive(JsonSchema, Serialize)]
+    struct ComplexInput {
+        id: i64,
+        tags: Vec<String>,
+        metadata: HashMap<String, String>,
+    }
+
+    #[test]
+    fn test_complex_schema_conversion() {
+        let schema = ToolInputSchema::from_json_schema::<ComplexInput>();
+
+        assert_eq!(schema.schema_type, "object");
+
+        let properties = schema.properties.expect("Should have properties");
+        assert!(properties.contains_key("id"));
+        assert!(properties.contains_key("tags"));
+        assert!(properties.contains_key("metadata"));
+
+        // Verify array type for tags
+        let tags_schema = &properties["tags"];
+        assert_eq!(
+            tags_schema.get("type").and_then(|v| v.as_str()),
+            Some("array")
+        );
+
+        // Verify object type for metadata
+        let metadata_schema = &properties["metadata"];
+        assert_eq!(
+            metadata_schema.get("type").and_then(|v| v.as_str()),
+            Some("object")
+        );
+    }
 }

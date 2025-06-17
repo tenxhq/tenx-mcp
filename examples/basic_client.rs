@@ -1,6 +1,16 @@
+use serde::{Deserialize, Serialize};
 use std::env;
-use tenx_mcp::{ClientCapabilities, Content, Implementation, MCPClient, Result, TcpTransport};
+use tenx_mcp::{
+    schemars, ClientCapabilities, Content, Implementation, MCPClient, Result, TcpTransport,
+};
 use tracing::info;
+
+/// Echo tool input parameters - must match the server definition
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
+struct EchoParams {
+    /// The message to echo back
+    message: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -46,12 +56,13 @@ async fn main() -> Result<()> {
 
     // Call the echo tool
     info!("\nCalling echo tool...");
+    let echo_params = EchoParams {
+        message: "Hello from tenx-mcp client!".to_string(),
+    };
     let result = client
         .call_tool(
             "echo".to_string(),
-            Some(serde_json::json!({
-                "message": "Hello from tenx-mcp client!"
-            })),
+            Some(serde_json::to_value(&echo_params)?),
         )
         .await?;
 

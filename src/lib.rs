@@ -13,10 +13,13 @@ pub use connection::{Connection, ConnectionContext};
 pub use error::{Error, Result};
 pub use schema::{
     ClientCapabilities, Content, Implementation, JSONRPCNotification, ResourceContents,
-    ToolsCapability,
+    ToolInputSchema, ToolsCapability,
 };
 pub use server::{MCPServer, MCPServerHandle};
 pub use transport::{StdioTransport, TcpServerTransport, TcpTransport};
+
+// Re-export schemars for users
+pub use schemars;
 
 #[cfg(test)]
 mod tests {

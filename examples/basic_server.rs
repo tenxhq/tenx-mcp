@@ -8,10 +8,11 @@
 //!   cargo run --example basic_server  # defaults to 127.0.0.1:3000
 
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::env;
 use tenx_mcp::{
-    connection::Connection, error::Error, schema::*, transport::TcpServerTransport, MCPServer,
-    MCPServerHandle, Result,
+    connection::Connection, error::Error, schema::*, schemars, transport::TcpServerTransport,
+    MCPServer, MCPServerHandle, Result,
 };
 use tokio::net::TcpListener;
 use tokio::signal;
@@ -19,6 +20,13 @@ use tracing::{error, info};
 
 const NAME: &str = "basic-server";
 const VERSION: &str = "0.1.0";
+
+/// Echo tool input parameters
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
+struct EchoParams {
+    /// The message to echo back
+    message: String,
+}
 
 /// Basic server connection that provides an echo tool
 #[derive(Debug, Default)]
@@ -37,16 +45,10 @@ impl Connection for BasicConnection {
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
-        Ok(ListToolsResult::default().with_tool(Tool::new(
-            "echo",
-            ToolInputSchema::default().with_property(
-                "message",
-                serde_json::json!({
-                    "type": "string",
-                    "description": "The message to echo back"
-                }),
-            ),
-        )))
+        Ok(ListToolsResult::default().with_tool(
+            Tool::new("echo", ToolInputSchema::from_json_schema::<EchoParams>())
+                .with_description("Echoes back the provided message"),
+        ))
     }
 
     async fn tools_call(
@@ -58,15 +60,14 @@ impl Connection for BasicConnection {
             return Err(Error::ToolNotFound(name));
         }
 
-        let message = arguments
-            .as_ref()
-            .and_then(|args| args.get("message"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("No message provided")
-            .to_string();
+        let params = match arguments {
+            Some(args) => serde_json::from_value::<EchoParams>(args)
+                .map_err(|e| Error::invalid_params("echo", format!("Invalid parameters: {e}")))?,
+            None => return Err(Error::invalid_params("echo", "No arguments provided")),
+        };
 
         Ok(CallToolResult::new()
-            .with_text_content(message)
+            .with_text_content(params.message)
             .is_error(false))
     }
 }

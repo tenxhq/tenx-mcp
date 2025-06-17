@@ -119,19 +119,15 @@ impl Error {
             Self::ToolNotFound(tool_name) => {
                 (METHOD_NOT_FOUND, format!("Tool not found: {tool_name}"))
             }
-            Self::MethodNotFound(method_name) => (
-                METHOD_NOT_FOUND,
-                format!("Method not found: {method_name}"),
-            ),
+            Self::MethodNotFound(method_name) => {
+                (METHOD_NOT_FOUND, format!("Method not found: {method_name}"))
+            }
             Self::InvalidParams { method, message } => (
                 INVALID_PARAMS,
                 format!("Invalid parameters for method '{method}': {message}"),
             ),
             Self::InvalidRequest(msg) => (INVALID_REQUEST, format!("Invalid request: {msg}")),
-            Self::Json { message } => (
-                PARSE_ERROR,
-                format!("JSON serialization error: {message}"),
-            ),
+            Self::Json { message } => (PARSE_ERROR, format!("JSON serialization error: {message}")),
             Self::InvalidMessageFormat { message } => {
                 (PARSE_ERROR, format!("Invalid message format: {message}"))
             }
