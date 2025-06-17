@@ -218,24 +218,29 @@ async fn handle_request(
             })
         }
         Err(e) => {
-            // Create a proper JSON-RPC error response
-            let error_code = match &e {
-                Error::MethodNotFound(_) => METHOD_NOT_FOUND,
-                Error::InvalidParams { .. } => INVALID_PARAMS,
-                Error::InvalidRequest(_) => INVALID_REQUEST,
-                Error::Json { .. } | Error::InvalidMessageFormat { .. } => PARSE_ERROR,
-                _ => INTERNAL_ERROR,
-            };
+            // Check if error has a specific JSONRPC response
+            if let Some(jsonrpc_error) = e.to_jsonrpc_response(request.id.clone()) {
+                JSONRPCMessage::Error(jsonrpc_error)
+            } else {
+                // Create a proper JSON-RPC error response
+                let error_code = match &e {
+                    Error::MethodNotFound(_) => METHOD_NOT_FOUND,
+                    Error::InvalidParams { .. } => INVALID_PARAMS,
+                    Error::InvalidRequest(_) => INVALID_REQUEST,
+                    Error::Json { .. } | Error::InvalidMessageFormat { .. } => PARSE_ERROR,
+                    _ => INTERNAL_ERROR,
+                };
 
-            JSONRPCMessage::Error(JSONRPCError {
-                jsonrpc: JSONRPC_VERSION.to_string(),
-                id: request.id,
-                error: ErrorObject {
-                    code: error_code,
-                    message: e.to_string(),
-                    data: None,
-                },
-            })
+                JSONRPCMessage::Error(JSONRPCError {
+                    jsonrpc: JSONRPC_VERSION.to_string(),
+                    id: request.id,
+                    error: ErrorObject {
+                        code: error_code,
+                        message: e.to_string(),
+                        data: None,
+                    },
+                })
+            }
         }
     }
 }

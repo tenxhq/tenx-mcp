@@ -1,5 +1,6 @@
 use std::time::Duration;
 use thiserror::Error;
+use crate::schema::{JSONRPCError, ErrorObject, RequestId, JSONRPC_VERSION, METHOD_NOT_FOUND};
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {
@@ -113,6 +114,22 @@ impl Error {
                 | Self::ConnectionClosed
                 | Self::Timeout { .. }
         )
+    }
+
+    /// Convert error to a specific JSONRPC response if applicable
+    pub fn to_jsonrpc_response(&self, request_id: RequestId) -> Option<JSONRPCError> {
+        match self {
+            Self::ToolNotFound(tool_name) => Some(JSONRPCError {
+                jsonrpc: JSONRPC_VERSION.to_string(),
+                id: request_id,
+                error: ErrorObject {
+                    code: METHOD_NOT_FOUND,
+                    message: format!("Tool not found: {}", tool_name),
+                    data: None,
+                },
+            }),
+            _ => None,
+        }
     }
 }
 
