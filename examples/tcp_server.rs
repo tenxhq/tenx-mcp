@@ -1,15 +1,12 @@
-//! Example TCP server demonstrating the modern Connection trait pattern
+//! Example TCP server demonstrating the simplified server API
 //!
 //! This example shows how to create an MCP server that accepts TCP connections
-//! and provides echo and add tools using the Connection trait.
+//! and provides echo and add tools using the Connection trait with minimal boilerplate.
 
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::env;
 use tenx_mcp::{connection::Connection, error::Error, schema::*, Result, Server};
-use tokio::net::TcpListener;
-use tokio::signal;
-use tracing::{error, info};
 
 /// TCP server connection that provides echo and add tools
 struct TcpExampleConnection {
@@ -164,62 +161,21 @@ async fn main() -> Result<()> {
 
     let addr = format!("{host}:{port}");
 
-    // Create TCP listener
-    let listener = TcpListener::bind(&addr).await?;
-    info!("MCP server listening on {}", addr);
+    // Create server configuration
+    let server_info = Implementation {
+        name: "tenx-mcp-tcp-example".to_string(),
+        version: "0.1.0".to_string(),
+    };
 
-    // Accept connections in a loop
-    loop {
-        tokio::select! {
-            result = listener.accept() => {
-                match result {
-                    Ok((stream, peer_addr)) => {
-                        info!("New connection from {}", peer_addr);
+    let capabilities = ServerCapabilities::default();
 
-                        // Create a new server instance for each connection
-                        let server_info = Implementation {
-                            name: "tenx-mcp-tcp-example".to_string(),
-                            version: "0.1.0".to_string(),
-                        };
+    // Use the new simplified API to serve TCP connections
+    Server::default()
+        .with_connection_factory(move || {
+            Box::new(TcpExampleConnection::new(server_info.clone(), capabilities.clone()))
+        })
+        .serve_tcp(addr)
+        .await?;
 
-                        let capabilities = ServerCapabilities::default();
-
-                        let server = Server::default()
-                            .with_connection_factory(move || {
-                                Box::new(TcpExampleConnection::new(server_info.clone(), capabilities.clone()))
-                            });
-
-                        // Create transport from the accepted connection
-                        let transport = Box::new(tenx_mcp::transport::TcpServerTransport::new(stream));
-
-                        // Handle the connection in a separate task
-                        tokio::spawn(async move {
-                            info!("Handling connection from {}", peer_addr);
-                            match tenx_mcp::ServerHandle::new(server, transport).await {
-                                Ok(server_handle) => {
-                                    info!("Server handle created for {}", peer_addr);
-                                    if let Err(e) = server_handle.handle.await {
-                                        error!("Server task failed for {}: {}", peer_addr, e);
-                                    } else {
-                                        info!("Connection from {} closed", peer_addr);
-                                    }
-                                },
-                                Err(e) => error!("Error creating server handle for {}: {}", peer_addr, e),
-                            }
-                        });
-                    }
-                    Err(e) => {
-                        error!("Failed to accept connection: {}", e);
-                    }
-                }
-            }
-            _ = signal::ctrl_c() => {
-                info!("\nShutting down server...");
-                break;
-            }
-        }
-    }
-
-    info!("Server stopped");
     Ok(())
 }

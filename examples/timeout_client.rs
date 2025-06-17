@@ -12,7 +12,7 @@ use tenx_mcp::{
     error::{Error, Result},
     retry::RetryConfig,
     schema::*,
-    transport::TcpTransport,
+    transport::TcpClientTransport,
 };
 use tracing::{error, info};
 
@@ -108,7 +108,7 @@ async fn test_custom_retry_config(host: &str, port: u16) -> Result<()> {
     };
 
     let mut client = Client::with_config(config);
-    let transport = TcpTransport::new(format!("{host}:{port}"));
+    let transport = TcpClientTransport::new(format!("{host}:{port}"));
 
     client.connect(Box::new(transport)).await?;
     client
@@ -177,7 +177,7 @@ async fn main() -> Result<()> {
     let mut client = Client::with_config(config);
 
     // Create transport
-    let transport = TcpTransport::new(format!("{host}:{port}"));
+    let transport = TcpClientTransport::new(format!("{host}:{port}"));
 
     // Connect and initialize
     info!("Connecting to server...");

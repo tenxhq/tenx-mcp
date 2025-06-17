@@ -47,6 +47,136 @@ impl Server {
     pub fn capabilities(&self) -> &ServerCapabilities {
         &self.capabilities
     }
+
+    /// Serve a single connection using the provided transport
+    /// This is a convenience method that starts the server and waits for completion
+    pub async fn serve(self, transport: Box<dyn Transport>) -> Result<()> {
+        let handle = ServerHandle::new(self, transport).await?;
+        handle.stop().await
+    }
+
+    /// Serve connections from stdin/stdout
+    /// This is a convenience method for the common stdio use case
+    pub async fn serve_stdio(self) -> Result<()> {
+        let transport = Box::new(crate::transport::StdioTransport::new());
+        self.serve(transport).await
+    }
+
+    /// Serve TCP connections by accepting them in a loop
+    /// This is a convenience method for the common TCP server use case
+    pub async fn serve_tcp(self, addr: impl tokio::net::ToSocketAddrs) -> Result<()> {
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind(addr).await?;
+        let local_addr = listener.local_addr()?;
+        info!("MCP server listening on {}", local_addr);
+
+        // Convert connection factory to Arc for sharing across tasks
+        let connection_factory = Arc::new(self.connection_factory);
+        let capabilities = Arc::new(self.capabilities);
+
+        loop {
+            match listener.accept().await {
+                Ok((stream, peer_addr)) => {
+                    info!("New connection from {}", peer_addr);
+
+                    // Clone Arc references for the spawned task
+                    let factory = connection_factory.clone();
+                    let caps = capabilities.clone();
+
+                    // Handle each connection in a separate task
+                    tokio::spawn(async move {
+                        // Create a new connection factory that clones the Arc'd factory
+                        let server = Server {
+                            capabilities: (*caps).clone(),
+                            connection_factory: factory.as_ref().as_ref().map(|_f| {
+                                let factory = factory.clone();
+                                Box::new(move || {
+                                    // Call the original factory through the Arc
+                                    factory.as_ref().as_ref().unwrap()()
+                                }) as ConnectionFactory
+                            }),
+                        };
+
+                        let transport = Box::new(crate::transport::StreamTransport::new(stream));
+
+                        match server.serve(transport).await {
+                            Ok(()) => info!("Connection from {} closed", peer_addr),
+                            Err(e) => error!("Error handling connection from {}: {}", peer_addr, e),
+                        }
+                    });
+                }
+                Err(e) => {
+                    error!("Failed to accept connection: {}", e);
+                }
+            }
+        }
+    }
+
+    /// Start a TCP listener and return a handle for advanced control
+    /// Returns a task handle for the accept loop
+    ///
+    /// Note: This returns only the JoinHandle, not the listener itself,
+    /// as the listener is moved into the spawned task.
+    pub async fn listen_tcp(
+        self,
+        addr: impl tokio::net::ToSocketAddrs,
+    ) -> Result<JoinHandle<Result<()>>> {
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind(addr).await?;
+        let local_addr = listener.local_addr()?;
+        info!("MCP server listening on {}", local_addr);
+
+        // Convert to Arc for sharing
+        let connection_factory = Arc::new(self.connection_factory);
+        let capabilities = Arc::new(self.capabilities);
+
+        let handle = tokio::spawn(async move {
+            loop {
+                match listener.accept().await {
+                    Ok((stream, peer_addr)) => {
+                        info!("New connection from {}", peer_addr);
+
+                        let factory = connection_factory.clone();
+                        let caps = capabilities.clone();
+
+                        tokio::spawn(async move {
+                            // Create a new connection factory that clones the Arc'd factory
+                            let server = Server {
+                                capabilities: (*caps).clone(),
+                                connection_factory: factory.as_ref().as_ref().map(|_f| {
+                                    let factory = factory.clone();
+                                    Box::new(move || {
+                                        // Call the original factory through the Arc
+                                        factory.as_ref().as_ref().unwrap()()
+                                    }) as ConnectionFactory
+                                }),
+                            };
+
+                            let transport =
+                                Box::new(crate::transport::StreamTransport::new(stream));
+
+                            match server.serve(transport).await {
+                                Ok(()) => info!("Connection from {} closed", peer_addr),
+                                Err(e) => {
+                                    error!("Error handling connection from {}: {}", peer_addr, e)
+                                }
+                            }
+                        });
+                    }
+                    Err(e) => {
+                        error!("Failed to accept connection: {}", e);
+                        return Err(Error::from(e));
+                    }
+                }
+            }
+        });
+
+        Ok(handle)
+    }
 }
 
 impl ServerHandle {

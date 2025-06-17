@@ -10,13 +10,8 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::env;
-use tenx_mcp::{
-    connection::Connection, error::Error, schema::*, schemars, transport::TcpServerTransport,
-    Result, Server, ServerHandle,
-};
-use tokio::net::TcpListener;
-use tokio::signal;
-use tracing::{error, info};
+use tenx_mcp::{connection::Connection, error::Error, schema::*, schemars, Result, Server};
+use tracing::info;
 
 const NAME: &str = "basic-server";
 const VERSION: &str = "0.1.0";
@@ -94,53 +89,13 @@ async fn main() -> Result<()> {
 
     let addr = format!("{host}:{port}");
 
-    // Create TCP listener
-    let listener = TcpListener::bind(&addr).await?;
-    info!("Basic MCP server listening on {}", addr);
+    // Create and run the server using the new simplified API
+    info!("Starting basic MCP server on {}", addr);
 
-    // Accept connections in a loop
-    loop {
-        tokio::select! {
-            result = listener.accept() => {
-                match result {
-                    Ok((stream, peer_addr)) => {
-                        info!("New connection from {}", peer_addr);
-                        let server = Server::default()
-                            .with_connection_factory(move || {
-                                Box::new(BasicConnection::default())
-                            });
+    Server::default()
+        .with_connection_factory(|| Box::new(BasicConnection::default()))
+        .serve_tcp(addr)
+        .await?;
 
-                        // Create transport from the accepted connection
-                        let transport = Box::new(TcpServerTransport::new(stream));
-
-                        // Handle the connection in a separate task
-                        tokio::spawn(async move {
-                            info!("Handling connection from {}", peer_addr);
-                            match ServerHandle::new(server, transport).await {
-                                Ok(server_handle) => {
-                                    info!("Server handle created for {}", peer_addr);
-                                    if let Err(e) = server_handle.handle.await {
-                                        error!("Server task failed for {}: {}", peer_addr, e);
-                                    } else {
-                                        info!("Connection from {} closed", peer_addr);
-                                    }
-                                },
-                                Err(e) => error!("Error creating server handle for {}: {}", peer_addr, e),
-                            }
-                        });
-                    }
-                    Err(e) => {
-                        error!("Failed to accept connection: {}", e);
-                    }
-                }
-            }
-            _ = signal::ctrl_c() => {
-                info!("\nShutting down server...");
-                break;
-            }
-        }
-    }
-
-    info!("Server stopped");
     Ok(())
 }

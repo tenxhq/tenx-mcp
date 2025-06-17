@@ -256,7 +256,7 @@ async fn main() -> Result<()> {
                         .with_connection_factory(|| Box::new(MyConnection::new()));
 
                         // Create transport from the accepted connection
-                        let transport = Box::new(tenx_mcp::transport::TcpServerTransport::new(stream));
+                        let transport = Box::new(tenx_mcp::transport::StreamTransport::new(stream));
 
                         // Handle the connection in a separate task
                         tokio::spawn(async move {

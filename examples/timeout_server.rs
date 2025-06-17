@@ -15,12 +15,9 @@ use tenx_mcp::{
     error::{Error, Result},
     schema::*,
     server::Server,
-    transport::TcpServerTransport,
 };
-use tokio::net::TcpListener;
-use tokio::signal;
 use tokio::time::sleep;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 /// Connection that demonstrates various timeout and retry scenarios
 struct TimeoutTestConnection {
@@ -188,73 +185,40 @@ async fn main() -> Result<()> {
 
     let addr = format!("{host}:{port}");
 
-    // Create TCP listener
-    let listener = TcpListener::bind(&addr).await?;
-    info!("Timeout Test Server listening on {}", addr);
+    // Create server configuration
+    let server_info = Implementation {
+        name: "timeout-test-server".to_string(),
+        version: "1.0.0".to_string(),
+    };
 
-    // Accept connections in a loop
-    loop {
-        tokio::select! {
-            result = listener.accept() => {
-                match result {
-                    Ok((stream, peer_addr)) => {
-                        info!("New connection from {}", peer_addr);
+    let capabilities = ServerCapabilities::default();
 
-                        // Create a new server instance for each connection
-                        let server_info = Implementation {
-                            name: "timeout-test-server".to_string(),
-                            version: "1.0.0".to_string(),
-                        };
+    // Log server capabilities
+    info!("Starting timeout test server on {}", addr);
+    info!("Server capabilities:");
+    info!("  - Simulates intermittent failures");
+    info!("  - Demonstrates slow operations");
+    info!("  - Shows non-retryable errors");
+    info!("  - Provides a reliable operation");
+    info!("");
+    info!("Available tools:");
+    info!("  - flakey_operation: Fails 2 times before succeeding");
+    info!("  - slow_operation: Takes 5 seconds to complete");
+    info!("  - broken_operation: Always fails with non-retryable error");
+    info!("  - reliable_operation: Always succeeds immediately");
 
-                        let capabilities = ServerCapabilities::default();
+    // Use the new simplified API to serve TCP connections
+    Server::default()
+        .with_connection_factory(move || {
+            Box::new(TimeoutTestConnection::new(
+                server_info.clone(),
+                capabilities.clone(),
+                2, // Fails first 2 attempts
+                5, // Takes 5 seconds
+            ))
+        })
+        .serve_tcp(addr)
+        .await?;
 
-                        let server = Server::default()
-                            .with_connection_factory(move || {
-                                Box::new(TimeoutTestConnection::new(
-                                    server_info.clone(),
-                                    capabilities.clone(),
-                                    2, // Fails first 2 attempts
-                                    5, // Takes 5 seconds
-                                ))
-                            });
-
-                        info!("Registered tools for {}:", peer_addr);
-                        info!("  - flakey_operation: Fails 2 times before succeeding");
-                        info!("  - slow_operation: Takes 5 seconds to complete");
-                        info!("  - broken_operation: Always fails with non-retryable error");
-                        info!("  - reliable_operation: Always succeeds immediately");
-
-                        // Create transport from the accepted connection
-                        let transport = Box::new(TcpServerTransport::new(stream));
-
-                        // Handle the connection in a separate task
-                        tokio::spawn(async move {
-                            info!("Handling connection from {}", peer_addr);
-                            match tenx_mcp::ServerHandle::new(server, transport).await {
-                                Ok(server_handle) => {
-                                    info!("Server handle created for {}", peer_addr);
-                                    if let Err(e) = server_handle.handle.await {
-                                        error!("Server task failed for {}: {}", peer_addr, e);
-                                    } else {
-                                        info!("Connection from {} closed", peer_addr);
-                                    }
-                                },
-                                Err(e) => error!("Error creating server handle for {}: {}", peer_addr, e),
-                            }
-                        });
-                    }
-                    Err(e) => {
-                        error!("Failed to accept connection: {}", e);
-                    }
-                }
-            }
-            _ = signal::ctrl_c() => {
-                info!("\nShutting down server...");
-                break;
-            }
-        }
-    }
-
-    info!("Server stopped");
     Ok(())
 }

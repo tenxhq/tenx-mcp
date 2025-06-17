@@ -112,13 +112,13 @@ impl Transport for StdioTransport {
     }
 }
 
-/// TCP transport for network connections
-pub struct TcpTransport {
+/// TCP client transport for outgoing network connections
+pub struct TcpClientTransport {
     addr: String,
     stream: Option<TcpStream>,
 }
 
-impl TcpTransport {
+impl TcpClientTransport {
     pub fn new(addr: impl Into<String>) -> Self {
         Self {
             addr: addr.into(),
@@ -127,8 +127,21 @@ impl TcpTransport {
     }
 }
 
+/// Wrapper to turn any AsyncRead + AsyncWrite stream into a Transport
+pub struct StreamTransport<S> {
+    stream: Option<S>,
+}
+
+impl<S> StreamTransport<S> {
+    pub fn new(stream: S) -> Self {
+        Self {
+            stream: Some(stream),
+        }
+    }
+}
+
 #[async_trait]
-impl Transport for TcpTransport {
+impl Transport for TcpClientTransport {
     async fn connect(&mut self) -> Result<()> {
         info!("Connecting to TCP endpoint: {}", self.addr);
         let stream = TcpStream::connect(&self.addr).await?;
@@ -144,31 +157,33 @@ impl Transport for TcpTransport {
     }
 }
 
-/// TCP server transport that accepts incoming connections
-pub struct TcpServerTransport {
-    stream: Option<TcpStream>,
-}
-
-impl TcpServerTransport {
-    /// Create a new TCP server transport from an accepted connection
-    pub fn new(stream: TcpStream) -> Self {
-        Self {
-            stream: Some(stream),
-        }
-    }
-}
-
 #[async_trait]
-impl Transport for TcpServerTransport {
+impl<S> Transport for StreamTransport<S>
+where
+    S: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
+{
     async fn connect(&mut self) -> Result<()> {
-        // Server transport is already connected
+        // Stream transports are already connected
         Ok(())
     }
 
     fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
         let stream = self.stream.ok_or(Error::TransportDisconnected)?;
-
         let framed = Framed::new(stream, JsonRpcCodec::new());
+        Ok(Box::new(framed))
+    }
+}
+
+// Convenience implementation for TcpStream
+#[async_trait]
+impl Transport for TcpStream {
+    async fn connect(&mut self) -> Result<()> {
+        // TcpStream is already connected
+        Ok(())
+    }
+
+    fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
+        let framed = Framed::new(*self, JsonRpcCodec::new());
         Ok(Box::new(framed))
     }
 }
@@ -284,8 +299,8 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_tcp_transport_creation() {
-        let transport = TcpTransport::new("localhost:8080");
+    async fn test_tcp_client_transport_creation() {
+        let transport = TcpClientTransport::new("localhost:8080");
         assert_eq!(transport.addr, "localhost:8080");
     }
 
