@@ -185,7 +185,7 @@ impl Connection for MyConnection {
                 })]
             }
             _ => {
-                return Err(tenx_mcp::MCPError::ToolExecutionFailed {
+                return Err(tenx_mcp::Error::ToolExecutionFailed {
                     tool: name,
                     message: "Tool not found".to_string(),
                 });

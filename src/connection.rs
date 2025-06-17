@@ -21,7 +21,7 @@ impl ConnectionContext {
     /// Send a notification to the client
     pub fn send_notification(&self, notification: ServerNotification) -> Result<()> {
         self.notification_tx.send(notification).map_err(|_| {
-            crate::error::MCPError::InternalError("Failed to send notification".into())
+            crate::error::Error::InternalError("Failed to send notification".into())
         })?;
         Ok(())
     }
@@ -68,7 +68,7 @@ pub trait Connection: Send + Sync {
         name: String,
         _arguments: Option<Value>,
     ) -> Result<CallToolResult> {
-        Err(crate::error::MCPError::ToolExecutionFailed {
+        Err(crate::error::Error::ToolExecutionFailed {
             tool: name,
             message: "Tool not found".to_string(),
         })
@@ -92,7 +92,7 @@ pub trait Connection: Send + Sync {
 
     /// Read a resource
     async fn resources_read(&mut self, uri: String) -> Result<ReadResourceResult> {
-        Err(crate::error::MCPError::ResourceNotFound { uri })
+        Err(crate::error::Error::ResourceNotFound { uri })
     }
 
     /// Subscribe to resource updates
@@ -119,7 +119,7 @@ pub trait Connection: Send + Sync {
         name: String,
         _arguments: Option<std::collections::HashMap<String, serde_json::Value>>,
     ) -> Result<GetPromptResult> {
-        Err(crate::error::MCPError::handler_error(
+        Err(crate::error::Error::handler_error(
             "prompt",
             format!("Prompt '{name}' not found"),
         ))
@@ -159,7 +159,7 @@ pub trait Connection: Send + Sync {
         &mut self,
         _params: crate::schema::CreateMessageParams,
     ) -> Result<crate::schema::CreateMessageResult> {
-        Err(crate::error::MCPError::MethodNotFound(
+        Err(crate::error::Error::MethodNotFound(
             "sampling/createMessage".to_string(),
         ))
     }

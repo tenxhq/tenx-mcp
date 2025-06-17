@@ -5,7 +5,7 @@ use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use tenx_mcp::{
     connection::Connection,
-    error::{MCPError, Result},
+    error::{Error, Result},
     schema::*,
     server::MCPServer,
     transport::Transport,
@@ -68,18 +68,18 @@ impl Connection for TestConnection {
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
         if name != "test" {
-            return Err(MCPError::ToolExecutionFailed {
+            return Err(Error::ToolExecutionFailed {
                 tool: name,
                 message: "Tool not found".to_string(),
             });
         }
 
-        let args = arguments
-            .ok_or_else(|| MCPError::invalid_params("strict_params", "Missing arguments"))?;
+        let args =
+            arguments.ok_or_else(|| Error::invalid_params("strict_params", "Missing arguments"))?;
 
         let _field = args
             .get("required_field")
-            .ok_or_else(|| MCPError::invalid_params("strict_params", "Missing required_field"))?;
+            .ok_or_else(|| Error::invalid_params("strict_params", "Missing required_field"))?;
 
         Ok(CallToolResult::new()
             .with_text_content("Success")

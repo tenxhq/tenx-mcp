@@ -10,7 +10,7 @@
 use async_trait::async_trait;
 use std::env;
 use tenx_mcp::{
-    connection::Connection, error::MCPError, schema::*, transport::TcpServerTransport, MCPServer,
+    connection::Connection, error::Error, schema::*, transport::TcpServerTransport, MCPServer,
     MCPServerHandle, Result,
 };
 use tokio::net::TcpListener;
@@ -55,7 +55,7 @@ impl Connection for BasicConnection {
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
         if name != "echo" {
-            return Err(MCPError::ToolExecutionFailed {
+            return Err(Error::ToolExecutionFailed {
                 tool: name,
                 message: "Tool not found".to_string(),
             });

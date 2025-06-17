@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use tenx_mcp::{
-    connection::Connection, error::MCPError, schema::*, transport::StdioTransport, MCPServer,
+    connection::Connection, error::Error, schema::*, transport::StdioTransport, MCPServer,
     MCPServerHandle, Result,
 };
 use tracing::{info, level_filters::LevelFilter};
@@ -74,7 +74,7 @@ impl Connection for EchoConnection {
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
         if name != "echo" {
-            return Err(MCPError::ToolExecutionFailed {
+            return Err(Error::ToolExecutionFailed {
                 tool: name,
                 message: "Tool not found".to_string(),
             });
@@ -142,6 +142,6 @@ async fn main() -> Result<()> {
     server_handle
         .handle
         .await
-        .map_err(|e| MCPError::InternalError(format!("Server task failed: {e}")))?;
+        .map_err(|e| Error::InternalError(format!("Server task failed: {e}")))?;
     Ok(())
 }

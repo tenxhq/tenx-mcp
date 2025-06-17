@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tenx_mcp::{
     connection::Connection,
-    error::{MCPError, Result},
+    error::{Error, Result},
     schema::*,
     server::MCPServer,
     transport::TcpServerTransport,
@@ -122,7 +122,7 @@ impl Connection for TimeoutTestConnection {
                 if count < self.failures_before_success {
                     warn!("FlakeyTool failing (attempt {})", count + 1);
                     // Simulate a transient network error
-                    Err(MCPError::ConnectionClosed)
+                    Err(Error::ConnectionClosed)
                 } else {
                     info!("FlakeyTool succeeding (attempt {})", count + 1);
                     // Reset counter for next invocation
@@ -148,7 +148,7 @@ impl Connection for TimeoutTestConnection {
             }
             "broken_operation" => {
                 // Return an error that is not retryable
-                Err(MCPError::InvalidParams {
+                Err(Error::InvalidParams {
                     method: "broken_operation".to_string(),
                     message: "This operation is permanently broken".to_string(),
                 })
@@ -156,7 +156,7 @@ impl Connection for TimeoutTestConnection {
             "reliable_operation" => Ok(CallToolResult::new()
                 .with_text_content("Reliable operation completed")
                 .is_error(false)),
-            _ => Err(MCPError::ToolExecutionFailed {
+            _ => Err(Error::ToolExecutionFailed {
                 tool: name,
                 message: "Tool not found".to_string(),
             }),

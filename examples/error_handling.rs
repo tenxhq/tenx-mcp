@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use tenx_mcp::{
     connection::Connection,
-    error::{MCPError, Result},
+    error::{Error, Result},
     schema::*,
     server::MCPServer,
     transport::{StdioTransport, Transport},
@@ -87,20 +87,20 @@ impl Connection for ErrorHandlingConnection {
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
         match name.as_str() {
-            "always_fail" => Err(MCPError::tool_execution_failed(
+            "always_fail" => Err(Error::tool_execution_failed(
                 "always_fail",
                 "This tool always fails for testing purposes",
             )),
             "strict_tool" => {
                 let args = arguments.ok_or_else(|| {
-                    MCPError::invalid_params("strict_tool", "Missing arguments object")
+                    Error::invalid_params("strict_tool", "Missing arguments object")
                 })?;
 
                 let required_field = args
                     .get("required_field")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        MCPError::invalid_params(
+                        Error::invalid_params(
                             "strict_tool",
                             "Missing or invalid 'required_field' parameter",
                         )
@@ -110,7 +110,7 @@ impl Connection for ErrorHandlingConnection {
                     .with_text_content(format!("Received: {required_field}"))
                     .is_error(false))
             }
-            _ => Err(MCPError::ToolExecutionFailed {
+            _ => Err(Error::ToolExecutionFailed {
                 tool: name,
                 message: "Tool not found".to_string(),
             }),
@@ -163,6 +163,6 @@ async fn main() -> Result<()> {
     server_handle
         .handle
         .await
-        .map_err(|e| MCPError::InternalError(format!("Server task failed: {e}")))?;
+        .map_err(|e| Error::InternalError(format!("Server task failed: {e}")))?;
     Ok(())
 }

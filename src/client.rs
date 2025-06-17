@@ -8,7 +8,7 @@ use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    error::{MCPError, Result},
+    error::{Error, Result},
     retry::RetryConfig,
     schema::*,
     transport::{Transport, TransportStream},
@@ -265,18 +265,17 @@ impl MCPClient {
 
                         // Deserialize directly from the combined map
                         serde_json::from_value(serde_json::Value::Object(result_value)).map_err(
-                            |e| MCPError::Protocol(format!("Failed to deserialize response: {e}")),
+                            |e| Error::Protocol(format!("Failed to deserialize response: {e}")),
                         )
                     }
                     ResponseOrError::Error(error) => {
                         // Map JSON-RPC errors to appropriate MCPError variants
                         match error.error.code {
-                            METHOD_NOT_FOUND => Err(MCPError::MethodNotFound(error.error.message)),
-                            INVALID_PARAMS => Err(MCPError::invalid_params(
-                                request.method(),
-                                error.error.message,
-                            )),
-                            _ => Err(MCPError::Protocol(format!(
+                            METHOD_NOT_FOUND => Err(Error::MethodNotFound(error.error.message)),
+                            INVALID_PARAMS => {
+                                Err(Error::invalid_params(request.method(), error.error.message))
+                            }
+                            _ => Err(Error::Protocol(format!(
                                 "JSON-RPC error {}: {}",
                                 error.error.code, error.error.message
                             ))),
@@ -288,7 +287,7 @@ impl MCPClient {
                 error!("Response channel closed for request {}: {}", id, e);
                 // Remove the pending request
                 self.pending_requests.lock().await.remove(&id);
-                Err(MCPError::Protocol("Response channel closed".to_string()))
+                Err(Error::Protocol("Response channel closed".to_string()))
             }
             Err(_) => {
                 // Timeout occurred
@@ -298,7 +297,7 @@ impl MCPClient {
                 );
                 // Remove the pending request
                 self.pending_requests.lock().await.remove(&id);
-                Err(MCPError::timeout(self.config.request_timeout, id))
+                Err(Error::timeout(self.config.request_timeout, id))
             }
         }
     }
@@ -310,7 +309,7 @@ impl MCPClient {
             tx.send(message).await?;
             Ok(())
         } else {
-            Err(MCPError::Transport("Not connected".to_string()))
+            Err(Error::Transport("Not connected".to_string()))
         }
     }
 

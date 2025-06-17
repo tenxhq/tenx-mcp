@@ -10,7 +10,7 @@ pub mod transport;
 // Re-export commonly used types
 pub use client::MCPClient;
 pub use connection::{Connection, ConnectionContext};
-pub use error::{MCPError, Result};
+pub use error::{Error, Result};
 pub use schema::{
     ClientCapabilities, Content, Implementation, JSONRPCNotification, ResourceContents,
     ToolsCapability,

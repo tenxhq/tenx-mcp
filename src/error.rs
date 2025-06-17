@@ -2,7 +2,7 @@ use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
-pub enum MCPError {
+pub enum Error {
     #[error("IO error: {message}")]
     Io { message: String },
 
@@ -70,7 +70,7 @@ pub enum MCPError {
     ToolNotFound(String),
 }
 
-impl MCPError {
+impl Error {
     /// Create an InvalidParams error with method context
     pub fn invalid_params(method: impl Into<String>, message: impl Into<String>) -> Self {
         Self::InvalidParams {
@@ -116,7 +116,7 @@ impl MCPError {
     }
 }
 
-impl From<std::io::Error> for MCPError {
+impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Self::Io {
             message: err.to_string(),
@@ -124,7 +124,7 @@ impl From<std::io::Error> for MCPError {
     }
 }
 
-impl From<serde_json::Error> for MCPError {
+impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
         Self::Json {
             message: err.to_string(),
@@ -132,4 +132,4 @@ impl From<serde_json::Error> for MCPError {
     }
 }
 
-pub type Result<T> = std::result::Result<T, MCPError>;
+pub type Result<T> = std::result::Result<T, Error>;

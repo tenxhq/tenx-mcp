@@ -4,7 +4,7 @@ use std::time::Duration;
 use tokio::time::{sleep, timeout};
 use tracing::{debug, warn};
 
-use crate::error::{MCPError, Result};
+use crate::error::{Error, Result};
 
 /// Configuration for retry behavior
 #[derive(Clone, Debug)]
@@ -75,7 +75,7 @@ where
                 }
             }
             Err(_) => {
-                let timeout_error = MCPError::timeout(config.timeout, format!("attempt-{attempt}"));
+                let timeout_error = Error::timeout(config.timeout, format!("attempt-{attempt}"));
                 last_error = Some(timeout_error);
 
                 // Don't sleep on the last attempt
@@ -94,9 +94,8 @@ where
         }
     }
 
-    Err(last_error.unwrap_or_else(|| {
-        MCPError::InternalError("Retry failed with no error captured".to_string())
-    }))
+    Err(last_error
+        .unwrap_or_else(|| Error::InternalError("Retry failed with no error captured".to_string())))
 }
 
 #[cfg(test)]
@@ -121,7 +120,7 @@ mod tests {
             async move {
                 let attempt = count.fetch_add(1, Ordering::SeqCst);
                 if attempt == 0 {
-                    Err(MCPError::ConnectionClosed)
+                    Err(Error::ConnectionClosed)
                 } else {
                     Ok("success")
                 }
@@ -147,7 +146,7 @@ mod tests {
             let count = attempt_count_clone.clone();
             async move {
                 count.fetch_add(1, Ordering::SeqCst);
-                Err(MCPError::MethodNotFound("test".to_string()))
+                Err(Error::MethodNotFound("test".to_string()))
             }
         })
         .await;
@@ -171,7 +170,7 @@ mod tests {
         })
         .await;
 
-        assert!(matches!(result, Err(MCPError::Timeout { .. })));
+        assert!(matches!(result, Err(Error::Timeout { .. })));
     }
 
     #[tokio::test]
@@ -192,7 +191,7 @@ mod tests {
             let times = times_clone.clone();
             async move {
                 times.lock().unwrap().push(start.elapsed());
-                Err(MCPError::ConnectionClosed)
+                Err(Error::ConnectionClosed)
             }
         })
         .await;
@@ -224,7 +223,7 @@ mod tests {
             let times = times_clone.clone();
             async move {
                 times.lock().unwrap().push(start.elapsed());
-                Err(MCPError::ConnectionClosed)
+                Err(Error::ConnectionClosed)
             }
         })
         .await;
@@ -265,7 +264,7 @@ mod tests {
                     // We're tracking that sleep WOULD be called between attempts
                     sleep_track.fetch_add(1, Ordering::SeqCst);
                 }
-                Err(MCPError::ConnectionClosed)
+                Err(Error::ConnectionClosed)
             }
         })
         .await;
@@ -322,7 +321,7 @@ mod tests {
         })
         .await;
 
-        assert!(matches!(result, Err(MCPError::Timeout { .. })));
+        assert!(matches!(result, Err(Error::Timeout { .. })));
         // We can verify partial execution happened
         let final_progress = progress.load(Ordering::SeqCst);
         assert!((1..=2).contains(&final_progress));
@@ -340,7 +339,7 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result,
-            Err(MCPError::InternalError(msg)) if msg.contains("Retry failed")
+            Err(Error::InternalError(msg)) if msg.contains("Retry failed")
         ));
     }
 
@@ -360,12 +359,12 @@ mod tests {
             async move {
                 let attempt = count.fetch_add(1, Ordering::SeqCst);
                 match attempt {
-                    0 => Err(MCPError::ConnectionClosed),
-                    1 => Err(MCPError::Timeout {
+                    0 => Err(Error::ConnectionClosed),
+                    1 => Err(Error::Timeout {
                         duration: Duration::from_secs(1),
                         request_id: "test".to_string(),
                     }),
-                    2 => Err(MCPError::TransportDisconnected),
+                    2 => Err(Error::TransportDisconnected),
                     _ => Ok("success after various errors"),
                 }
             }

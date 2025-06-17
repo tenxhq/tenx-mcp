@@ -3,7 +3,7 @@ use tokio_util::codec::{Decoder, Encoder};
 use tracing::{debug, error};
 
 use crate::{
-    error::{MCPError, Result},
+    error::{Error, Result},
     schema::{JSONRPCMessage, JSONRPCNotification, JSONRPCRequest, JSONRPCResponse},
 };
 
@@ -24,7 +24,7 @@ impl Default for JsonRpcCodec {
 }
 
 impl Decoder for JsonRpcCodec {
-    type Error = MCPError;
+    type Error = Error;
     type Item = JSONRPCMessage;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>> {
@@ -53,11 +53,11 @@ impl Decoder for JsonRpcCodec {
         let message: JSONRPCMessage = serde_json::from_slice(json_bytes).map_err(|e| {
             error!("Failed to parse JSON-RPC message: {}", e);
             if let Ok(text) = std::str::from_utf8(json_bytes) {
-                MCPError::InvalidMessageFormat {
+                Error::InvalidMessageFormat {
                     message: format!("Invalid JSON: {e} (content: {text})"),
                 }
             } else {
-                MCPError::InvalidMessageFormat {
+                Error::InvalidMessageFormat {
                     message: format!("Invalid JSON: {e} (non-UTF8 content)"),
                 }
             }
@@ -67,7 +67,7 @@ impl Decoder for JsonRpcCodec {
 }
 
 impl Encoder<JSONRPCMessage> for JsonRpcCodec {
-    type Error = MCPError;
+    type Error = Error;
 
     fn encode(&mut self, item: JSONRPCMessage, dst: &mut BytesMut) -> Result<()> {
         let json = serde_json::to_vec(&item)?;
@@ -75,7 +75,7 @@ impl Encoder<JSONRPCMessage> for JsonRpcCodec {
         // Check message size
         const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; // 10MB
         if json.len() > MAX_MESSAGE_SIZE {
-            return Err(MCPError::MessageTooLarge {
+            return Err(Error::MessageTooLarge {
                 size: json.len(),
                 max_size: MAX_MESSAGE_SIZE,
             });
@@ -92,7 +92,7 @@ impl Encoder<JSONRPCMessage> for JsonRpcCodec {
 }
 
 impl Encoder<JSONRPCRequest> for JsonRpcCodec {
-    type Error = MCPError;
+    type Error = Error;
 
     fn encode(&mut self, item: JSONRPCRequest, dst: &mut BytesMut) -> Result<()> {
         self.encode(JSONRPCMessage::Request(item), dst)
@@ -100,7 +100,7 @@ impl Encoder<JSONRPCRequest> for JsonRpcCodec {
 }
 
 impl Encoder<JSONRPCResponse> for JsonRpcCodec {
-    type Error = MCPError;
+    type Error = Error;
 
     fn encode(&mut self, item: JSONRPCResponse, dst: &mut BytesMut) -> Result<()> {
         self.encode(JSONRPCMessage::Response(item), dst)
@@ -108,7 +108,7 @@ impl Encoder<JSONRPCResponse> for JsonRpcCodec {
 }
 
 impl Encoder<JSONRPCNotification> for JsonRpcCodec {
-    type Error = MCPError;
+    type Error = Error;
 
     fn encode(&mut self, item: JSONRPCNotification, dst: &mut BytesMut) -> Result<()> {
         self.encode(JSONRPCMessage::Notification(item), dst)

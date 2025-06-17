@@ -9,7 +9,7 @@ use tracing::info;
 
 use crate::{
     codec::JsonRpcCodec,
-    error::{MCPError, Result},
+    error::{Error, Result},
     schema::JSONRPCMessage,
 };
 
@@ -25,7 +25,7 @@ pub trait Transport: Send + Sync {
 
 /// Trait for a bidirectional stream of JSON-RPC messages
 pub trait TransportStream:
-    Stream<Item = Result<JSONRPCMessage>> + Sink<JSONRPCMessage, Error = MCPError> + Send + Unpin
+    Stream<Item = Result<JSONRPCMessage>> + Sink<JSONRPCMessage, Error = Error> + Send + Unpin
 {
 }
 
@@ -137,7 +137,7 @@ impl Transport for TcpTransport {
     }
 
     fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
-        let stream = self.stream.ok_or(MCPError::TransportDisconnected)?;
+        let stream = self.stream.ok_or(Error::TransportDisconnected)?;
 
         let framed = Framed::new(stream, JsonRpcCodec::new());
         Ok(Box::new(framed))
@@ -166,7 +166,7 @@ impl Transport for TcpServerTransport {
     }
 
     fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
-        let stream = self.stream.ok_or(MCPError::TransportDisconnected)?;
+        let stream = self.stream.ok_or(Error::TransportDisconnected)?;
 
         let framed = Framed::new(stream, JsonRpcCodec::new());
         Ok(Box::new(framed))
@@ -245,7 +245,7 @@ pub(crate) mod test_transport {
     }
 
     impl Sink<JSONRPCMessage> for TestTransportStream {
-        type Error = MCPError;
+        type Error = Error;
 
         fn poll_ready(
             self: Pin<&mut Self>,
@@ -258,9 +258,7 @@ pub(crate) mod test_transport {
             self: Pin<&mut Self>,
             item: JSONRPCMessage,
         ) -> std::result::Result<(), Self::Error> {
-            self.sender
-                .send(item)
-                .map_err(|_| MCPError::ConnectionClosed)
+            self.sender.send(item).map_err(|_| Error::ConnectionClosed)
         }
 
         fn poll_flush(

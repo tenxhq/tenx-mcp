@@ -9,7 +9,7 @@ use std::env;
 use std::time::Duration;
 use tenx_mcp::{
     client::{ClientConfig, MCPClient},
-    error::{MCPError, Result},
+    error::{Error, Result},
     retry::RetryConfig,
     schema::*,
     transport::TcpTransport,
@@ -64,7 +64,7 @@ async fn test_slow_operation(client: &mut MCPClient) -> Result<()> {
         Err(e) => {
             info!("✓ Expected timeout: {}", e);
             // Verify it's actually a timeout error
-            if !matches!(e, MCPError::Timeout { .. }) {
+            if !matches!(e, Error::Timeout { .. }) {
                 error!("Error was not a timeout: {:?}", e);
             }
         }

@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use serde_json::json;
 use tenx_mcp::{
     connection::Connection,
-    error::{MCPError, Result},
+    error::{Error, Result},
     schema::*,
 };
 
@@ -125,34 +125,34 @@ impl Connection for TestConnection {
     ) -> Result<CallToolResult> {
         match name.as_str() {
             "echo" => {
-                let args = arguments
-                    .ok_or_else(|| MCPError::invalid_params("echo", "Missing arguments"))?;
+                let args =
+                    arguments.ok_or_else(|| Error::invalid_params("echo", "Missing arguments"))?;
                 let message = args
                     .get("message")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| MCPError::invalid_params("echo", "Missing message parameter"))?;
+                    .ok_or_else(|| Error::invalid_params("echo", "Missing message parameter"))?;
 
                 Ok(CallToolResult::new()
                     .with_text_content(message.to_string())
                     .is_error(false))
             }
             "add" => {
-                let args = arguments
-                    .ok_or_else(|| MCPError::invalid_params("add", "Missing arguments"))?;
+                let args =
+                    arguments.ok_or_else(|| Error::invalid_params("add", "Missing arguments"))?;
 
                 let a = args.get("a").and_then(|v| v.as_f64()).ok_or_else(|| {
-                    MCPError::invalid_params("add", "Missing or invalid 'a' parameter")
+                    Error::invalid_params("add", "Missing or invalid 'a' parameter")
                 })?;
 
                 let b = args.get("b").and_then(|v| v.as_f64()).ok_or_else(|| {
-                    MCPError::invalid_params("add", "Missing or invalid 'b' parameter")
+                    Error::invalid_params("add", "Missing or invalid 'b' parameter")
                 })?;
 
                 Ok(CallToolResult::new()
                     .with_text_content(format!("{}", a + b))
                     .is_error(false))
             }
-            _ => Err(MCPError::ToolExecutionFailed {
+            _ => Err(Error::ToolExecutionFailed {
                 tool: name,
                 message: "Tool not found".to_string(),
             }),
@@ -196,7 +196,7 @@ mod tests {
         // Test error on missing arguments
         let error = conn.tools_call("echo".to_string(), None).await.unwrap_err();
         match error {
-            MCPError::InvalidParams { .. } => {}
+            Error::InvalidParams { .. } => {}
             _ => panic!("Expected InvalidParams error"),
         }
 
@@ -206,7 +206,7 @@ mod tests {
             .await
             .unwrap_err();
         match error {
-            MCPError::InvalidParams { .. } => {}
+            Error::InvalidParams { .. } => {}
             _ => panic!("Expected InvalidParams error"),
         }
     }
@@ -257,7 +257,7 @@ mod tests {
         // Test error on missing arguments
         let error = conn.tools_call("add".to_string(), None).await.unwrap_err();
         match error {
-            MCPError::InvalidParams { .. } => {}
+            Error::InvalidParams { .. } => {}
             _ => panic!("Expected InvalidParams error"),
         }
 
@@ -267,7 +267,7 @@ mod tests {
             .await
             .unwrap_err();
         match error {
-            MCPError::InvalidParams { .. } => {}
+            Error::InvalidParams { .. } => {}
             _ => panic!("Expected InvalidParams error"),
         }
 
@@ -277,7 +277,7 @@ mod tests {
             .await
             .unwrap_err();
         match error {
-            MCPError::InvalidParams { .. } => {}
+            Error::InvalidParams { .. } => {}
             _ => panic!("Expected InvalidParams error"),
         }
     }

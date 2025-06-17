@@ -6,7 +6,7 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::env;
-use tenx_mcp::{connection::Connection, error::MCPError, schema::*, MCPServer, Result};
+use tenx_mcp::{connection::Connection, error::Error, schema::*, MCPServer, Result};
 use tokio::net::TcpListener;
 use tokio::signal;
 use tracing::{error, info};
@@ -131,7 +131,7 @@ impl Connection for TcpExampleConnection {
                     .with_text_content(format!("{a} + {b} = {result}"))
                     .is_error(false))
             }
-            _ => Err(MCPError::ToolExecutionFailed {
+            _ => Err(Error::ToolExecutionFailed {
                 tool: name,
                 message: "Tool not found".to_string(),
             }),
