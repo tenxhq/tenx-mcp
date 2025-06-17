@@ -17,17 +17,17 @@ pub type ConnectionFactory = Box<dyn Fn() -> Box<dyn Connection> + Send + Sync>;
 
 /// MCP Server implementation
 #[derive(Default)]
-pub struct MCPServer {
+pub struct Server {
     capabilities: ServerCapabilities,
     connection_factory: Option<ConnectionFactory>,
 }
 
-pub struct MCPServerHandle {
+pub struct ServerHandle {
     pub handle: JoinHandle<()>,
     notification_tx: broadcast::Sender<ServerNotification>,
 }
 
-impl MCPServer {
+impl Server {
     /// Set the connection factory for creating Connection instances
     pub fn with_connection_factory<F>(mut self, factory: F) -> Self
     where
@@ -49,9 +49,9 @@ impl MCPServer {
     }
 }
 
-impl MCPServerHandle {
+impl ServerHandle {
     /// Start serving connections using the provided transport, returning a handle for runtime operations
-    pub async fn new(server: MCPServer, mut transport: Box<dyn Transport>) -> Result<Self> {
+    pub async fn new(server: Server, mut transport: Box<dyn Transport>) -> Result<Self> {
         transport.connect().await?;
         let stream = transport.framed()?;
         let (mut sink_tx, mut stream_rx) = stream.split();
@@ -135,7 +135,7 @@ impl MCPServerHandle {
             info!("MCP server stopped");
         });
 
-        Ok(MCPServerHandle {
+        Ok(ServerHandle {
             handle,
             notification_tx: notification_tx_handle,
         })

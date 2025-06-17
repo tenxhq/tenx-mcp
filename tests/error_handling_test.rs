@@ -1,7 +1,7 @@
 //! Unit tests for JSON-RPC error handling
 
 use futures::{SinkExt, StreamExt};
-use tenx_mcp::{schema::*, server::MCPServer, transport::Transport, MCPServerHandle};
+use tenx_mcp::{schema::*, server::Server, transport::Transport, ServerHandle};
 
 // Reuse test transport from integration test
 mod test_helpers {
@@ -63,11 +63,11 @@ async fn test_method_not_found() {
         }
     }
 
-    let server = MCPServer::default().with_connection_factory(|| Box::new(TestConnection));
+    let server = Server::default().with_connection_factory(|| Box::new(TestConnection));
     let (client, server_stream) = tokio::io::duplex(8192);
 
     let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
-    let server_handle = MCPServerHandle::new(server, transport).await.unwrap();
+    let server_handle = ServerHandle::new(server, transport).await.unwrap();
 
     let mut transport = Box::new(TestTransport::new(client));
     transport.connect().await.unwrap();
@@ -121,11 +121,11 @@ async fn test_invalid_params() {
         }
     }
 
-    let server = MCPServer::default().with_connection_factory(|| Box::new(TestConnection));
+    let server = Server::default().with_connection_factory(|| Box::new(TestConnection));
     let (client, server_stream) = tokio::io::duplex(8192);
 
     let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
-    let server_handle = MCPServerHandle::new(server, transport).await.unwrap();
+    let server_handle = ServerHandle::new(server, transport).await.unwrap();
 
     let mut transport = Box::new(TestTransport::new(client));
     transport.connect().await.unwrap();
@@ -182,7 +182,7 @@ async fn test_successful_response() {
         }
     }
 
-    let server = MCPServer::default()
+    let server = Server::default()
         .with_connection_factory(|| Box::new(TestConnection))
         .with_capabilities(ServerCapabilities {
             tools: Some(ToolsCapability { list_changed: None }),
@@ -192,9 +192,7 @@ async fn test_successful_response() {
     let (client_stream, server_stream) = tokio::io::duplex(8192);
 
     let server_transport = Box::new(TestTransport::new(server_stream));
-    let server_handle = MCPServerHandle::new(server, server_transport)
-        .await
-        .unwrap();
+    let server_handle = ServerHandle::new(server, server_transport).await.unwrap();
 
     let mut client_transport = Box::new(TestTransport::new(client_stream));
     client_transport.connect().await.unwrap();

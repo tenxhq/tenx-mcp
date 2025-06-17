@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::env;
 use tenx_mcp::{
-    schemars, ClientCapabilities, Content, Implementation, MCPClient, Result, TcpTransport,
+    schemars, Client, ClientCapabilities, Content, Implementation, Result, TcpTransport,
 };
 use tracing::info;
 
@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     info!("Connecting to MCP server at {}", addr);
 
     // Create client and connect
-    let mut client = MCPClient::new();
+    let mut client = Client::new();
     let transport = Box::new(TcpTransport::new(addr));
     client.connect(transport).await?;
 

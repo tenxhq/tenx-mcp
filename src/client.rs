@@ -41,7 +41,7 @@ impl Default for ClientConfig {
 type TransportSink = Arc<Mutex<SplitSink<Box<dyn TransportStream>, JSONRPCMessage>>>;
 
 /// MCP Client implementation
-pub struct MCPClient {
+pub struct Client {
     transport_tx: Option<TransportSink>,
     pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<ResponseOrError>>>>,
     notification_tx: mpsc::Sender<JSONRPCNotification>,
@@ -50,7 +50,7 @@ pub struct MCPClient {
     config: ClientConfig,
 }
 
-impl MCPClient {
+impl Client {
     /// Create a new MCP client with default configuration
     pub fn new() -> Self {
         Self::with_config(ClientConfig::default())
@@ -469,7 +469,7 @@ impl MCPClient {
     }
 }
 
-impl Default for MCPClient {
+impl Default for Client {
     fn default() -> Self {
         Self::new()
     }
@@ -482,7 +482,7 @@ mod tests {
     #[test]
     fn test_pagination_api() {
         // This test just verifies the API is ergonomic - it doesn't run async code
-        let mut client = MCPClient::new();
+        let mut client = Client::new();
 
         // These should all compile cleanly
         std::mem::drop(async {
@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn test_call_tool_api() {
         // This test just verifies the API is ergonomic - it doesn't run async code
-        let mut client = MCPClient::new();
+        let mut client = Client::new();
 
         // These should all compile cleanly
         std::mem::drop(async {
@@ -546,10 +546,10 @@ mod tests {
         });
     }
 
-    use crate::server::{MCPServer, MCPServerHandle};
+    use crate::server::{Server, ServerHandle};
     use crate::transport::TestTransport;
 
-    async fn setup_client_server() -> (MCPClient, MCPServerHandle) {
+    async fn setup_client_server() -> (Client, ServerHandle) {
         let (client_transport, server_transport) = TestTransport::create_pair();
 
         // Create a minimal test connection
@@ -567,12 +567,12 @@ mod tests {
             }
         }
 
-        let server = MCPServer::default().with_connection_factory(|| Box::new(TestConnection));
-        let server_handle = MCPServerHandle::new(server, server_transport)
+        let server = Server::default().with_connection_factory(|| Box::new(TestConnection));
+        let server_handle = ServerHandle::new(server, server_transport)
             .await
             .expect("Failed to start server");
 
-        let mut client = MCPClient::new();
+        let mut client = Client::new();
         client
             .connect(client_transport)
             .await
@@ -592,13 +592,13 @@ mod tests {
 
     #[test]
     fn test_client_creation() {
-        let client = MCPClient::new();
+        let client = Client::new();
         assert!(client.transport_tx.is_none());
     }
 
     #[tokio::test]
     async fn test_next_request_id() {
-        let client = MCPClient::new();
+        let client = Client::new();
         assert_eq!(client.next_request_id().await, "req-1");
         assert_eq!(client.next_request_id().await, "req-2");
     }

@@ -9,7 +9,7 @@ use tenx_mcp::{
     connection::Connection,
     error::{Error, Result},
     schema::*,
-    server::MCPServer,
+    server::Server,
     transport::{StdioTransport, Transport},
 };
 use tracing::info;
@@ -136,7 +136,7 @@ async fn main() -> Result<()> {
         version: "0.1.0".to_string(),
     };
 
-    let server = MCPServer::default()
+    let server = Server::default()
         .with_capabilities(capabilities.clone())
         .with_connection_factory(move || {
             Box::new(ErrorHandlingConnection::new(
@@ -159,7 +159,7 @@ async fn main() -> Result<()> {
 
     // Create and run transport
     let transport: Box<dyn Transport> = Box::new(StdioTransport::new());
-    let server_handle = tenx_mcp::MCPServerHandle::new(server, transport).await?;
+    let server_handle = tenx_mcp::ServerHandle::new(server, transport).await?;
     server_handle
         .handle
         .await

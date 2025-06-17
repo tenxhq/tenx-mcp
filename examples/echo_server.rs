@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use tenx_mcp::{
-    connection::Connection, error::Error, schema::*, transport::StdioTransport, MCPServer,
-    MCPServerHandle, Result,
+    connection::Connection, error::Error, schema::*, transport::StdioTransport, Result, Server,
+    ServerHandle,
 };
 use tracing::{info, level_filters::LevelFilter};
 
@@ -122,7 +122,7 @@ async fn main() -> Result<()> {
         version: "1.0.0".to_string(),
     };
 
-    let server = MCPServer::default()
+    let server = Server::default()
         .with_capabilities(capabilities.clone())
         .with_connection_factory(move || {
             Box::new(EchoConnection::new(
@@ -138,7 +138,7 @@ async fn main() -> Result<()> {
 
     info!("Server ready, starting to serve on stdio");
 
-    let server_handle = MCPServerHandle::new(server, Box::new(transport)).await?;
+    let server_handle = ServerHandle::new(server, Box::new(transport)).await?;
     server_handle
         .handle
         .await

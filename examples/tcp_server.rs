@@ -6,7 +6,7 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::env;
-use tenx_mcp::{connection::Connection, error::Error, schema::*, MCPServer, Result};
+use tenx_mcp::{connection::Connection, error::Error, schema::*, Result, Server};
 use tokio::net::TcpListener;
 use tokio::signal;
 use tracing::{error, info};
@@ -184,7 +184,7 @@ async fn main() -> Result<()> {
 
                         let capabilities = ServerCapabilities::default();
 
-                        let server = MCPServer::default()
+                        let server = Server::default()
                             .with_connection_factory(move || {
                                 Box::new(TcpExampleConnection::new(server_info.clone(), capabilities.clone()))
                             });
@@ -195,7 +195,7 @@ async fn main() -> Result<()> {
                         // Handle the connection in a separate task
                         tokio::spawn(async move {
                             info!("Handling connection from {}", peer_addr);
-                            match tenx_mcp::MCPServerHandle::new(server, transport).await {
+                            match tenx_mcp::ServerHandle::new(server, transport).await {
                                 Ok(server_handle) => {
                                     info!("Server handle created for {}", peer_addr);
                                     if let Err(e) = server_handle.handle.await {

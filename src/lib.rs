@@ -8,14 +8,14 @@ pub mod server;
 pub mod transport;
 
 // Re-export commonly used types
-pub use client::MCPClient;
+pub use client::Client;
 pub use connection::{Connection, ConnectionContext};
 pub use error::{Error, Result};
 pub use schema::{
     ClientCapabilities, Content, Implementation, JSONRPCNotification, ResourceContents,
     ToolInputSchema, ToolsCapability,
 };
-pub use server::{MCPServer, MCPServerHandle};
+pub use server::{Server, ServerHandle};
 pub use transport::{StdioTransport, TcpServerTransport, TcpTransport};
 
 // Re-export schemars for users

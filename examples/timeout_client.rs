@@ -8,7 +8,7 @@
 use std::env;
 use std::time::Duration;
 use tenx_mcp::{
-    client::{ClientConfig, MCPClient},
+    client::{Client, ClientConfig},
     error::{Error, Result},
     retry::RetryConfig,
     schema::*,
@@ -16,7 +16,7 @@ use tenx_mcp::{
 };
 use tracing::{error, info};
 
-async fn test_reliable_operation(client: &mut MCPClient) -> Result<()> {
+async fn test_reliable_operation(client: &mut Client) -> Result<()> {
     info!("\n=== Testing Reliable Operation ===");
     info!("This should succeed immediately...");
 
@@ -32,7 +32,7 @@ async fn test_reliable_operation(client: &mut MCPClient) -> Result<()> {
     Ok(())
 }
 
-async fn test_flakey_operation(client: &mut MCPClient) -> Result<()> {
+async fn test_flakey_operation(client: &mut Client) -> Result<()> {
     info!("\n=== Testing Flakey Operation ===");
     info!("This operation fails 2 times before succeeding.");
     info!("With retry enabled, it should eventually succeed...");
@@ -49,7 +49,7 @@ async fn test_flakey_operation(client: &mut MCPClient) -> Result<()> {
     Ok(())
 }
 
-async fn test_slow_operation(client: &mut MCPClient) -> Result<()> {
+async fn test_slow_operation(client: &mut Client) -> Result<()> {
     info!("\n=== Testing Slow Operation ===");
     info!("This operation takes 5 seconds, but our timeout is 2 seconds.");
     info!("It should timeout and retry, but still fail...");
@@ -70,7 +70,7 @@ async fn test_slow_operation(client: &mut MCPClient) -> Result<()> {
     Ok(())
 }
 
-async fn test_broken_operation(client: &mut MCPClient) -> Result<()> {
+async fn test_broken_operation(client: &mut Client) -> Result<()> {
     info!("\n=== Testing Broken Operation ===");
     info!("This operation always fails with a non-retryable error.");
     info!("Should fail immediately without retries...");
@@ -107,7 +107,7 @@ async fn test_custom_retry_config(host: &str, port: u16) -> Result<()> {
         request_timeout: Duration::from_secs(1),
     };
 
-    let mut client = MCPClient::with_config(config);
+    let mut client = Client::with_config(config);
     let transport = TcpTransport::new(format!("{host}:{port}"));
 
     client.connect(Box::new(transport)).await?;
@@ -174,7 +174,7 @@ async fn main() -> Result<()> {
         request_timeout: Duration::from_secs(5),
     };
 
-    let mut client = MCPClient::with_config(config);
+    let mut client = Client::with_config(config);
 
     // Create transport
     let transport = TcpTransport::new(format!("{host}:{port}"));

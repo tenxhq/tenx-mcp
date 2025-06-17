@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use tenx_mcp::{
     connection::Connection, error::Error, schema::*, schemars, transport::TcpServerTransport,
-    MCPServer, MCPServerHandle, Result,
+    Result, Server, ServerHandle,
 };
 use tokio::net::TcpListener;
 use tokio::signal;
@@ -105,7 +105,7 @@ async fn main() -> Result<()> {
                 match result {
                     Ok((stream, peer_addr)) => {
                         info!("New connection from {}", peer_addr);
-                        let server = MCPServer::default()
+                        let server = Server::default()
                             .with_connection_factory(move || {
                                 Box::new(BasicConnection::default())
                             });
@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
                         // Handle the connection in a separate task
                         tokio::spawn(async move {
                             info!("Handling connection from {}", peer_addr);
-                            match MCPServerHandle::new(server, transport).await {
+                            match ServerHandle::new(server, transport).await {
                                 Ok(server_handle) => {
                                     info!("Server handle created for {}", peer_addr);
                                     if let Err(e) = server_handle.handle.await {

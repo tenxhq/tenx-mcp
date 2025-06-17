@@ -14,7 +14,7 @@ use tenx_mcp::{
     connection::Connection,
     error::{Error, Result},
     schema::*,
-    server::MCPServer,
+    server::Server,
     transport::TcpServerTransport,
 };
 use tokio::net::TcpListener;
@@ -208,7 +208,7 @@ async fn main() -> Result<()> {
 
                         let capabilities = ServerCapabilities::default();
 
-                        let server = MCPServer::default()
+                        let server = Server::default()
                             .with_connection_factory(move || {
                                 Box::new(TimeoutTestConnection::new(
                                     server_info.clone(),
@@ -230,7 +230,7 @@ async fn main() -> Result<()> {
                         // Handle the connection in a separate task
                         tokio::spawn(async move {
                             info!("Handling connection from {}", peer_addr);
-                            match tenx_mcp::MCPServerHandle::new(server, transport).await {
+                            match tenx_mcp::ServerHandle::new(server, transport).await {
                                 Ok(server_handle) => {
                                     info!("Server handle created for {}", peer_addr);
                                     if let Err(e) = server_handle.handle.await {

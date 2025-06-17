@@ -7,7 +7,7 @@ use tenx_mcp::{
     connection::Connection,
     error::{Error, Result},
     schema::*,
-    server::MCPServer,
+    server::Server,
     transport::Transport,
 };
 
@@ -124,7 +124,7 @@ use test_transport::TestTransport;
 #[tokio::test]
 async fn test_error_responses() {
     // Setup server
-    let server = MCPServer::default().with_connection_factory(|| Box::new(TestConnection));
+    let server = Server::default().with_connection_factory(|| Box::new(TestConnection));
 
     // Create streams
     let (client_stream, server_stream) = tokio::io::duplex(8192);
@@ -132,7 +132,7 @@ async fn test_error_responses() {
     // Start server
     let server_handle = tokio::spawn(async move {
         let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
-        let server_handle = tenx_mcp::MCPServerHandle::new(server, transport)
+        let server_handle = tenx_mcp::ServerHandle::new(server, transport)
             .await
             .unwrap();
         server_handle.handle.await.ok();

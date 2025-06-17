@@ -7,7 +7,7 @@ use tenx_mcp::{
         CallToolResult, Content, InitializeResult, ListToolsResult, TextContent, Tool,
         ToolInputSchema,
     },
-    Connection, ConnectionContext, MCPServer, MCPServerHandle, Result,
+    Connection, ConnectionContext, Result, Server, ServerHandle,
 };
 use tokio::net::TcpListener;
 use tokio::signal;
@@ -252,7 +252,7 @@ async fn main() -> Result<()> {
                         info!("New connection from {}", peer_addr);
 
                         // Create a new server with connection factory
-                        let server = MCPServer::default()
+                        let server = Server::default()
                         .with_connection_factory(|| Box::new(MyConnection::new()));
 
                         // Create transport from the accepted connection
@@ -261,7 +261,7 @@ async fn main() -> Result<()> {
                         // Handle the connection in a separate task
                         tokio::spawn(async move {
                             info!("Handling connection from {}", peer_addr);
-                            match MCPServerHandle::new(server, transport).await {
+                            match ServerHandle::new(server, transport).await {
                                 Ok(server_handle) => {
                                     info!("Server handle created for {}", peer_addr);
                                     if let Err(e) = server_handle.handle.await {

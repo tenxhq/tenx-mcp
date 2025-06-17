@@ -12,7 +12,7 @@ use rmcp::model::{CallToolRequestParam, PaginatedRequestParam};
 use serde_json::json;
 // Import tenx-mcp types
 use tenx_mcp::error::{Error, Result};
-use tenx_mcp::{connection::Connection, schema::*, MCPClient, MCPServer};
+use tenx_mcp::{connection::Connection, schema::*, Client, Server};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 // Simple echo connection for testing
@@ -93,7 +93,7 @@ async fn test_tenx_server_with_rmcp_client() {
     let (client_reader, server_writer) = tokio::io::duplex(8192);
 
     // Create and configure tenx-mcp server
-    let server = MCPServer::default()
+    let server = Server::default()
         .with_connection_factory(|| Box::new(EchoConnection))
         .with_capabilities(ServerCapabilities {
             tools: Some(ToolsCapability {
@@ -111,7 +111,7 @@ async fn test_tenx_server_with_rmcp_client() {
         server_reader,
         server_writer,
     ));
-    let server_handle = tenx_mcp::MCPServerHandle::new(server, transport)
+    let server_handle = tenx_mcp::ServerHandle::new(server, transport)
         .await
         .expect("Failed to start server");
 
@@ -264,7 +264,7 @@ async fn test_rmcp_server_with_tenx_client() {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     // Create tenx-mcp client
-    let mut client = MCPClient::new();
+    let mut client = Client::new();
     let transport = Box::new(transport_helpers::TransportAdapter::new(
         client_reader,
         client_writer,
