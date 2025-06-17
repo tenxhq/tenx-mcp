@@ -1,11 +1,15 @@
 //! Basic MCP server example that pairs with basic_client.rs
 //!
-//! This server listens on TCP port 3000 (by default) and provides
-//! a simple echo tool that can be called by the basic_client example.
+//! This server can run in two modes:
+//! 1. TCP mode: listens on TCP port 3000 (by default)
+//! 2. Stdio mode: communicates via stdin/stdout
+//!
+//! Both modes provide a simple echo tool that can be called by clients.
 //!
 //! Usage:
-//!   cargo run --example basic_server [host] [port]
-//!   cargo run --example basic_server  # defaults to 127.0.0.1:3000
+//!   cargo run --example basic_server [host] [port]  # TCP mode
+//!   cargo run --example basic_server                # TCP mode, defaults to 127.0.0.1:3000
+//!   cargo run --example basic_server --stdio        # Stdio mode
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -66,36 +70,52 @@ impl Connection for BasicConnection {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging
-    tracing_subscriber::fmt::init();
-
     // Parse command line arguments
     let args: Vec<String> = env::args().collect();
 
-    let (host, port) = if args.len() == 3 {
-        (
-            args[1].clone(),
-            args[2].parse::<u16>().expect("Invalid port number"),
-        )
-    } else if args.len() == 1 {
-        // Default to localhost:3000 to match basic_client
-        ("127.0.0.1".to_string(), 3000)
+    // Check for --stdio flag
+    let is_stdio = args.iter().any(|arg| arg == "--stdio");
+
+    // Only initialize logging for TCP mode
+    // In stdio mode, logging would interfere with JSON-RPC communication
+    if !is_stdio {
+        tracing_subscriber::fmt::init();
+    }
+
+    if is_stdio {
+        // Run in stdio mode - no logging to avoid interfering with JSON-RPC
+        Server::default()
+            .with_connection_factory(|| Box::new(BasicConnection::default()))
+            .serve_stdio()
+            .await?;
     } else {
-        eprintln!("Usage: {} [host] [port]", args[0]);
-        eprintln!("Example: {} 127.0.0.1 3000", args[0]);
-        eprintln!("If no arguments provided, defaults to 127.0.0.1:3000");
-        std::process::exit(1);
-    };
+        // Run in TCP mode
+        let (host, port) = if args.len() == 3 {
+            (
+                args[1].clone(),
+                args[2].parse::<u16>().expect("Invalid port number"),
+            )
+        } else if args.len() == 1 {
+            // Default to localhost:3000 to match basic_client
+            ("127.0.0.1".to_string(), 3000)
+        } else {
+            eprintln!("Usage: {} [host] [port] or {} --stdio", args[0], args[0]);
+            eprintln!("Example: {} 127.0.0.1 3000", args[0]);
+            eprintln!("Example: {} --stdio", args[0]);
+            eprintln!("If no arguments provided, defaults to 127.0.0.1:3000");
+            std::process::exit(1);
+        };
 
-    let addr = format!("{host}:{port}");
+        let addr = format!("{host}:{port}");
 
-    // Create and run the server using the new simplified API
-    info!("Starting basic MCP server on {}", addr);
+        // Create and run the server using the new simplified API
+        info!("Starting basic MCP server on {}", addr);
 
-    Server::default()
-        .with_connection_factory(|| Box::new(BasicConnection::default()))
-        .serve_tcp(addr)
-        .await?;
+        Server::default()
+            .with_connection_factory(|| Box::new(BasicConnection::default()))
+            .serve_tcp(addr)
+            .await?;
+    }
 
     Ok(())
 }
