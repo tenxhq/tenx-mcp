@@ -51,7 +51,3 @@ path = "examples/process_spawn.rs"
 [[example]]
 name = "stream_connection"
 path = "examples/stream_connection.rs"
-
-[[example]]
-name = "stream_server"
-path = "examples/stream_server.rs"

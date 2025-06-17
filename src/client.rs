@@ -209,19 +209,63 @@ impl Client {
         .await
     }
 
-    /// Call a tool on the server
-    pub async fn call_tool(
+    /// Call a tool on the server without arguments
+    ///
+    /// This is a convenience method for calling tools that don't require arguments.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use tenx_mcp::{Client, Result};
+    /// # async fn example(client: &mut Client) -> Result<()> {
+    /// client.call_tool_without_args("ping").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn call_tool_without_args(
         &mut self,
         name: impl Into<String>,
-        arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
-        let arguments = arguments.map(|args| {
-            if let serde_json::Value::Object(map) = args {
-                map.into_iter().collect()
-            } else {
-                std::collections::HashMap::new()
-            }
-        });
+        let request = ClientRequest::CallTool {
+            name: name.into(),
+            arguments: None,
+        };
+        self.request_with_retry(request).await
+    }
+
+    /// Call a tool on the server with arguments
+    ///
+    /// # Arguments
+    /// * `name` - The name of the tool to call
+    /// * `arguments` - The arguments to pass to the tool. Can be any type that implements `Serialize`
+    ///
+    /// # Examples
+    /// ```no_run
+    /// # use tenx_mcp::{Client, Result};
+    /// # async fn example(client: &mut Client) -> Result<()> {
+    /// // With a struct
+    /// #[derive(serde::Serialize)]
+    /// struct Args { message: String }
+    /// client.call_tool("echo", &Args { message: "hello".into() }).await?;
+    ///
+    /// // With serde_json::Value
+    /// client.call_tool("echo", &serde_json::json!({"message": "hello"})).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn call_tool<T>(
+        &mut self,
+        name: impl Into<String>,
+        arguments: &T,
+    ) -> Result<CallToolResult>
+    where
+        T: serde::Serialize,
+    {
+        let value = serde_json::to_value(arguments)?;
+        let arguments = if let serde_json::Value::Object(map) = value {
+            Some(map.into_iter().collect())
+        } else {
+            Some(std::collections::HashMap::new())
+        };
 
         let request = ClientRequest::CallTool {
             name: name.into(),
@@ -755,23 +799,40 @@ mod tests {
 
         // These should all compile cleanly
         std::mem::drop(async {
-            // Call with &str
-            client.call_tool("my_tool", None).await.unwrap();
+            // Call without arguments
+            client.call_tool_without_args("my_tool").await.unwrap();
 
-            // Call with String
+            // Call with String for tool name
             let tool_name = "another_tool".to_string();
-            client.call_tool(tool_name, None).await.unwrap();
+            client.call_tool_without_args(tool_name).await.unwrap();
 
             // Call with &String
             let tool_name = "third_tool".to_string();
-            client.call_tool(&tool_name, None).await.unwrap();
+            client.call_tool_without_args(&tool_name).await.unwrap();
 
-            // Call with arguments
+            // Call with serde_json::Value arguments
             let args = serde_json::json!({"param": "value"});
+            client.call_tool("tool_with_args", &args).await.unwrap();
+
+            // Call with struct that implements Serialize
+            #[derive(serde::Serialize)]
+            struct MyArgs {
+                param: String,
+                count: i32,
+            }
+            let my_args = MyArgs {
+                param: "value".to_string(),
+                count: 42,
+            };
             client
-                .call_tool("tool_with_args", Some(args))
+                .call_tool("tool_with_struct", &my_args)
                 .await
                 .unwrap();
+
+            // Call with HashMap
+            let mut map = std::collections::HashMap::new();
+            map.insert("key", "value");
+            client.call_tool("tool_with_map", &map).await.unwrap();
         });
     }
 

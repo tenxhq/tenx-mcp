@@ -86,9 +86,9 @@ async fn main() -> Result<()> {
     match client
         .call_tool(
             "echo",
-            Some(serde_json::json!({
+            &serde_json::json!({
                 "message": "Hello from spawned process!"
-            })),
+            }),
         )
         .await
     {

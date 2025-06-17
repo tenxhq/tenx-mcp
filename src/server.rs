@@ -409,7 +409,7 @@ async fn handle_request_inner(
                 Error::InvalidParams("initialize: Missing required parameters".to_string())
             })?;
             let params = serde_json::from_value::<InitializeParams>(p)
-                .map_err(|e| Error::InvalidParams(format!("initialize: {}", e)))?;
+                .map_err(|e| Error::InvalidParams(format!("initialize: {e}")))?;
             connection
                 .initialize(
                     params.protocol_version,
@@ -432,7 +432,7 @@ async fn handle_request_inner(
                 Error::InvalidParams("tools/call: Missing required parameters".to_string())
             })?;
             let params = serde_json::from_value::<CallToolParams>(p)
-                .map_err(|e| Error::InvalidParams(format!("tools/call: {}", e)))?;
+                .map_err(|e| Error::InvalidParams(format!("tools/call: {e}")))?;
             let arguments = params
                 .arguments
                 .map(serde_json::to_value)
@@ -458,7 +458,7 @@ async fn handle_request_inner(
                 Error::InvalidParams("resources/read: Missing required parameters".to_string())
             })?;
             let params = serde_json::from_value::<ReadResourceParams>(p)
-                .map_err(|e| Error::InvalidParams(format!("resources/read: {}", e)))?;
+                .map_err(|e| Error::InvalidParams(format!("resources/read: {e}")))?;
             connection
                 .resources_read(params.uri)
                 .await
@@ -469,7 +469,7 @@ async fn handle_request_inner(
                 Error::InvalidParams("resources/subscribe: Missing required parameters".to_string())
             })?;
             let params = serde_json::from_value::<HashMap<String, String>>(p)
-                .map_err(|e| Error::InvalidParams(format!("resources/subscribe: {}", e)))?;
+                .map_err(|e| Error::InvalidParams(format!("resources/subscribe: {e}")))?;
             let uri = params.get("uri").ok_or_else(|| {
                 Error::InvalidParams("resources/subscribe: Missing uri parameter".to_string())
             })?;
@@ -485,7 +485,7 @@ async fn handle_request_inner(
                 )
             })?;
             let params = serde_json::from_value::<HashMap<String, String>>(p)
-                .map_err(|e| Error::InvalidParams(format!("resources/unsubscribe: {}", e)))?;
+                .map_err(|e| Error::InvalidParams(format!("resources/unsubscribe: {e}")))?;
             let uri = params.get("uri").ok_or_else(|| {
                 Error::InvalidParams("resources/unsubscribe: Missing uri parameter".to_string())
             })?;
@@ -503,7 +503,7 @@ async fn handle_request_inner(
                 Error::InvalidParams("prompts/get: Missing required parameters".to_string())
             })?;
             let params = serde_json::from_value::<GetPromptParams>(p)
-                .map_err(|e| Error::InvalidParams(format!("prompts/get: {}", e)))?;
+                .map_err(|e| Error::InvalidParams(format!("prompts/get: {e}")))?;
             connection
                 .prompts_get(params.name, params.arguments)
                 .await
@@ -514,7 +514,7 @@ async fn handle_request_inner(
                 Error::InvalidParams("completion/complete: Missing required parameters".to_string())
             })?;
             let params = serde_json::from_value::<CompleteParams>(p)
-                .map_err(|e| Error::InvalidParams(format!("completion/complete: {}", e)))?;
+                .map_err(|e| Error::InvalidParams(format!("completion/complete: {e}")))?;
             connection
                 .completion_complete(params.reference, params.argument)
                 .await
@@ -525,7 +525,7 @@ async fn handle_request_inner(
                 Error::InvalidParams("logging/setLevel: Missing required parameters".to_string())
             })?;
             let params = serde_json::from_value::<HashMap<String, LoggingLevel>>(p)
-                .map_err(|e| Error::InvalidParams(format!("logging/setLevel: {}", e)))?;
+                .map_err(|e| Error::InvalidParams(format!("logging/setLevel: {e}")))?;
             let level = params.get("level").ok_or_else(|| {
                 Error::InvalidParams("logging/setLevel: Missing level parameter".to_string())
             })?;

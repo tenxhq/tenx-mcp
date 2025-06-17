@@ -43,11 +43,13 @@ async fn main() -> Result<()> {
 
     // Call the echo tool
     info!("\nCalling echo tool...");
-    let echo_params = EchoParams {
-        message: "Hello from tenx-mcp client!".to_string(),
-    };
     let result = client
-        .call_tool("echo", Some(serde_json::to_value(&echo_params)?))
+        .call_tool(
+            "echo",
+            &EchoParams {
+                message: "Hello from tenx-mcp client!".to_string(),
+            },
+        )
         .await?;
 
     // Assume text response
