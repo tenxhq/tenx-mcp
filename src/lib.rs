@@ -16,7 +16,6 @@ pub use schema::{
     ToolInputSchema, ToolsCapability,
 };
 pub use server::{Server, ServerHandle};
-pub use transport::{Transport, TransportStream};
 
 // Re-export schemars for users
 pub use schemars;

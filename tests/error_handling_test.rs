@@ -1,79 +1,66 @@
-//! Unit tests for JSON-RPC error handling
-
 use futures::{SinkExt, StreamExt};
-use tenx_mcp::{schema::*, server::Server, ServerHandle, Transport};
+use tenx_mcp::{
+    codec::JsonRpcCodec, connection::Connection, schema::*, server::Server, Result, ServerHandle,
+};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_util::codec::Framed;
 
-// Reuse test transport from integration test
-mod test_helpers {
-    use super::*;
-    use async_trait::async_trait;
-    use tenx_mcp::{codec::JsonRpcCodec, error::Result, TransportStream};
-    use tokio_util::codec::Framed;
+// Minimal test connection for error testing
+struct TestConnection;
 
-    pub struct TestTransport {
-        stream: Option<tokio::io::DuplexStream>,
-    }
-
-    impl TestTransport {
-        pub fn new(stream: tokio::io::DuplexStream) -> Self {
-            Self {
-                stream: Some(stream),
-            }
-        }
-    }
-
-    #[async_trait]
-    impl Transport for TestTransport {
-        async fn connect(&mut self) -> Result<()> {
-            Ok(())
-        }
-
-        fn framed(mut self: Box<Self>) -> Result<Box<dyn TransportStream>> {
-            let stream = self.stream.take().unwrap();
-            Ok(Box::new(Framed::new(stream, JsonRpcCodec::new())))
-        }
+#[async_trait::async_trait]
+impl Connection for TestConnection {
+    async fn initialize(
+        &mut self,
+        _protocol_version: String,
+        _capabilities: ClientCapabilities,
+        _client_info: Implementation,
+    ) -> Result<InitializeResult> {
+        Ok(InitializeResult {
+            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
+            capabilities: ServerCapabilities::default(),
+            server_info: Implementation {
+                name: "test-server".to_string(),
+                version: "1.0.0".to_string(),
+            },
+            instructions: None,
+            meta: None,
+        })
     }
 }
 
-use test_helpers::TestTransport;
+// Helper to create a bidirectional connection using two duplex streams
+fn create_test_connection() -> (
+    impl AsyncRead + AsyncWrite + Send + Sync + Unpin,
+    impl AsyncRead + Send + Sync + Unpin,
+    impl AsyncWrite + Send + Sync + Unpin,
+) {
+    // Create two duplex streams to simulate bidirectional communication
+    let (client_to_server, server_from_client) = tokio::io::duplex(8192);
+    let (server_to_client, client_from_server) = tokio::io::duplex(8192);
+
+    // Combine streams for client side
+    let client = tokio::io::join(client_from_server, client_to_server);
+
+    (client, server_from_client, server_to_client)
+}
 
 #[tokio::test]
 async fn test_method_not_found() {
-    // Create a minimal test connection
-    struct TestConnection;
-
-    #[async_trait::async_trait]
-    impl tenx_mcp::connection::Connection for TestConnection {
-        async fn initialize(
-            &mut self,
-            _protocol_version: String,
-            _capabilities: tenx_mcp::schema::ClientCapabilities,
-            _client_info: tenx_mcp::schema::Implementation,
-        ) -> tenx_mcp::Result<tenx_mcp::schema::InitializeResult> {
-            Ok(InitializeResult {
-                protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-                capabilities: ServerCapabilities::default(),
-                server_info: Implementation {
-                    name: "test-server".to_string(),
-                    version: "1.0.0".to_string(),
-                },
-                instructions: None,
-                meta: None,
-            })
-        }
-    }
-
     let server = Server::default().with_connection_factory(|| Box::new(TestConnection));
-    let (client, server_stream) = tokio::io::duplex(8192);
 
-    let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
-    let server_handle = ServerHandle::new(server, transport).await.unwrap();
+    let (client_stream, server_reader, server_writer) = create_test_connection();
 
-    let mut transport = Box::new(TestTransport::new(client));
-    transport.connect().await.unwrap();
-    let mut stream = transport.framed().unwrap();
+    // Start server with the proper read/write streams
+    let server_handle = ServerHandle::from_stream(server, server_reader, server_writer)
+        .await
+        .unwrap();
 
-    stream
+    // Create client using the combined stream
+    let mut client = Framed::new(client_stream, JsonRpcCodec::new());
+
+    // Send request to non-existent method
+    client
         .send(JSONRPCMessage::Request(JSONRPCRequest {
             jsonrpc: JSONRPC_VERSION.to_string(),
             id: RequestId::Number(1),
@@ -85,53 +72,33 @@ async fn test_method_not_found() {
         .await
         .unwrap();
 
-    let response = stream.next().await.unwrap().unwrap();
+    // Verify we get a method not found error
+    let response = client.next().await.unwrap().unwrap();
     assert!(matches!(
         response,
         JSONRPCMessage::Error(err) if err.error.code == METHOD_NOT_FOUND
     ));
 
-    drop(stream);
+    drop(client);
     server_handle.stop().await.unwrap();
 }
 
 #[tokio::test]
 async fn test_invalid_params() {
-    // Create a minimal test connection
-    struct TestConnection;
-
-    #[async_trait::async_trait]
-    impl tenx_mcp::connection::Connection for TestConnection {
-        async fn initialize(
-            &mut self,
-            _protocol_version: String,
-            _capabilities: tenx_mcp::schema::ClientCapabilities,
-            _client_info: tenx_mcp::schema::Implementation,
-        ) -> tenx_mcp::Result<tenx_mcp::schema::InitializeResult> {
-            Ok(InitializeResult {
-                protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-                capabilities: ServerCapabilities::default(),
-                server_info: Implementation {
-                    name: "test-server".to_string(),
-                    version: "1.0.0".to_string(),
-                },
-                instructions: None,
-                meta: None,
-            })
-        }
-    }
-
     let server = Server::default().with_connection_factory(|| Box::new(TestConnection));
-    let (client, server_stream) = tokio::io::duplex(8192);
 
-    let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
-    let server_handle = ServerHandle::new(server, transport).await.unwrap();
+    let (client_stream, server_reader, server_writer) = create_test_connection();
 
-    let mut transport = Box::new(TestTransport::new(client));
-    transport.connect().await.unwrap();
-    let mut stream = transport.framed().unwrap();
+    // Start server with the proper read/write streams
+    let server_handle = ServerHandle::from_stream(server, server_reader, server_writer)
+        .await
+        .unwrap();
 
-    stream
+    // Create client using the combined stream
+    let mut client = Framed::new(client_stream, JsonRpcCodec::new());
+
+    // Send initialize request without required params
+    client
         .send(JSONRPCMessage::Request(JSONRPCRequest {
             jsonrpc: JSONRPC_VERSION.to_string(),
             id: RequestId::Number(1),
@@ -143,45 +110,20 @@ async fn test_invalid_params() {
         .await
         .unwrap();
 
-    let response = stream.next().await.unwrap().unwrap();
+    // Verify we get an invalid params error
+    let response = client.next().await.unwrap().unwrap();
     assert!(matches!(
         response,
         JSONRPCMessage::Error(err) if err.error.code == INVALID_PARAMS
     ));
 
-    drop(stream);
+    drop(client);
     server_handle.stop().await.unwrap();
 }
 
 #[tokio::test]
 async fn test_successful_response() {
-    // Create a minimal test connection
-    struct TestConnection;
-
-    #[async_trait::async_trait]
-    impl tenx_mcp::connection::Connection for TestConnection {
-        async fn initialize(
-            &mut self,
-            _protocol_version: String,
-            _capabilities: tenx_mcp::schema::ClientCapabilities,
-            _client_info: tenx_mcp::schema::Implementation,
-        ) -> tenx_mcp::Result<tenx_mcp::schema::InitializeResult> {
-            Ok(InitializeResult {
-                protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-                capabilities: ServerCapabilities {
-                    tools: Some(ToolsCapability { list_changed: None }),
-                    ..Default::default()
-                },
-                server_info: Implementation {
-                    name: "test-server".to_string(),
-                    version: "1.0.0".to_string(),
-                },
-                instructions: None,
-                meta: None,
-            })
-        }
-    }
-
+    // Create server with tools capability
     let server = Server::default()
         .with_connection_factory(|| Box::new(TestConnection))
         .with_capabilities(ServerCapabilities {
@@ -189,16 +131,18 @@ async fn test_successful_response() {
             ..Default::default()
         });
 
-    let (client_stream, server_stream) = tokio::io::duplex(8192);
+    let (client_stream, server_reader, server_writer) = create_test_connection();
 
-    let server_transport = Box::new(TestTransport::new(server_stream));
-    let server_handle = ServerHandle::new(server, server_transport).await.unwrap();
+    // Start server with the proper read/write streams
+    let server_handle = ServerHandle::from_stream(server, server_reader, server_writer)
+        .await
+        .unwrap();
 
-    let mut client_transport = Box::new(TestTransport::new(client_stream));
-    client_transport.connect().await.unwrap();
-    let mut stream = client_transport.framed().unwrap();
+    // Create client using the combined stream
+    let mut client = Framed::new(client_stream, JsonRpcCodec::new());
 
-    stream
+    // Send valid tools/list request
+    client
         .send(JSONRPCMessage::Request(JSONRPCRequest {
             jsonrpc: JSONRPC_VERSION.to_string(),
             id: RequestId::String("test-1".to_string()),
@@ -210,9 +154,10 @@ async fn test_successful_response() {
         .await
         .unwrap();
 
-    let response = stream.next().await.unwrap().unwrap();
+    // Verify we get a successful response
+    let response = client.next().await.unwrap().unwrap();
     assert!(matches!(response, JSONRPCMessage::Response(_)));
 
-    drop(stream);
+    drop(client);
     server_handle.stop().await.unwrap();
 }

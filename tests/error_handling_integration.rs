@@ -4,12 +4,15 @@ use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use tenx_mcp::{
+    codec::JsonRpcCodec,
     connection::Connection,
     error::{Error, Result},
     schema::*,
     server::Server,
-    Transport,
+    ServerHandle,
 };
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_util::codec::Framed;
 
 /// Simple connection for testing error handling
 struct TestConnection;
@@ -87,61 +90,36 @@ impl Connection for TestConnection {
     }
 }
 
-// Minimal test transport
-mod test_transport {
-    use super::*;
-    use tenx_mcp::codec::JsonRpcCodec;
-    use tenx_mcp::TransportStream;
-    use tokio_util::codec::Framed;
+// Helper to create a bidirectional connection using two duplex streams
+fn create_test_connection() -> (
+    impl AsyncRead + AsyncWrite + Send + Sync + Unpin,
+    impl AsyncRead + Send + Sync + Unpin,
+    impl AsyncWrite + Send + Sync + Unpin,
+) {
+    // Create two duplex streams to simulate bidirectional communication
+    let (client_to_server, server_from_client) = tokio::io::duplex(8192);
+    let (server_to_client, client_from_server) = tokio::io::duplex(8192);
 
-    pub struct TestTransport {
-        stream: Option<tokio::io::DuplexStream>,
-    }
+    // Combine streams for client side
+    let client = tokio::io::join(client_from_server, client_to_server);
 
-    impl TestTransport {
-        pub fn new(stream: tokio::io::DuplexStream) -> Self {
-            Self {
-                stream: Some(stream),
-            }
-        }
-    }
-
-    #[async_trait]
-    impl Transport for TestTransport {
-        async fn connect(&mut self) -> Result<()> {
-            Ok(())
-        }
-
-        fn framed(mut self: Box<Self>) -> Result<Box<dyn TransportStream>> {
-            let stream = self.stream.take().unwrap();
-            Ok(Box::new(Framed::new(stream, JsonRpcCodec::new())))
-        }
-    }
+    (client, server_from_client, server_to_client)
 }
-
-use test_transport::TestTransport;
 
 #[tokio::test]
 async fn test_error_responses() {
     // Setup server
     let server = Server::default().with_connection_factory(|| Box::new(TestConnection));
 
-    // Create streams
-    let (client_stream, server_stream) = tokio::io::duplex(8192);
+    let (client_stream, server_reader, server_writer) = create_test_connection();
 
-    // Start server
-    let server_handle = tokio::spawn(async move {
-        let transport: Box<dyn Transport> = Box::new(TestTransport::new(server_stream));
-        let server_handle = tenx_mcp::ServerHandle::new(server, transport)
-            .await
-            .unwrap();
-        server_handle.handle.await.ok();
-    });
+    // Start server with the proper read/write streams
+    let server_handle = ServerHandle::from_stream(server, server_reader, server_writer)
+        .await
+        .unwrap();
 
-    // Test raw JSON-RPC error responses
-    let mut transport = Box::new(TestTransport::new(client_stream));
-    transport.connect().await.unwrap();
-    let mut stream = transport.framed().unwrap();
+    // Create client using the combined stream
+    let mut stream = Framed::new(client_stream, JsonRpcCodec::new());
 
     // Test 1: Unknown method
     if stream
@@ -157,7 +135,7 @@ async fn test_error_responses() {
         .is_err()
     {
         // Connection closed, which is expected behavior
-        server_handle.abort();
+        server_handle.stop().await.ok();
         return;
     }
 
@@ -219,5 +197,5 @@ async fn test_error_responses() {
     }
 
     drop(stream);
-    server_handle.abort();
+    server_handle.stop().await.unwrap();
 }

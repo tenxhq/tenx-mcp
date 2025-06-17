@@ -75,10 +75,8 @@ async fn main() -> Result<()> {
         .call_tool("echo", &serde_json::to_value(&params)?)
         .await?;
 
-    if let Some(content) = result.content.first() {
-        if let tenx_mcp::schema::Content::Text(text_content) = content {
-            info!("Echo response: {}", text_content.text);
-        }
+    if let Some(tenx_mcp::schema::Content::Text(text_content)) = result.content.first() {
+        info!("Echo response: {}", text_content.text);
     }
 
     // Clean shutdown
