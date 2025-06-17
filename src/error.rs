@@ -1,6 +1,9 @@
+use crate::schema::{
+    ErrorObject, JSONRPCError, RequestId, INVALID_PARAMS, INVALID_REQUEST, JSONRPC_VERSION,
+    METHOD_NOT_FOUND, PARSE_ERROR,
+};
 use std::time::Duration;
 use thiserror::Error;
-use crate::schema::{JSONRPCError, ErrorObject, RequestId, JSONRPC_VERSION, METHOD_NOT_FOUND};
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {
@@ -58,14 +61,8 @@ pub enum Error {
     #[error("Tool execution failed for '{tool}': {message}")]
     ToolExecutionFailed { tool: String, message: String },
 
-    #[error("Message too large: {size} bytes exceeds maximum of {max_size} bytes")]
-    MessageTooLarge { size: usize, max_size: usize },
-
     #[error("Invalid message format: {message}")]
     InvalidMessageFormat { message: String },
-
-    #[error("Codec error: {message}")]
-    CodecError { message: String },
 
     #[error("Tool not found: {0}")]
     ToolNotFound(String),
@@ -118,18 +115,39 @@ impl Error {
 
     /// Convert error to a specific JSONRPC response if applicable
     pub fn to_jsonrpc_response(&self, request_id: RequestId) -> Option<JSONRPCError> {
-        match self {
-            Self::ToolNotFound(tool_name) => Some(JSONRPCError {
-                jsonrpc: JSONRPC_VERSION.to_string(),
-                id: request_id,
-                error: ErrorObject {
-                    code: METHOD_NOT_FOUND,
-                    message: format!("Tool not found: {}", tool_name),
-                    data: None,
-                },
-            }),
-            _ => None,
-        }
+        let (code, message) = match self {
+            Self::ToolNotFound(tool_name) => {
+                (METHOD_NOT_FOUND, format!("Tool not found: {tool_name}"))
+            }
+            Self::MethodNotFound(method_name) => (
+                METHOD_NOT_FOUND,
+                format!("Method not found: {method_name}"),
+            ),
+            Self::InvalidParams { method, message } => (
+                INVALID_PARAMS,
+                format!("Invalid parameters for method '{method}': {message}"),
+            ),
+            Self::InvalidRequest(msg) => (INVALID_REQUEST, format!("Invalid request: {msg}")),
+            Self::Json { message } => (
+                PARSE_ERROR,
+                format!("JSON serialization error: {message}"),
+            ),
+            Self::InvalidMessageFormat { message } => {
+                (PARSE_ERROR, format!("Invalid message format: {message}"))
+            }
+            // Return None for errors that should use the generic INTERNAL_ERROR handling
+            _ => return None,
+        };
+
+        Some(JSONRPCError {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            id: request_id,
+            error: ErrorObject {
+                code,
+                message,
+                data: None,
+            },
+        })
     }
 }
 

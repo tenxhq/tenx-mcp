@@ -71,22 +71,10 @@ impl Encoder<JSONRPCMessage> for JsonRpcCodec {
 
     fn encode(&mut self, item: JSONRPCMessage, dst: &mut BytesMut) -> Result<()> {
         let json = serde_json::to_vec(&item)?;
-
-        // Check message size
-        const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; // 10MB
-        if json.len() > MAX_MESSAGE_SIZE {
-            return Err(Error::MessageTooLarge {
-                size: json.len(),
-                max_size: MAX_MESSAGE_SIZE,
-            });
-        }
-
         dst.reserve(json.len() + 1);
         dst.put_slice(&json);
         dst.put_u8(b'\n');
-
         debug!("Encoded JSON-RPC message: {:?}", std::str::from_utf8(&json));
-
         Ok(())
     }
 }

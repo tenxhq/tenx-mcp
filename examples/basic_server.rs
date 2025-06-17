@@ -55,10 +55,7 @@ impl Connection for BasicConnection {
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
         if name != "echo" {
-            return Err(Error::ToolExecutionFailed {
-                tool: name,
-                message: "Tool not found".to_string(),
-            });
+            return Err(Error::ToolNotFound(name));
         }
 
         let message = arguments

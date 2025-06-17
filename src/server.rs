@@ -222,20 +222,12 @@ async fn handle_request(
             if let Some(jsonrpc_error) = e.to_jsonrpc_response(request.id.clone()) {
                 JSONRPCMessage::Error(jsonrpc_error)
             } else {
-                // Create a proper JSON-RPC error response
-                let error_code = match &e {
-                    Error::MethodNotFound(_) => METHOD_NOT_FOUND,
-                    Error::InvalidParams { .. } => INVALID_PARAMS,
-                    Error::InvalidRequest(_) => INVALID_REQUEST,
-                    Error::Json { .. } | Error::InvalidMessageFormat { .. } => PARSE_ERROR,
-                    _ => INTERNAL_ERROR,
-                };
-
+                // For all other errors, use INTERNAL_ERROR
                 JSONRPCMessage::Error(JSONRPCError {
                     jsonrpc: JSONRPC_VERSION.to_string(),
                     id: request.id,
                     error: ErrorObject {
-                        code: error_code,
+                        code: INTERNAL_ERROR,
                         message: e.to_string(),
                         data: None,
                     },

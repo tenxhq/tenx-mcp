@@ -480,7 +480,7 @@ mod tests {
         let mut client = MCPClient::new();
 
         // These should all compile cleanly
-        let _ = async {
+        std::mem::drop(async {
             // Simple calls without cursors
             client.list_tools().await.unwrap();
             client.list_resources().await.unwrap();
@@ -511,7 +511,7 @@ mod tests {
                 .list_resource_templates_with_cursor(cursor)
                 .await
                 .unwrap();
-        };
+        });
     }
 
     use crate::server::{MCPServer, MCPServerHandle};
