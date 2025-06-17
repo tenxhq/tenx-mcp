@@ -1025,24 +1025,24 @@ impl ToolInputSchema {
 
     /// Create a ToolInputSchema from a type that implements schemars::JsonSchema
     pub fn from_json_schema<T: schemars::JsonSchema>() -> Self {
-        let root_schema = schemars::schema_for!(T);
+        let schema = schemars::schema_for!(T);
 
-        // Convert the root schema to JSON
-        let schema_json = serde_json::to_value(&root_schema).unwrap_or_default();
+        // Get the underlying JSON value from the Schema
+        let schema_value = schema.as_value();
 
-        // Extract the schema object
-        let schema_obj = schema_json.get("schema").unwrap_or(&schema_json);
+        // Get the schema object if it exists
+        let schema_obj = schema_value.as_object();
 
-        // Extract type
+        // Extract type - default to "object" if not specified
         let schema_type = schema_obj
-            .get("type")
+            .and_then(|obj| obj.get("type"))
             .and_then(|v| v.as_str())
             .unwrap_or("object")
             .to_string();
 
         // Extract properties
         let properties = schema_obj
-            .get("properties")
+            .and_then(|obj| obj.get("properties"))
             .and_then(|v| v.as_object())
             .map(|props| {
                 props
@@ -1053,7 +1053,7 @@ impl ToolInputSchema {
 
         // Extract required fields
         let required = schema_obj
-            .get("required")
+            .and_then(|obj| obj.get("required"))
             .and_then(|v| v.as_array())
             .map(|arr| {
                 arr.iter()
