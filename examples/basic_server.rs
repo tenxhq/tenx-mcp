@@ -18,16 +18,12 @@ use tokio::net::TcpListener;
 use tokio::signal;
 use tracing::{error, info};
 
-/// Basic server connection that provides an echo tool
-struct BasicConnection {
-    server_info: Implementation,
-}
+const NAME: &str = "basic-server";
+const VERSION: &str = "0.1.0";
 
-impl BasicConnection {
-    fn new(server_info: Implementation) -> Self {
-        Self { server_info }
-    }
-}
+/// Basic server connection that provides an echo tool
+#[derive(Debug, Default)]
+struct BasicConnection {}
 
 #[async_trait]
 impl Connection for BasicConnection {
@@ -37,36 +33,31 @@ impl Connection for BasicConnection {
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
     ) -> Result<InitializeResult> {
-        Ok(
-            InitializeResult::new(&self.server_info.name, &self.server_info.version)
-                .with_capabilities(ServerCapabilities::default().with_tools(None)),
-        )
+        Ok(InitializeResult::new(NAME, VERSION)
+            .with_capabilities(ServerCapabilities::default().with_tools(None)))
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
-        Ok(ListToolsResult {
-            tools: vec![Tool {
-                name: "echo".to_string(),
-                description: Some("Echoes back the provided message".to_string()),
-                input_schema: ToolInputSchema {
-                    schema_type: "object".to_string(),
-                    properties: Some({
-                        let mut props = HashMap::new();
-                        props.insert(
-                            "message".to_string(),
-                            serde_json::json!({
-                                "type": "string",
-                                "description": "The message to echo back"
-                            }),
-                        );
-                        props
-                    }),
-                    required: Some(vec!["message".to_string()]),
-                },
-                annotations: None,
-            }],
-            next_cursor: None,
-        })
+        Ok(ListToolsResult::default().with_tool(Tool {
+            name: "echo".to_string(),
+            description: Some("Echoes back the provided message".to_string()),
+            input_schema: ToolInputSchema {
+                schema_type: "object".to_string(),
+                properties: Some({
+                    let mut props = HashMap::new();
+                    props.insert(
+                        "message".to_string(),
+                        serde_json::json!({
+                            "type": "string",
+                            "description": "The message to echo back"
+                        }),
+                    );
+                    props
+                }),
+                required: Some(vec!["message".to_string()]),
+            },
+            annotations: None,
+        }))
     }
 
     async fn tools_call(
@@ -135,16 +126,9 @@ async fn main() -> Result<()> {
                 match result {
                     Ok((stream, peer_addr)) => {
                         info!("New connection from {}", peer_addr);
-
-                        // Create a new server instance for each connection
-                        let server_info = Implementation {
-                            name: "basic-server".to_string(),
-                            version: "0.1.0".to_string(),
-                        };
-
                         let server = MCPServer::default()
                             .with_connection_factory(move || {
-                                Box::new(BasicConnection::new(server_info.clone()))
+                                Box::new(BasicConnection::default())
                             });
 
                         // Create transport from the accepted connection

@@ -716,13 +716,41 @@ pub struct PromptListChangedNotification {
 // Tools
 
 /// The server's response to a tools/list request from the client.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListToolsResult {
     pub tools: Vec<Tool>,
     /// An opaque token representing the pagination position after the last
     /// returned result. If present, there may be more results available.
     #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
+}
+
+impl ListToolsResult {
+    /// Create a new empty ListToolsResult
+    pub fn new() -> Self {
+        Self {
+            tools: Vec::new(),
+            next_cursor: None,
+        }
+    }
+
+    /// Add a tool to the list
+    pub fn with_tool(mut self, tool: Tool) -> Self {
+        self.tools.push(tool);
+        self
+    }
+
+    /// Add multiple tools to the list
+    pub fn with_tools(mut self, tools: impl IntoIterator<Item = Tool>) -> Self {
+        self.tools.extend(tools);
+        self
+    }
+
+    /// Set the pagination cursor
+    pub fn with_cursor(mut self, cursor: impl Into<Cursor>) -> Self {
+        self.next_cursor = Some(cursor.into());
+        self
+    }
 }
 
 /// The server's response to a tool call.
