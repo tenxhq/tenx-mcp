@@ -298,7 +298,7 @@ async fn test_rmcp_server_with_tenx_client() {
 
     // Call reverse tool
     let result = client
-        .call_tool("reverse".to_string(), Some(json!({ "text": "hello" })))
+        .call_tool("reverse", Some(json!({ "text": "hello" })))
         .await
         .unwrap();
 

@@ -60,10 +60,7 @@ async fn main() -> Result<()> {
         message: "Hello from tenx-mcp client!".to_string(),
     };
     let result = client
-        .call_tool(
-            "echo".to_string(),
-            Some(serde_json::to_value(&echo_params)?),
-        )
+        .call_tool("echo", Some(serde_json::to_value(&echo_params)?))
         .await?;
 
     // Assume text response

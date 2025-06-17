@@ -20,10 +20,7 @@ async fn test_reliable_operation(client: &mut MCPClient) -> Result<()> {
     info!("\n=== Testing Reliable Operation ===");
     info!("This should succeed immediately...");
 
-    match client
-        .call_tool("reliable_operation".to_string(), None)
-        .await
-    {
+    match client.call_tool("reliable_operation", None).await {
         Ok(result) => {
             info!("✓ Success: {:?}", result.content);
         }
@@ -40,7 +37,7 @@ async fn test_flakey_operation(client: &mut MCPClient) -> Result<()> {
     info!("This operation fails 2 times before succeeding.");
     info!("With retry enabled, it should eventually succeed...");
 
-    match client.call_tool("flakey_operation".to_string(), None).await {
+    match client.call_tool("flakey_operation", None).await {
         Ok(result) => {
             info!("✓ Success after retries: {:?}", result.content);
         }
@@ -57,7 +54,7 @@ async fn test_slow_operation(client: &mut MCPClient) -> Result<()> {
     info!("This operation takes 5 seconds, but our timeout is 2 seconds.");
     info!("It should timeout and retry, but still fail...");
 
-    match client.call_tool("slow_operation".to_string(), None).await {
+    match client.call_tool("slow_operation", None).await {
         Ok(_) => {
             error!("✗ Unexpected success - should have timed out");
         }
@@ -78,7 +75,7 @@ async fn test_broken_operation(client: &mut MCPClient) -> Result<()> {
     info!("This operation always fails with a non-retryable error.");
     info!("Should fail immediately without retries...");
 
-    match client.call_tool("broken_operation".to_string(), None).await {
+    match client.call_tool("broken_operation", None).await {
         Ok(_) => {
             error!("✗ Unexpected success");
         }
@@ -125,7 +122,7 @@ async fn test_custom_retry_config(host: &str, port: u16) -> Result<()> {
         .await?;
 
     // This should timeout very quickly
-    match client.call_tool("slow_operation".to_string(), None).await {
+    match client.call_tool("slow_operation", None).await {
         Ok(_) => {
             error!("✗ Unexpected success");
         }

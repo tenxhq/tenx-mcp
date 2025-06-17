@@ -174,7 +174,7 @@ impl MCPClient {
     /// Call a tool on the server
     pub async fn call_tool(
         &mut self,
-        name: String,
+        name: impl Into<String>,
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
         let arguments = arguments.map(|args| {
@@ -185,7 +185,10 @@ impl MCPClient {
             }
         });
 
-        let request = ClientRequest::CallTool { name, arguments };
+        let request = ClientRequest::CallTool {
+            name: name.into(),
+            arguments,
+        };
         self.request_with_retry(request).await
     }
 
@@ -511,6 +514,33 @@ mod tests {
                 .unwrap();
             client
                 .list_resource_templates_with_cursor(cursor)
+                .await
+                .unwrap();
+        });
+    }
+
+    #[test]
+    fn test_call_tool_api() {
+        // This test just verifies the API is ergonomic - it doesn't run async code
+        let mut client = MCPClient::new();
+
+        // These should all compile cleanly
+        std::mem::drop(async {
+            // Call with &str
+            client.call_tool("my_tool", None).await.unwrap();
+
+            // Call with String
+            let tool_name = "another_tool".to_string();
+            client.call_tool(tool_name, None).await.unwrap();
+
+            // Call with &String
+            let tool_name = "third_tool".to_string();
+            client.call_tool(&tool_name, None).await.unwrap();
+
+            // Call with arguments
+            let args = serde_json::json!({"param": "value"});
+            client
+                .call_tool("tool_with_args", Some(args))
                 .await
                 .unwrap();
         });
