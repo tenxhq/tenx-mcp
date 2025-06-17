@@ -5,7 +5,7 @@ pub mod error;
 pub mod retry;
 pub mod schema;
 pub mod server;
-pub mod transport;
+mod transport;
 
 // Re-export commonly used types
 pub use client::Client;
@@ -16,7 +16,7 @@ pub use schema::{
     ToolInputSchema, ToolsCapability,
 };
 pub use server::{Server, ServerHandle};
-pub use transport::{GenericDuplex, StdioTransport, StreamTransport, TcpClientTransport};
+pub use transport::{Transport, TransportStream};
 
 // Re-export schemars for users
 pub use schemars;

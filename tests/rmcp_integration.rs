@@ -13,7 +13,6 @@ use serde_json::json;
 // Import tenx-mcp types
 use tenx_mcp::error::{Error, Result};
 use tenx_mcp::{connection::Connection, schema::*, Client, Server};
-use tokio::io::{AsyncRead, AsyncWrite};
 
 // Simple echo connection for testing
 struct EchoConnection;
@@ -106,12 +105,8 @@ async fn test_tenx_server_with_rmcp_client() {
             experimental: None,
         });
 
-    // Start tenx-mcp server in background
-    let transport = Box::new(transport_helpers::TransportAdapter::new(
-        server_reader,
-        server_writer,
-    ));
-    let server_handle = tenx_mcp::ServerHandle::new(server, transport)
+    // Start tenx-mcp server in background using the new serve_stream method
+    let server_handle = tenx_mcp::ServerHandle::from_stream(server, server_reader, server_writer)
         .await
         .expect("Failed to start server");
 
@@ -265,12 +260,10 @@ async fn test_rmcp_server_with_tenx_client() {
 
     // Create tenx-mcp client
     let mut client = Client::new();
-    let transport = Box::new(transport_helpers::TransportAdapter::new(
-        client_reader,
-        client_writer,
-    ));
-
-    client.connect(transport).await.unwrap();
+    client
+        .connect_stream(client_reader, client_writer)
+        .await
+        .unwrap();
 
     // Initialize
     let init_result = client
@@ -313,103 +306,4 @@ async fn test_rmcp_server_with_tenx_client() {
 
     // Cleanup
     server_handle.abort();
-}
-
-// Transport adapter helpers
-mod transport_helpers {
-    use std::{
-        pin::Pin,
-        task::{Context, Poll},
-    };
-
-    use super::*;
-
-    /// Helper to create a transport that works with tenx-mcp from
-    /// AsyncRead/AsyncWrite
-    pub struct TransportAdapter<R, W> {
-        reader: R,
-        writer: W,
-        connected: bool,
-    }
-
-    impl<R: AsyncRead + Send + Unpin + 'static, W: AsyncWrite + Send + Unpin + 'static>
-        TransportAdapter<R, W>
-    {
-        pub fn new(reader: R, writer: W) -> Self {
-            Self {
-                reader,
-                writer,
-                connected: false,
-            }
-        }
-    }
-
-    #[async_trait]
-    impl<R, W> tenx_mcp::transport::Transport for TransportAdapter<R, W>
-    where
-        R: AsyncRead + Send + Sync + Unpin + 'static,
-        W: AsyncWrite + Send + Sync + Unpin + 'static,
-    {
-        async fn connect(&mut self) -> tenx_mcp::error::Result<()> {
-            self.connected = true;
-            Ok(())
-        }
-
-        fn framed(
-            self: Box<Self>,
-        ) -> tenx_mcp::error::Result<Box<dyn tenx_mcp::transport::TransportStream>> {
-            if !self.connected {
-                return Err(Error::Transport("Not connected".to_string()));
-            }
-
-            // Create a duplex stream from reader and writer
-            struct DuplexStream<R, W> {
-                reader: Pin<Box<R>>,
-                writer: Pin<Box<W>>,
-            }
-
-            impl<R: AsyncRead, W: AsyncWrite> AsyncRead for DuplexStream<R, W> {
-                fn poll_read(
-                    mut self: Pin<&mut Self>,
-                    cx: &mut Context<'_>,
-                    buf: &mut tokio::io::ReadBuf<'_>,
-                ) -> Poll<std::io::Result<()>> {
-                    self.reader.as_mut().poll_read(cx, buf)
-                }
-            }
-
-            impl<R: AsyncRead, W: AsyncWrite> AsyncWrite for DuplexStream<R, W> {
-                fn poll_write(
-                    mut self: Pin<&mut Self>,
-                    cx: &mut Context<'_>,
-                    buf: &[u8],
-                ) -> Poll<std::io::Result<usize>> {
-                    self.writer.as_mut().poll_write(cx, buf)
-                }
-
-                fn poll_flush(
-                    mut self: Pin<&mut Self>,
-                    cx: &mut Context<'_>,
-                ) -> Poll<std::io::Result<()>> {
-                    self.writer.as_mut().poll_flush(cx)
-                }
-
-                fn poll_shutdown(
-                    mut self: Pin<&mut Self>,
-                    cx: &mut Context<'_>,
-                ) -> Poll<std::io::Result<()>> {
-                    self.writer.as_mut().poll_shutdown(cx)
-                }
-            }
-
-            let stream = DuplexStream {
-                reader: Box::pin(self.reader),
-                writer: Box::pin(self.writer),
-            };
-
-            let framed =
-                tokio_util::codec::Framed::new(stream, tenx_mcp::codec::JsonRpcCodec::new());
-            Ok(Box::new(framed))
-        }
-    }
 }

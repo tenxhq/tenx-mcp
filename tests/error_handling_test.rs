@@ -1,13 +1,13 @@
 //! Unit tests for JSON-RPC error handling
 
 use futures::{SinkExt, StreamExt};
-use tenx_mcp::{schema::*, server::Server, transport::Transport, ServerHandle};
+use tenx_mcp::{schema::*, server::Server, ServerHandle, Transport};
 
 // Reuse test transport from integration test
 mod test_helpers {
     use super::*;
     use async_trait::async_trait;
-    use tenx_mcp::{codec::JsonRpcCodec, error::Result, transport::TransportStream};
+    use tenx_mcp::{codec::JsonRpcCodec, error::Result, TransportStream};
     use tokio_util::codec::Framed;
 
     pub struct TestTransport {

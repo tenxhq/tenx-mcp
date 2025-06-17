@@ -62,6 +62,18 @@ impl Server {
         self.serve(transport).await
     }
 
+    /// Serve using generic AsyncRead and AsyncWrite streams
+    /// This is a convenience method that creates a StreamTransport from the provided streams
+    pub async fn serve_stream<R, W>(self, reader: R, writer: W) -> Result<()>
+    where
+        R: tokio::io::AsyncRead + Send + Sync + Unpin + 'static,
+        W: tokio::io::AsyncWrite + Send + Sync + Unpin + 'static,
+    {
+        let duplex = crate::transport::GenericDuplex::new(reader, writer);
+        let transport = Box::new(crate::transport::StreamTransport::new(duplex));
+        self.serve(transport).await
+    }
+
     /// Serve TCP connections by accepting them in a loop
     /// This is a convenience method for the common TCP server use case
     pub async fn serve_tcp(self, addr: impl tokio::net::ToSocketAddrs) -> Result<()> {
@@ -269,6 +281,18 @@ impl ServerHandle {
             handle,
             notification_tx: notification_tx_handle,
         })
+    }
+
+    /// Create a ServerHandle using generic AsyncRead and AsyncWrite streams
+    /// This is a convenience method that creates a StreamTransport from the provided streams
+    pub async fn from_stream<R, W>(server: Server, reader: R, writer: W) -> Result<Self>
+    where
+        R: tokio::io::AsyncRead + Send + Sync + Unpin + 'static,
+        W: tokio::io::AsyncWrite + Send + Sync + Unpin + 'static,
+    {
+        let duplex = crate::transport::GenericDuplex::new(reader, writer);
+        let transport = Box::new(crate::transport::StreamTransport::new(duplex));
+        Self::new(server, transport).await
     }
 
     pub async fn stop(self) -> Result<()> {

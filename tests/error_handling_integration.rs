@@ -8,7 +8,7 @@ use tenx_mcp::{
     error::{Error, Result},
     schema::*,
     server::Server,
-    transport::Transport,
+    Transport,
 };
 
 /// Simple connection for testing error handling
@@ -91,7 +91,7 @@ impl Connection for TestConnection {
 mod test_transport {
     use super::*;
     use tenx_mcp::codec::JsonRpcCodec;
-    use tenx_mcp::transport::TransportStream;
+    use tenx_mcp::TransportStream;
     use tokio_util::codec::Framed;
 
     pub struct TestTransport {
