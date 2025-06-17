@@ -1,8 +1,10 @@
 use futures::stream::SplitSink;
 use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
+use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
@@ -11,7 +13,10 @@ use crate::{
     error::{Error, Result},
     retry::RetryConfig,
     schema::*,
-    transport::{StdioTransport, TcpClientTransport, Transport, TransportStream},
+    transport::{
+        GenericDuplex, StdioTransport, StreamTransport, TcpClientTransport, Transport,
+        TransportStream,
+    },
 };
 
 /// Type for handling either a response or error from JSON-RPC
@@ -335,6 +340,96 @@ impl Client {
         };
 
         self.initialize(client_info, capabilities).await
+    }
+
+    /// Connect using generic AsyncRead and AsyncWrite streams
+    ///
+    /// This method allows you to connect to a server using any pair of
+    /// AsyncRead and AsyncWrite streams, such as process stdio, pipes,
+    /// or custom implementations.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use tenx_mcp::{Client, Result};
+    /// # use tokio::io::{AsyncRead, AsyncWrite};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// // Using concrete types (e.g., from tokio::io::duplex)
+    /// let (reader, writer) = tokio::io::duplex(8192);
+    /// let mut client = Client::new();
+    /// client.connect_stream(reader, writer).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn connect_stream<R, W>(&mut self, reader: R, writer: W) -> Result<()>
+    where
+        R: tokio::io::AsyncRead + Send + Sync + Unpin + 'static,
+        W: tokio::io::AsyncWrite + Send + Sync + Unpin + 'static,
+    {
+        let duplex = GenericDuplex::new(reader, writer);
+        let transport = Box::new(StreamTransport::new(duplex));
+        self.connect(transport).await
+    }
+
+    /// Spawn a process and connect to it via its stdin/stdout
+    ///
+    /// This method spawns a new process and establishes an MCP connection
+    /// through its standard input and output streams.
+    ///
+    /// # Arguments
+    /// * `command` - A configured tokio::process::Command ready to be spawned
+    ///
+    /// # Returns
+    /// Returns the spawned Child process handle, allowing you to manage the
+    /// process lifecycle (e.g., wait for completion, kill it, etc.)
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use tenx_mcp::{Client, Result};
+    /// # use tokio::process::Command;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// let mut client = Client::new();
+    ///
+    /// // Spawn a process and connect to it
+    /// let mut cmd = Command::new("my-mcp-server");
+    /// cmd.arg("--some-flag");
+    ///
+    /// let child = client.connect_process(cmd).await?;
+    ///
+    /// // Now you can use the client to communicate with the process
+    /// // The child handle can be used to manage the process
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn connect_process(&mut self, mut command: Command) -> Result<Child> {
+        // Configure the command to use piped stdio
+        command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit()); // Let stderr pass through for debugging
+
+        // Spawn the process
+        let mut child = command
+            .spawn()
+            .map_err(|e| Error::Transport(format!("Failed to spawn process: {e}")))?;
+
+        // Take ownership of stdin and stdout
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| Error::Transport("Failed to capture process stdin".to_string()))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| Error::Transport("Failed to capture process stdout".to_string()))?;
+
+        // Connect using the process streams
+        // Note: We swap the order here - the child's stdout is our reader,
+        // and the child's stdin is our writer
+        self.connect_stream(stdout, stdin).await?;
+
+        Ok(child)
     }
 
     /// Send a request with retry logic
@@ -773,5 +868,87 @@ mod tests {
             pings_per_second > 50.0,
             "Too slow: {pings_per_second:.1} pings/sec"
         );
+    }
+
+    #[tokio::test]
+    async fn test_connect_stream() {
+        // Create a pair of duplex streams for testing
+        let (client_reader, server_writer) = tokio::io::duplex(8192);
+        let (server_reader, client_writer) = tokio::io::duplex(8192);
+
+        // Create a minimal test connection
+        struct TestStreamConnection;
+
+        #[async_trait::async_trait]
+        impl crate::connection::Connection for TestStreamConnection {
+            async fn initialize(
+                &mut self,
+                _protocol_version: String,
+                _capabilities: ClientCapabilities,
+                _client_info: Implementation,
+            ) -> Result<InitializeResult> {
+                Ok(InitializeResult::new("test-server", "1.0.0"))
+            }
+        }
+
+        // Create and configure server
+        let server = Server::default()
+            .with_connection_factory(|| Box::new(TestStreamConnection))
+            .with_capabilities(ServerCapabilities {
+                tools: Some(ToolsCapability {
+                    list_changed: Some(true),
+                }),
+                ..Default::default()
+            });
+
+        // Create server transport from the streams
+        let server_duplex = crate::transport::GenericDuplex::new(server_reader, server_writer);
+        let server_transport = Box::new(crate::transport::StreamTransport::new(server_duplex));
+
+        let _server_handle = ServerHandle::new(server, server_transport)
+            .await
+            .expect("Failed to start server");
+
+        // Create and connect client using connect_stream
+        let mut client = Client::new();
+        client
+            .connect_stream(client_reader, client_writer)
+            .await
+            .expect("Failed to connect client");
+
+        // Test that we can initialize
+        let client_info = Implementation {
+            name: "test-client".to_string(),
+            version: "1.0.0".to_string(),
+        };
+        let result = client
+            .initialize(client_info, ClientCapabilities::default())
+            .await
+            .expect("Failed to initialize");
+
+        assert_eq!(result.server_info.name, "test-server");
+
+        // Test that we can ping
+        client.ping().await.expect("Ping failed");
+    }
+
+    #[tokio::test]
+    async fn test_connect_process() {
+        // This test would require an actual MCP server binary to spawn
+        // For now, we'll just test that the API compiles and handles errors correctly
+
+        let mut client = Client::new();
+
+        // Try to spawn a non-existent process
+        let cmd = tokio::process::Command::new("non-existent-mcp-server");
+        let result = client.connect_process(cmd).await;
+
+        // Should fail with a transport error
+        assert!(result.is_err());
+        if let Err(Error::Transport(msg)) = result {
+            assert!(msg.contains("Failed to spawn process"));
+        } else {
+            panic!("Expected Transport error");
+        }
     }
 }

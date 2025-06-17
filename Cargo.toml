@@ -25,20 +25,12 @@ schemars = "0.9.0"
 rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk", branch = "main", features = ["client", "server"] }
 
 [[example]]
-name = "echo_server"
-path = "examples/echo_server.rs"
-
-[[example]]
 name = "basic_server"
 path = "examples/basic_server.rs"
 
 [[example]]
 name = "basic_client"
 path = "examples/basic_client.rs"
-
-[[example]]
-name = "error_handling"
-path = "examples/error_handling.rs"
 
 [[example]]
 name = "timeout_server"
@@ -51,3 +43,11 @@ path = "examples/timeout_client.rs"
 [[example]]
 name = "tcp_server"
 path = "examples/tcp_server.rs"
+
+[[example]]
+name = "process_spawn"
+path = "examples/process_spawn.rs"
+
+[[example]]
+name = "stream_connection"
+path = "examples/stream_connection.rs"

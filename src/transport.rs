@@ -35,6 +35,12 @@ pub struct StdioDuplex {
     writer: tokio::io::Stdout,
 }
 
+/// A generic duplex wrapper for combining separate AsyncRead and AsyncWrite streams
+pub struct GenericDuplex<R, W> {
+    reader: BufReader<R>,
+    writer: W,
+}
+
 impl StdioDuplex {
     pub fn new(stdin: tokio::io::Stdin, stdout: tokio::io::Stdout) -> Self {
         Self {
@@ -55,6 +61,60 @@ impl AsyncRead for StdioDuplex {
 }
 
 impl AsyncWrite for StdioDuplex {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::result::Result<usize, std::io::Error>> {
+        std::pin::Pin::new(&mut self.writer).poll_write(cx, buf)
+    }
+
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), std::io::Error>> {
+        std::pin::Pin::new(&mut self.writer).poll_flush(cx)
+    }
+
+    fn poll_shutdown(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), std::io::Error>> {
+        std::pin::Pin::new(&mut self.writer).poll_shutdown(cx)
+    }
+}
+
+impl<R, W> GenericDuplex<R, W>
+where
+    R: AsyncRead,
+{
+    pub fn new(reader: R, writer: W) -> Self {
+        Self {
+            reader: BufReader::new(reader),
+            writer,
+        }
+    }
+}
+
+impl<R, W> AsyncRead for GenericDuplex<R, W>
+where
+    R: AsyncRead + Unpin,
+    W: Unpin,
+{
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::pin::Pin::new(&mut self.reader).poll_read(cx, buf)
+    }
+}
+
+impl<R, W> AsyncWrite for GenericDuplex<R, W>
+where
+    R: Unpin,
+    W: AsyncWrite + Unpin,
+{
     fn poll_write(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -317,5 +377,52 @@ mod tests {
         // Both should connect successfully
         t1.connect().await.unwrap();
         t2.connect().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_generic_duplex() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        // Create two pairs of duplex streams
+        let (reader1, writer1) = tokio::io::duplex(64);
+        let (reader2, writer2) = tokio::io::duplex(64);
+
+        // Create GenericDuplex instances that cross-connect
+        let mut duplex1 = GenericDuplex::new(reader1, writer2);
+        let mut duplex2 = GenericDuplex::new(reader2, writer1);
+
+        // Test writing from duplex1 and reading from duplex2
+        let data = b"Hello, world!";
+        duplex1.write_all(data).await.unwrap();
+        duplex1.flush().await.unwrap();
+
+        let mut buf = vec![0u8; data.len()];
+        duplex2.read_exact(&mut buf).await.unwrap();
+        assert_eq!(&buf, data);
+
+        // Test the reverse direction
+        let data2 = b"Response!";
+        duplex2.write_all(data2).await.unwrap();
+        duplex2.flush().await.unwrap();
+
+        let mut buf2 = vec![0u8; data2.len()];
+        duplex1.read_exact(&mut buf2).await.unwrap();
+        assert_eq!(&buf2, data2);
+    }
+
+    #[tokio::test]
+    async fn test_stream_transport_with_generic_duplex() {
+        // Create duplex streams for testing
+        let (reader, writer) = tokio::io::duplex(1024);
+        let duplex = GenericDuplex::new(reader, writer);
+
+        // Create StreamTransport
+        let mut transport = StreamTransport::new(duplex);
+
+        // Should connect successfully (no-op for StreamTransport)
+        transport.connect().await.unwrap();
+
+        // Should be able to create a framed stream
+        let _framed = Box::new(transport).framed().unwrap();
     }
 }

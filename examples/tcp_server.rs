@@ -172,7 +172,10 @@ async fn main() -> Result<()> {
     // Use the new simplified API to serve TCP connections
     Server::default()
         .with_connection_factory(move || {
-            Box::new(TcpExampleConnection::new(server_info.clone(), capabilities.clone()))
+            Box::new(TcpExampleConnection::new(
+                server_info.clone(),
+                capabilities.clone(),
+            ))
         })
         .serve_tcp(addr)
         .await?;

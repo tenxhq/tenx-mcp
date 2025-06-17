@@ -7,7 +7,7 @@
 
 use std::env;
 use std::time::Duration;
-use tenx_mcp::{Client, Error, Result, retry::RetryConfig};
+use tenx_mcp::{retry::RetryConfig, Client, Error, Result};
 use tracing::{error, info};
 
 async fn test_reliable_operation(client: &mut Client) -> Result<()> {
@@ -161,11 +161,7 @@ async fn main() -> Result<()> {
     // Connect and initialize
     info!("Connecting to server...");
     let server_info = client
-        .connect_tcp(
-            format!("{host}:{port}"),
-            "timeout-test-client",
-            "1.0.0",
-        )
+        .connect_tcp(format!("{host}:{port}"), "timeout-test-client", "1.0.0")
         .await?;
 
     info!(
