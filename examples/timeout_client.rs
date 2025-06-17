@@ -7,13 +7,7 @@
 
 use std::env;
 use std::time::Duration;
-use tenx_mcp::{
-    client::{Client, ClientConfig},
-    error::{Error, Result},
-    retry::RetryConfig,
-    schema::*,
-    transport::TcpClientTransport,
-};
+use tenx_mcp::{Client, Error, Result, retry::RetryConfig};
 use tracing::{error, info};
 
 async fn test_reliable_operation(client: &mut Client) -> Result<()> {
@@ -96,28 +90,21 @@ async fn test_custom_retry_config(host: &str, port: u16) -> Result<()> {
     info!("Creating a client with very short timeouts and few retries...");
 
     // Create a new client with custom configuration
-    let config = ClientConfig {
-        retry: RetryConfig {
+    let mut client = Client::new()
+        .with_retry(RetryConfig {
             max_attempts: 2,
             initial_delay: Duration::from_millis(50),
             max_delay: Duration::from_millis(100),
             backoff_multiplier: 2.0,
             timeout: Duration::from_millis(500), // Very short timeout
-        },
-        request_timeout: Duration::from_secs(1),
-    };
+        })
+        .with_request_timeout(Duration::from_secs(1));
 
-    let mut client = Client::with_config(config);
-    let transport = TcpClientTransport::new(format!("{host}:{port}"));
-
-    client.connect(Box::new(transport)).await?;
     client
-        .initialize(
-            Implementation {
-                name: "timeout-test-client-custom".to_string(),
-                version: "1.0.0".to_string(),
-            },
-            ClientCapabilities::default(),
+        .connect_tcp(
+            format!("{host}:{port}"),
+            "timeout-test-client-custom",
+            "1.0.0",
         )
         .await?;
 
@@ -160,42 +147,30 @@ async fn main() -> Result<()> {
     info!("Starting Timeout Test Client");
     info!("Connecting to {}:{}", host, port);
 
-    // Create client with default retry configuration
-    let retry_config = RetryConfig {
-        max_attempts: 3,
-        initial_delay: Duration::from_millis(100),
-        max_delay: Duration::from_secs(2),
-        backoff_multiplier: 2.0,
-        timeout: Duration::from_secs(2), // 2 second timeout
-    };
-
-    let config = ClientConfig {
-        retry: retry_config,
-        request_timeout: Duration::from_secs(5),
-    };
-
-    let mut client = Client::with_config(config);
-
-    // Create transport
-    let transport = TcpClientTransport::new(format!("{host}:{port}"));
+    // Create client with custom retry configuration
+    let mut client = Client::new()
+        .with_retry(RetryConfig {
+            max_attempts: 3,
+            initial_delay: Duration::from_millis(100),
+            max_delay: Duration::from_secs(2),
+            backoff_multiplier: 2.0,
+            timeout: Duration::from_secs(2), // 2 second timeout
+        })
+        .with_request_timeout(Duration::from_secs(5));
 
     // Connect and initialize
     info!("Connecting to server...");
-    client.connect(Box::new(transport)).await?;
-
-    let init_result = client
-        .initialize(
-            Implementation {
-                name: "timeout-test-client".to_string(),
-                version: "1.0.0".to_string(),
-            },
-            ClientCapabilities::default(),
+    let server_info = client
+        .connect_tcp(
+            format!("{host}:{port}"),
+            "timeout-test-client",
+            "1.0.0",
         )
         .await?;
 
     info!(
         "Connected! Server: {} v{}",
-        init_result.server_info.name, init_result.server_info.version
+        server_info.server_info.name, server_info.server_info.version
     );
 
     // List available tools
