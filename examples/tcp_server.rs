@@ -108,14 +108,9 @@ impl Connection for TcpExampleConnection {
                     .and_then(|v| v.as_str())
                     .unwrap_or("No message provided");
 
-                Ok(CallToolResult {
-                    content: vec![Content::Text(TextContent {
-                        text: message.to_string(),
-                        annotations: None,
-                    })],
-                    is_error: Some(false),
-                    meta: None,
-                })
+                Ok(CallToolResult::new()
+                    .with_text_content(message.to_string())
+                    .is_error(false))
             }
             "add" => {
                 let a = arguments
@@ -132,14 +127,9 @@ impl Connection for TcpExampleConnection {
 
                 let result = a + b;
 
-                Ok(CallToolResult {
-                    content: vec![Content::Text(TextContent {
-                        text: format!("{a} + {b} = {result}"),
-                        annotations: None,
-                    })],
-                    is_error: Some(false),
-                    meta: None,
-                })
+                Ok(CallToolResult::new()
+                    .with_text_content(format!("{a} + {b} = {result}"))
+                    .is_error(false))
             }
             _ => Err(MCPError::ToolExecutionFailed {
                 tool: name,

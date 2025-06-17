@@ -74,14 +74,9 @@ impl Connection for EchoConnection {
             .and_then(|v| v.as_str())
             .ok_or_else(|| MCPError::invalid_params("echo", "Missing message parameter"))?;
 
-        Ok(CallToolResult {
-            content: vec![Content::Text(TextContent {
-                text: message.to_string(),
-                annotations: None,
-            })],
-            is_error: Some(false),
-            meta: None,
-        })
+        Ok(CallToolResult::new()
+            .with_text_content(message.to_string())
+            .is_error(false))
     }
 }
 

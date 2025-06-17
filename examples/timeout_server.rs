@@ -129,14 +129,9 @@ impl Connection for TimeoutTestConnection {
                     if count >= self.failures_before_success {
                         self.flakey_fail_count.store(0, Ordering::SeqCst);
                     }
-                    Ok(CallToolResult {
-                        content: vec![Content::Text(TextContent {
-                            text: format!("Success after {} attempts", count + 1),
-                            annotations: None,
-                        })],
-                        is_error: Some(false),
-                        meta: None,
-                    })
+                    Ok(CallToolResult::new()
+                        .with_text_content(format!("Success after {} attempts", count + 1))
+                        .is_error(false))
                 }
             }
             "slow_operation" => {
@@ -147,14 +142,9 @@ impl Connection for TimeoutTestConnection {
                 sleep(Duration::from_secs(self.slow_delay_seconds)).await;
                 info!("SlowTool completed");
 
-                Ok(CallToolResult {
-                    content: vec![Content::Text(TextContent {
-                        text: "Operation completed successfully".to_string(),
-                        annotations: None,
-                    })],
-                    is_error: Some(false),
-                    meta: None,
-                })
+                Ok(CallToolResult::new()
+                    .with_text_content("Operation completed successfully")
+                    .is_error(false))
             }
             "broken_operation" => {
                 // Return an error that is not retryable
@@ -163,14 +153,9 @@ impl Connection for TimeoutTestConnection {
                     message: "This operation is permanently broken".to_string(),
                 })
             }
-            "reliable_operation" => Ok(CallToolResult {
-                content: vec![Content::Text(TextContent {
-                    text: "Reliable operation completed".to_string(),
-                    annotations: None,
-                })],
-                is_error: Some(false),
-                meta: None,
-            }),
+            "reliable_operation" => Ok(CallToolResult::new()
+                .with_text_content("Reliable operation completed")
+                .is_error(false)),
             _ => Err(MCPError::ToolExecutionFailed {
                 tool: name,
                 message: "Tool not found".to_string(),

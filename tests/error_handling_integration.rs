@@ -81,14 +81,9 @@ impl Connection for TestConnection {
             .get("required_field")
             .ok_or_else(|| MCPError::invalid_params("strict_params", "Missing required_field"))?;
 
-        Ok(CallToolResult {
-            content: vec![Content::Text(TextContent {
-                text: "Success".to_string(),
-                annotations: None,
-            })],
-            is_error: Some(false),
-            meta: None,
-        })
+        Ok(CallToolResult::new()
+            .with_text_content("Success")
+            .is_error(false))
     }
 }
 
