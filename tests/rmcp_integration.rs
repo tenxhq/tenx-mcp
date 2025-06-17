@@ -29,6 +29,7 @@ impl Connection for EchoConnection {
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
+        tracing::info!("EchoConnection.tools_list called");
         let schema = ToolInputSchema {
             schema_type: "object".to_string(),
             properties: Some({
@@ -80,8 +81,11 @@ impl Connection for EchoConnection {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore] // TODO: Fix integration with rmcp client
 async fn test_tenx_server_with_rmcp_client() {
+    // Initialize a tracing subscriber so that we get helpful debug output if
+    // this test fails or hangs. We deliberately call `try_init` so that it's
+    // no-op when a subscriber has already been installed by another test.
+    let _ = tracing_subscriber::fmt::try_init();
     // Create bidirectional streams for communication
     let (server_reader, client_writer) = tokio::io::duplex(8192);
     let (client_reader, server_writer) = tokio::io::duplex(8192);
@@ -146,8 +150,17 @@ async fn test_tenx_server_with_rmcp_client() {
         _ => panic!("Expected text content"),
     }
 
-    // Cleanup
-    let _ = server_handle.stop().await;
+    // Cleanup: we drop the client first so that the underlying transport is
+    // closed and the server task can finish. To avoid hanging the test in the
+    // unlikely case that it doesn't shut down promptly, we wrap the wait in a
+    // short timeout.
+    drop(client);
+
+    // Give the server task a moment to observe the closed connection and shut
+    // itself down. We ignore any timeout errors here because the important
+    // part of the test (inter-operability) has already completed.
+    let _ = tokio::time::timeout(std::time::Duration::from_millis(100), server_handle.stop())
+        .await;
 }
 
 #[tokio::test]

@@ -324,6 +324,7 @@ async fn handle_message_with_connection(
     match message {
         JSONRPCMessage::Request(request) => {
             let response_message = handle_request(connection, request.clone()).await;
+            tracing::info!("Server sending response: {:?}", response_message);
             sink.send(response_message).await?;
         }
         JSONRPCMessage::Notification(notification) => {
