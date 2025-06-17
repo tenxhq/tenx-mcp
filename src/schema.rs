@@ -982,7 +982,7 @@ impl Tool {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolInputSchema {
     #[serde(rename = "type")]
     pub schema_type: String,
@@ -990,6 +990,16 @@ pub struct ToolInputSchema {
     pub properties: Option<HashMap<String, Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub required: Option<Vec<String>>,
+}
+
+impl Default for ToolInputSchema {
+    fn default() -> Self {
+        Self {
+            schema_type: "object".to_string(),
+            properties: None,
+            required: None,
+        }
+    }
 }
 
 impl ToolInputSchema {
