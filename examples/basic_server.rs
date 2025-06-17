@@ -38,26 +38,16 @@ impl Connection for BasicConnection {
     }
 
     async fn tools_list(&mut self) -> Result<ListToolsResult> {
-        Ok(ListToolsResult::default().with_tool(Tool {
-            name: "echo".to_string(),
-            description: Some("Echoes back the provided message".to_string()),
-            input_schema: ToolInputSchema {
-                schema_type: "object".to_string(),
-                properties: Some({
-                    let mut props = HashMap::new();
-                    props.insert(
-                        "message".to_string(),
-                        serde_json::json!({
-                            "type": "string",
-                            "description": "The message to echo back"
-                        }),
-                    );
-                    props
+        Ok(ListToolsResult::default().with_tool(Tool::new(
+            "echo",
+            ToolInputSchema::default().with_property(
+                "message",
+                serde_json::json!({
+                    "type": "string",
+                    "description": "The message to echo back"
                 }),
-                required: Some(vec!["message".to_string()]),
-            },
-            annotations: None,
-        }))
+            ),
+        )))
     }
 
     async fn tools_call(

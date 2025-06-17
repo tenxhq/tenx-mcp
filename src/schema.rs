@@ -793,7 +793,7 @@ pub struct ToolListChangedNotification {
 ///
 /// Clients should never make tool use decisions based on ToolAnnotations
 /// received from untrusted servers.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolAnnotations {
     /// A human-readable title for the tool.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -868,7 +868,69 @@ pub struct Tool {
     pub annotations: Option<ToolAnnotations>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl Tool {
+    /// Create a new Tool with a name and input schema
+    pub fn new(name: impl Into<String>, schema: ToolInputSchema) -> Self {
+        Self {
+            name: name.into(),
+            description: None,
+            input_schema: schema,
+            annotations: None,
+        }
+    }
+
+    /// Set the description for the tool
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    /// Set the title annotation
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.annotations.get_or_insert_with(Default::default).title = Some(title.into());
+        self
+    }
+
+    /// Set the read_only_hint annotation
+    pub fn with_read_only_hint(mut self, read_only: bool) -> Self {
+        self.annotations
+            .get_or_insert_with(Default::default)
+            .read_only_hint = Some(read_only);
+        self
+    }
+
+    /// Set the destructive_hint annotation
+    pub fn with_destructive_hint(mut self, destructive: bool) -> Self {
+        self.annotations
+            .get_or_insert_with(Default::default)
+            .destructive_hint = Some(destructive);
+        self
+    }
+
+    /// Set the idempotent_hint annotation
+    pub fn with_idempotent_hint(mut self, idempotent: bool) -> Self {
+        self.annotations
+            .get_or_insert_with(Default::default)
+            .idempotent_hint = Some(idempotent);
+        self
+    }
+
+    /// Set the open_world_hint annotation
+    pub fn with_open_world_hint(mut self, open_world: bool) -> Self {
+        self.annotations
+            .get_or_insert_with(Default::default)
+            .open_world_hint = Some(open_world);
+        self
+    }
+
+    /// Set all annotations at once
+    pub fn with_annotations(mut self, annotations: ToolAnnotations) -> Self {
+        self.annotations = Some(annotations);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolInputSchema {
     #[serde(rename = "type")]
     pub schema_type: String,
@@ -876,6 +938,38 @@ pub struct ToolInputSchema {
     pub properties: Option<HashMap<String, Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub required: Option<Vec<String>>,
+}
+
+impl ToolInputSchema {
+    /// Add a property to the schema
+    pub fn with_property(mut self, name: impl Into<String>, schema: Value) -> Self {
+        self.properties
+            .get_or_insert_with(HashMap::new)
+            .insert(name.into(), schema);
+        self
+    }
+
+    /// Add multiple properties at once
+    pub fn with_properties(mut self, properties: HashMap<String, Value>) -> Self {
+        self.properties = Some(properties);
+        self
+    }
+
+    /// Mark a property as required
+    pub fn with_required(mut self, name: impl Into<String>) -> Self {
+        self.required.get_or_insert_with(Vec::new).push(name.into());
+        self
+    }
+
+    /// Mark multiple properties as required
+    pub fn with_required_properties(
+        mut self,
+        names: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        let required = self.required.get_or_insert_with(Vec::new);
+        required.extend(names.into_iter().map(|n| n.into()));
+        self
+    }
 }
 
 // Logging
