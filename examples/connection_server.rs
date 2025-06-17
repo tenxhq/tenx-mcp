@@ -206,11 +206,11 @@ impl Connection for MyConnection {
             }
         }
 
-        Ok(CallToolResult {
-            content,
-            is_error: Some(false),
-            meta: None,
-        })
+        let mut result = CallToolResult::new().is_error(false);
+        for c in content {
+            result = result.with_content(c);
+        }
+        Ok(result)
     }
 }
 

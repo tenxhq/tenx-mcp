@@ -777,6 +777,58 @@ pub struct CallToolResult {
     pub meta: Option<HashMap<String, Value>>,
 }
 
+impl CallToolResult {
+    /// Create a new CallToolResult with empty content
+    pub fn new() -> Self {
+        Self {
+            content: Vec::new(),
+            is_error: None,
+            meta: None,
+        }
+    }
+
+    /// Add content to the result
+    pub fn with_content(mut self, content: Content) -> Self {
+        self.content.push(content);
+        self
+    }
+
+    /// Add text content to the result
+    pub fn with_text_content(mut self, text: impl Into<String>) -> Self {
+        self.content.push(Content::Text(TextContent {
+            text: text.into(),
+            annotations: None,
+        }));
+        self
+    }
+
+    /// Set the error flag
+    pub fn is_error(mut self, is_error: bool) -> Self {
+        self.is_error = Some(is_error);
+        self
+    }
+
+    /// Set the metadata
+    pub fn with_meta(mut self, meta: HashMap<String, Value>) -> Self {
+        self.meta = Some(meta);
+        self
+    }
+
+    /// Add a single metadata entry
+    pub fn with_meta_entry(mut self, key: impl Into<String>, value: Value) -> Self {
+        self.meta
+            .get_or_insert_with(HashMap::new)
+            .insert(key.into(), value);
+        self
+    }
+}
+
+impl Default for CallToolResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// An optional notification from the server to the client, informing it that
 /// the list of tools it offers has changed. This may be issued by servers
 /// without any previous subscription from the client.

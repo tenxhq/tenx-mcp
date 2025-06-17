@@ -106,14 +106,9 @@ impl Connection for ErrorHandlingConnection {
                         )
                     })?;
 
-                Ok(CallToolResult {
-                    content: vec![Content::Text(TextContent {
-                        text: format!("Received: {required_field}"),
-                        annotations: None,
-                    })],
-                    is_error: Some(false),
-                    meta: None,
-                })
+                Ok(CallToolResult::new()
+                    .with_text_content(format!("Received: {required_field}"))
+                    .is_error(false))
             }
             _ => Err(MCPError::ToolExecutionFailed {
                 tool: name,

@@ -8,7 +8,6 @@
 //!   cargo run --example basic_server  # defaults to 127.0.0.1:3000
 
 use async_trait::async_trait;
-use std::collections::HashMap;
 use std::env;
 use tenx_mcp::{
     connection::Connection, error::MCPError, schema::*, transport::TcpServerTransport, MCPServer,
@@ -69,14 +68,9 @@ impl Connection for BasicConnection {
             .unwrap_or("No message provided")
             .to_string();
 
-        Ok(CallToolResult {
-            content: vec![Content::Text(TextContent {
-                text: message,
-                annotations: None,
-            })],
-            is_error: Some(false),
-            meta: None,
-        })
+        Ok(CallToolResult::new()
+            .with_text_content(message)
+            .is_error(false))
     }
 }
 

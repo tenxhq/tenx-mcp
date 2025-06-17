@@ -89,14 +89,9 @@ impl Connection for EchoConnection {
             "No arguments provided".to_string()
         };
 
-        Ok(CallToolResult {
-            content: vec![Content::Text(TextContent {
-                text: format!("Echo: {message}"),
-                annotations: None,
-            })],
-            is_error: Some(false),
-            meta: None,
-        })
+        Ok(CallToolResult::new()
+            .with_text_content(format!("Echo: {message}"))
+            .is_error(false))
     }
 }
 
