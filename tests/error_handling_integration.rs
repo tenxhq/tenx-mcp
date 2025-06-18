@@ -1,20 +1,23 @@
-//! Simplified integration tests for error handling
+//! Integration tests verifying server-side JSON-RPC error handling without
+//! relying on the JsonRpcCodec. We talk to the server directly over a pair of
+//! in-memory duplex streams, manually serialising/deserialising newline
+//! delimited JSON.
 
 use async_trait::async_trait;
-use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use tenx_mcp::{
-    codec::JsonRpcCodec,
     connection::Connection,
     error::{Error, Result},
     schema::*,
     server::Server,
     ServerHandle,
 };
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_util::codec::Framed;
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 
-/// Simple connection for testing error handling
+/// A very small test connection implementation that exposes a single `test`
+/// tool which requires a single `required_field` string parameter. Everything
+/// else purposefully fails so that we can exercise the server's error
+/// responses.
 struct TestConnection;
 
 #[async_trait]
@@ -65,6 +68,7 @@ impl Connection for TestConnection {
         name: String,
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
+        // We only handle the `test` tool in this fake implementation.
         if name != "test" {
             return Err(Error::ToolExecutionFailed {
                 tool: name,
@@ -73,11 +77,11 @@ impl Connection for TestConnection {
         }
 
         let args = arguments
-            .ok_or_else(|| Error::InvalidParams("strict_params: Missing arguments".to_string()))?;
+            .ok_or_else(|| Error::InvalidParams("strict_params: Missing arguments".into()))?;
 
-        let _field = args.get("required_field").ok_or_else(|| {
-            Error::InvalidParams("strict_params: Missing required_field".to_string())
-        })?;
+        let _ = args
+            .get("required_field")
+            .ok_or_else(|| Error::InvalidParams("strict_params: Missing required_field".into()))?;
 
         Ok(CallToolResult::new()
             .with_text_content("Success")
@@ -85,112 +89,163 @@ impl Connection for TestConnection {
     }
 }
 
-// Helper to create a bidirectional connection using two duplex streams
-fn create_test_connection() -> (
-    impl AsyncRead + AsyncWrite + Send + Sync + Unpin,
-    impl AsyncRead + Send + Sync + Unpin,
-    impl AsyncWrite + Send + Sync + Unpin,
+/// Convenience helper that creates two independent in-memory duplex pipes that
+/// together form a bidirectional channel. The returned tuple is laid out so
+/// that the first element can be given to the server as its reader, the second
+/// as the server writer, and the remaining two are the reader/writer pair for
+/// the client side of the connection.
+fn make_duplex_pair() -> (
+    impl AsyncRead + Send + Sync + Unpin + 'static,
+    impl AsyncWrite + Send + Sync + Unpin + 'static,
+    impl AsyncRead + Send + Sync + Unpin + 'static,
+    impl AsyncWrite + Send + Sync + Unpin + 'static,
 ) {
-    // Create two duplex streams to simulate bidirectional communication
-    let (client_to_server, server_from_client) = tokio::io::duplex(8192);
-    let (server_to_client, client_from_server) = tokio::io::duplex(8192);
+    let (server_reader, client_writer) = tokio::io::duplex(8 * 1024);
+    let (client_reader, server_writer) = tokio::io::duplex(8 * 1024);
+    (server_reader, server_writer, client_reader, client_writer)
+}
 
-    // Combine streams for client side
-    let client = tokio::io::join(client_from_server, client_to_server);
+/// Serialise a `JSONRPCMessage`, append a `\n` delimiter and send it over the
+/// provided writer.
+async fn send_message<W>(writer: &mut W, message: &JSONRPCMessage) -> Result<()>
+where
+    W: AsyncWrite + Unpin,
+{
+    let json = serde_json::to_vec(message)?;
+    writer.write_all(&json).await?;
+    writer.write_all(b"\n").await?;
+    writer.flush().await?;
+    Ok(())
+}
 
-    (client, server_from_client, server_to_client)
+/// Read a single newline-delimited JSON-RPC message from the reader.
+async fn read_message<R>(reader: &mut BufReader<R>) -> Result<JSONRPCMessage>
+where
+    R: AsyncRead + Unpin,
+{
+    let mut buf = Vec::new();
+    reader.read_until(b'\n', &mut buf).await?;
+    if buf.is_empty() {
+        return Err(Error::Transport("Stream closed".into()));
+    }
+    // Remove the trailing '\n'.
+    if buf.last() == Some(&b'\n') {
+        buf.pop();
+    }
+    Ok(serde_json::from_slice(&buf)?)
 }
 
 #[tokio::test]
 async fn test_error_responses() {
-    // Setup server
+    // Install tracing so that if the test hangs we at least get some idea of
+    // what happened.
+    let _ = tracing_subscriber::fmt::try_init();
+
+    // Spin up our test server backed by the `TestConnection` implementation.
     let server = Server::default().with_connection_factory(|| Box::new(TestConnection));
 
-    let (client_stream, server_reader, server_writer) = create_test_connection();
+    let (server_reader, server_writer, client_reader, mut client_writer) = make_duplex_pair();
 
-    // Start server with the proper read/write streams
-    let server_handle = ServerHandle::from_stream(server, server_reader, server_writer)
+    // Launch the server – this will run until either side of the transport is
+    // closed.
+    let server_handle: ServerHandle =
+        ServerHandle::from_stream(server, server_reader, server_writer)
+            .await
+            .expect("failed to start server");
+
+    // --- Test 1: Unknown method ------------------------------------------------
+    let request_unknown = JSONRPCMessage::Request(JSONRPCRequest {
+        jsonrpc: JSONRPC_VERSION.to_string(),
+        id: RequestId::Number(1),
+        request: Request {
+            method: "unknown".to_string(),
+            params: None,
+        },
+    });
+
+    let mut reader = BufReader::new(client_reader);
+
+    send_message(&mut client_writer, &request_unknown)
         .await
-        .unwrap();
+        .expect("send failed");
 
-    // Create client using the combined stream
-    let mut stream = Framed::new(client_stream, JsonRpcCodec::new());
+    let response = read_message(&mut reader).await.expect("read failed");
 
-    // Test 1: Unknown method
-    if stream
-        .send(JSONRPCMessage::Request(JSONRPCRequest {
-            jsonrpc: JSONRPC_VERSION.to_string(),
-            id: RequestId::Number(1),
-            request: Request {
-                method: "unknown".to_string(),
-                params: None,
-            },
-        }))
-        .await
-        .is_err()
-    {
-        // Connection closed, which is expected behavior
-        server_handle.stop().await.ok();
-        return;
+    match response {
+        JSONRPCMessage::Error(err) => {
+            assert_eq!(err.error.code, METHOD_NOT_FOUND);
+        }
+        other => panic!("unexpected message: {other:?}"),
     }
 
-    if let Some(Ok(response)) = stream.next().await {
-        assert!(matches!(
-            response,
-            JSONRPCMessage::Error(err) if err.error.code == METHOD_NOT_FOUND
-        ));
+    // After each read we have to extract the inner reader back so that we can
+    // keep using it. `BufReader::into_inner` requires ownership so we take it
+    // back between each phase.
+    // `reader` continues to own `client_reader`; we simply keep using the same
+    // buffered reader for the remainder of the test.
 
-        // Test 2: Missing params for initialize
-        if stream
-            .send(JSONRPCMessage::Request(JSONRPCRequest {
-                jsonrpc: JSONRPC_VERSION.to_string(),
-                id: RequestId::Number(2),
-                request: Request {
-                    method: "initialize".to_string(),
-                    params: None,
-                },
-            }))
-            .await
-            .is_ok()
-        {
-            if let Some(Ok(response)) = stream.next().await {
-                assert!(matches!(
-                    response,
-                    JSONRPCMessage::Error(err) if err.error.code == INVALID_PARAMS
-                ));
-            }
-        }
+    // --- Test 2: Missing params for initialise --------------------------------
+    let request_init_missing = JSONRPCMessage::Request(JSONRPCRequest {
+        jsonrpc: JSONRPC_VERSION.to_string(),
+        id: RequestId::Number(2),
+        request: Request {
+            method: "initialize".to_string(),
+            params: None,
+        },
+    });
 
-        // Test 3: Tool with missing required param
-        if stream
-            .send(JSONRPCMessage::Request(JSONRPCRequest {
-                jsonrpc: JSONRPC_VERSION.to_string(),
-                id: RequestId::Number(3),
-                request: Request {
-                    method: "tools/call".to_string(),
-                    params: Some(RequestParams {
-                        meta: None,
-                        other: {
-                            let mut map = HashMap::new();
-                            map.insert("name".to_string(), serde_json::json!("test"));
-                            map.insert("arguments".to_string(), serde_json::json!({}));
-                            map
-                        },
-                    }),
-                },
-            }))
-            .await
-            .is_ok()
-        {
-            if let Some(Ok(response)) = stream.next().await {
-                assert!(matches!(
-                    response,
-                    JSONRPCMessage::Error(err) if err.error.code == INVALID_PARAMS && err.error.message.contains("Missing required_field")
-                ));
-            }
+    send_message(&mut client_writer, &request_init_missing)
+        .await
+        .expect("send failed");
+
+    let response = read_message(&mut reader).await.expect("read failed");
+
+    match response {
+        JSONRPCMessage::Error(err) => {
+            assert_eq!(err.error.code, INVALID_PARAMS);
         }
+        other => panic!("unexpected message: {other:?}"),
     }
 
-    drop(stream);
-    server_handle.stop().await.unwrap();
+    // Keep using the same reader.
+
+    // --- Test 3: Tool invocation with missing required param ------------------
+    let mut params_map = HashMap::new();
+    params_map.insert("name".to_string(), serde_json::json!("test"));
+    params_map.insert("arguments".to_string(), serde_json::json!({}));
+
+    let request_tool_missing = JSONRPCMessage::Request(JSONRPCRequest {
+        jsonrpc: JSONRPC_VERSION.to_string(),
+        id: RequestId::Number(3),
+        request: Request {
+            method: "tools/call".to_string(),
+            params: Some(RequestParams {
+                meta: None,
+                other: params_map,
+            }),
+        },
+    });
+
+    send_message(&mut client_writer, &request_tool_missing)
+        .await
+        .expect("send failed");
+
+    let response = read_message(&mut reader).await.expect("read failed");
+
+    match response {
+        JSONRPCMessage::Error(err) => {
+            assert_eq!(err.error.code, INVALID_PARAMS);
+            assert!(err.error.message.contains("Missing required_field"));
+        }
+        other => panic!("unexpected message: {other:?}"),
+    }
+
+    // -------------------------------------------------------------------------
+    // Clean-up. Drop the client side of the connection and then ask the server
+    // to shut down. We wrap the shutdown in a short timeout so that the test
+    // doesn't hang in the unlikely event of a bug.
+    drop(client_writer);
+    drop(reader);
+
+    let _ = tokio::time::timeout(std::time::Duration::from_millis(100), server_handle.stop()).await;
 }

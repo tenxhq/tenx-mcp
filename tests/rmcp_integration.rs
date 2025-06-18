@@ -6,15 +6,12 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use rmcp::ServiceExt;
-// Import rmcp types
 use rmcp::model::{CallToolRequestParam, PaginatedRequestParam};
+use rmcp::ServiceExt;
 use serde_json::json;
-// Import tenx-mcp types
 use tenx_mcp::error::{Error, Result};
 use tenx_mcp::{connection::Connection, schema::*, Client, Server};
 
-// Simple echo connection for testing
 struct EchoConnection;
 
 #[async_trait]
@@ -159,8 +156,7 @@ async fn test_tenx_server_with_rmcp_client() {
     // Give the server task a moment to observe the closed connection and shut
     // itself down. We ignore any timeout errors here because the important
     // part of the test (inter-operability) has already completed.
-    let _ = tokio::time::timeout(std::time::Duration::from_millis(100), server_handle.stop())
-        .await;
+    let _ = tokio::time::timeout(std::time::Duration::from_millis(100), server_handle.stop()).await;
 }
 
 #[tokio::test]

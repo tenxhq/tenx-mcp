@@ -1,10 +1,11 @@
 pub mod client;
-pub mod codec;
 pub mod connection;
 pub mod error;
 pub mod retry;
 pub mod schema;
 pub mod server;
+
+mod codec;
 mod transport;
 
 // Re-export commonly used types
