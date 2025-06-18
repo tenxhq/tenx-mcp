@@ -1,4 +1,5 @@
 pub mod client;
+pub mod client_connection;
 pub mod error;
 pub mod retry;
 pub mod schema;
