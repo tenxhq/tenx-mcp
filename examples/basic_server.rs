@@ -14,7 +14,9 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::env;
-use tenx_mcp::{connection::Connection, error::Error, schema::*, schemars, Result, Server};
+use tenx_mcp::{
+    error::Error, schema::*, schemars, server_connection::ServerConnection, Result, Server,
+};
 use tracing::info;
 
 const NAME: &str = "basic-server";
@@ -32,7 +34,7 @@ struct EchoParams {
 struct BasicConnection {}
 
 #[async_trait]
-impl Connection for BasicConnection {
+impl ServerConnection for BasicConnection {
     async fn initialize(
         &mut self,
         _protocol_version: String,

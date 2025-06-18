@@ -6,10 +6,10 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use tenx_mcp::{
-    connection::Connection,
     error::{Error, Result},
     schema::*,
     server::Server,
+    server_connection::ServerConnection,
     ServerHandle,
 };
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
@@ -21,7 +21,7 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader
 struct TestConnection;
 
 #[async_trait]
-impl Connection for TestConnection {
+impl ServerConnection for TestConnection {
     async fn initialize(
         &mut self,
         _protocol_version: String,

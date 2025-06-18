@@ -11,13 +11,16 @@ use crate::{
     },
 };
 
+/// Factory function type for creating Connection instances
+pub type ServerConnectionFactory = Box<dyn Fn() -> Box<dyn ServerConnection> + Send + Sync>;
+
 /// Context provided to Connection implementations for interacting with the client
-pub struct ConnectionContext {
+pub struct ServerConnectionContext {
     /// Sender for server notifications
     pub(crate) notification_tx: broadcast::Sender<ServerNotification>,
 }
 
-impl ConnectionContext {
+impl ServerConnectionContext {
     /// Send a notification to the client
     pub fn send_notification(&self, notification: ServerNotification) -> Result<()> {
         self.notification_tx.send(notification).map_err(|_| {
@@ -30,9 +33,9 @@ impl ConnectionContext {
 /// Connection trait that server implementers must implement
 /// Each client connection will have its own instance of the implementation
 #[async_trait]
-pub trait Connection: Send + Sync {
+pub trait ServerConnection: Send + Sync {
     /// Called when a new connection is established
-    async fn on_connect(&mut self, _context: ConnectionContext) -> Result<()> {
+    async fn on_connect(&mut self, _context: ServerConnectionContext) -> Result<()> {
         Ok(())
     }
 
@@ -49,8 +52,8 @@ pub trait Connection: Send + Sync {
         _client_info: crate::schema::Implementation,
     ) -> Result<InitializeResult>;
 
-    /// Handle ping request
-    async fn ping(&mut self) -> Result<()> {
+    /// Respond to a ping request
+    async fn pong(&mut self) -> Result<()> {
         Ok(())
     }
 

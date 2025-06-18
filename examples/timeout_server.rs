@@ -11,10 +11,10 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tenx_mcp::{
-    connection::Connection,
     error::{Error, Result},
     schema::*,
     server::Server,
+    server_connection::ServerConnection,
 };
 use tokio::time::sleep;
 use tracing::{info, warn};
@@ -46,7 +46,7 @@ impl TimeoutTestConnection {
 }
 
 #[async_trait]
-impl Connection for TimeoutTestConnection {
+impl ServerConnection for TimeoutTestConnection {
     async fn initialize(
         &mut self,
         _protocol_version: String,

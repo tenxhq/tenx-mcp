@@ -4,7 +4,7 @@
 //! without the complexity of setting up full client-server communication.
 
 use std::collections::HashMap;
-use tenx_mcp::{connection::Connection, error::Error, schema::*, Result};
+use tenx_mcp::{error::Error, schema::*, server_connection::ServerConnection, Result};
 
 #[tokio::test]
 async fn test_method_not_found() {
@@ -13,7 +13,7 @@ async fn test_method_not_found() {
     struct MinimalConnection;
 
     #[async_trait::async_trait]
-    impl Connection for MinimalConnection {
+    impl ServerConnection for MinimalConnection {
         async fn initialize(
             &mut self,
             _protocol_version: String,
@@ -56,7 +56,7 @@ async fn test_invalid_params() {
     struct ConnectionWithValidation;
 
     #[async_trait::async_trait]
-    impl Connection for ConnectionWithValidation {
+    impl ServerConnection for ConnectionWithValidation {
         async fn initialize(
             &mut self,
             _protocol_version: String,
@@ -162,7 +162,7 @@ async fn test_successful_response() {
     struct ConnectionWithTools;
 
     #[async_trait::async_trait]
-    impl Connection for ConnectionWithTools {
+    impl ServerConnection for ConnectionWithTools {
         async fn initialize(
             &mut self,
             _protocol_version: String,
@@ -253,7 +253,7 @@ async fn test_error_propagation() {
     struct FaultyConnection;
 
     #[async_trait::async_trait]
-    impl Connection for FaultyConnection {
+    impl ServerConnection for FaultyConnection {
         async fn initialize(
             &mut self,
             _protocol_version: String,

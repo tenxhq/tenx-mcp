@@ -6,7 +6,7 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::env;
-use tenx_mcp::{connection::Connection, error::Error, schema::*, Result, Server};
+use tenx_mcp::{error::Error, schema::*, server_connection::ServerConnection, Result, Server};
 
 /// TCP server connection that provides echo and add tools
 struct TcpExampleConnection {
@@ -24,7 +24,7 @@ impl TcpExampleConnection {
 }
 
 #[async_trait]
-impl Connection for TcpExampleConnection {
+impl ServerConnection for TcpExampleConnection {
     async fn initialize(
         &mut self,
         _protocol_version: String,

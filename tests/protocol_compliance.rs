@@ -11,9 +11,9 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use serde_json::json;
 use tenx_mcp::{
-    connection::Connection,
     error::{Error, Result},
     schema::*,
+    server_connection::ServerConnection,
 };
 
 /// Test connection implementation with echo and add tools
@@ -81,7 +81,7 @@ impl TestConnection {
 }
 
 #[async_trait]
-impl Connection for TestConnection {
+impl ServerConnection for TestConnection {
     async fn initialize(
         &mut self,
         _protocol_version: String,

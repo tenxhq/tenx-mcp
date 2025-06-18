@@ -846,7 +846,7 @@ mod tests {
         struct TestConnection;
 
         #[async_trait::async_trait]
-        impl crate::connection::Connection for TestConnection {
+        impl crate::server_connection::ServerConnection for TestConnection {
             async fn initialize(
                 &mut self,
                 _protocol_version: String,
@@ -941,7 +941,7 @@ mod tests {
         struct TestStreamConnection;
 
         #[async_trait::async_trait]
-        impl crate::connection::Connection for TestStreamConnection {
+        impl crate::server_connection::ServerConnection for TestStreamConnection {
             async fn initialize(
                 &mut self,
                 _protocol_version: String,

@@ -10,12 +10,12 @@ use rmcp::model::{CallToolRequestParam, PaginatedRequestParam};
 use rmcp::ServiceExt;
 use serde_json::json;
 use tenx_mcp::error::{Error, Result};
-use tenx_mcp::{connection::Connection, schema::*, Client, Server};
+use tenx_mcp::{schema::*, server_connection::ServerConnection, Client, Server};
 
 struct EchoConnection;
 
 #[async_trait]
-impl Connection for EchoConnection {
+impl ServerConnection for EchoConnection {
     async fn initialize(
         &mut self,
         _protocol_version: String,

@@ -6,20 +6,17 @@ use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    connection::{Connection, ConnectionContext},
     error::{Error, Result},
     schema::{self, *},
+    server_connection::{ServerConnection, ServerConnectionContext, ServerConnectionFactory},
     transport::{Transport, TransportStream},
 };
-
-/// Factory function type for creating Connection instances
-pub type ConnectionFactory = Box<dyn Fn() -> Box<dyn Connection> + Send + Sync>;
 
 /// MCP Server implementation
 #[derive(Default)]
 pub struct Server {
     capabilities: ServerCapabilities,
-    connection_factory: Option<ConnectionFactory>,
+    connection_factory: Option<ServerConnectionFactory>,
 }
 
 pub struct ServerHandle {
@@ -31,7 +28,7 @@ impl Server {
     /// Set the connection factory for creating Connection instances
     pub fn with_connection_factory<F>(mut self, factory: F) -> Self
     where
-        F: Fn() -> Box<dyn Connection> + Send + Sync + 'static,
+        F: Fn() -> Box<dyn ServerConnection> + Send + Sync + 'static,
     {
         self.connection_factory = Some(Box::new(factory));
         self
@@ -107,7 +104,7 @@ impl Server {
                                 Box::new(move || {
                                     // Call the original factory through the Arc
                                     factory.as_ref().as_ref().unwrap()()
-                                }) as ConnectionFactory
+                                }) as ServerConnectionFactory
                             }),
                         };
 
@@ -164,7 +161,8 @@ impl Server {
                                     Box::new(move || {
                                         // Call the original factory through the Arc
                                         factory.as_ref().as_ref().unwrap()()
-                                    }) as ConnectionFactory
+                                    })
+                                        as ServerConnectionFactory
                                 }),
                             };
 
@@ -205,7 +203,7 @@ impl ServerHandle {
         let notification_tx_handle = notification_tx.clone();
 
         // Create connection instance
-        let mut connection: Option<Box<dyn Connection>> =
+        let mut connection: Option<Box<dyn ServerConnection>> =
             if let Some(factory) = &server.connection_factory {
                 Some(factory())
             } else {
@@ -214,7 +212,7 @@ impl ServerHandle {
 
         // Initialize connection if present
         if let Some(conn) = &mut connection {
-            let context = ConnectionContext {
+            let context = ServerConnectionContext {
                 notification_tx: notification_tx.clone(),
             };
             conn.on_connect(context).await?;
@@ -317,7 +315,7 @@ impl ServerHandle {
 
 /// Handle a message using the Connection trait
 async fn handle_message_with_connection(
-    connection: &mut Box<dyn Connection>,
+    connection: &mut Box<dyn ServerConnection>,
     message: JSONRPCMessage,
     sink: &mut SplitSink<Box<dyn TransportStream>, JSONRPCMessage>,
 ) -> Result<()> {
@@ -349,7 +347,7 @@ async fn handle_message_with_connection(
 
 /// Handle a request using the Connection trait and convert result to JSONRPCMessage
 async fn handle_request(
-    connection: &mut Box<dyn Connection>,
+    connection: &mut Box<dyn ServerConnection>,
     request: JSONRPCRequest,
 ) -> JSONRPCMessage {
     let result = handle_request_inner(connection, request.clone()).await;
@@ -394,7 +392,7 @@ async fn handle_request(
 
 /// Inner handler that returns Result<serde_json::Value>
 async fn handle_request_inner(
-    connection: &mut Box<dyn Connection>,
+    connection: &mut Box<dyn ServerConnection>,
     request: JSONRPCRequest,
 ) -> Result<serde_json::Value> {
     // Convert RequestParams to serde_json::Value
@@ -422,7 +420,7 @@ async fn handle_request_inner(
         }
         "ping" => {
             info!("Server received ping request, sending automatic response");
-            connection.ping().await.map(|_| serde_json::json!({}))
+            connection.pong().await.map(|_| serde_json::json!({}))
         }
         "tools/list" => connection
             .tools_list()
@@ -541,7 +539,7 @@ async fn handle_request_inner(
 
 /// Handle a notification using the Connection trait
 async fn handle_notification(
-    _connection: &mut Box<dyn Connection>,
+    _connection: &mut Box<dyn ServerConnection>,
     notification: JSONRPCNotification,
 ) -> Result<()> {
     debug!(

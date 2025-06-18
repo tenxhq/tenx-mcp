@@ -1,22 +1,22 @@
 pub mod client;
-pub mod connection;
 pub mod error;
 pub mod retry;
 pub mod schema;
 pub mod server;
+pub mod server_connection;
 
 mod codec;
 mod transport;
 
 // Re-export commonly used types
 pub use client::Client;
-pub use connection::{Connection, ConnectionContext};
 pub use error::{Error, Result};
 pub use schema::{
     ClientCapabilities, Content, Implementation, JSONRPCNotification, ResourceContents,
     ToolInputSchema, ToolsCapability,
 };
 pub use server::{Server, ServerHandle};
+pub use server_connection::{ServerConnection, ServerConnectionContext};
 
 // Re-export schemars for users
 pub use schemars;
