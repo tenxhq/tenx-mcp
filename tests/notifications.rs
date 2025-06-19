@@ -16,7 +16,7 @@ async fn test_server_to_client_notifications() {
 
     #[async_trait]
     impl ClientConn for NotificationRecorder {
-        async fn notification(
+        async fn notify(
             &mut self,
             _context: ClientCtx,
             notification: tenx_mcp::schema::ClientNotification,
@@ -47,7 +47,7 @@ async fn test_server_to_client_notifications() {
             tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                 // Send roots list changed notification
-                match context.send_notification(schema::ClientNotification::RootsListChanged) {
+                match context.notify(schema::ClientNotification::RootsListChanged) {
                     Ok(_) => {
                         tracing::info!("Server sent roots_list_changed notification");
                         *sent_notification.lock().unwrap() = true;

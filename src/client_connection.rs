@@ -66,7 +66,7 @@ pub trait ClientConn: Send + Sync {
     ///
     /// The default implementation ignores the notification. Implementations
     /// can override this method to react to server-initiated notifications.
-    async fn notification(
+    async fn notify(
         &mut self,
         _context: ClientCtx,
         _notification: schema::ClientNotification,

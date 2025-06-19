@@ -719,7 +719,7 @@ async fn handle_server_notification(
     let value = Value::Object(obj);
 
     match serde_json::from_value::<ClientNotification>(value) {
-        Ok(typed) => connection.notification(context, typed).await,
+        Ok(typed) => connection.notify(context, typed).await,
         Err(e) => Err(Error::InvalidParams(format!(
             "Failed to parse server notification: {e}",
         ))),
@@ -881,7 +881,7 @@ mod tests {
 
         #[async_trait::async_trait]
         impl crate::client_connection::ClientConn for NotifClientConnection {
-            async fn notification(
+            async fn notify(
                 &mut self,
                 _context: crate::client_connection::ClientCtx,
                 notification: crate::schema::ClientNotification,
