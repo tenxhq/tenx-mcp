@@ -123,7 +123,7 @@ where
     let server_handle = ServerHandle::from_stream(server, server_reader, server_writer).await?;
 
     // Build client instance.
-    let mut client = Client::new("test-client", "1.0.0").with_connection(client_connection);
+    let mut client = Client::new_with_connection("test-client", "1.0.0", client_connection);
 
     // Connect the client to its side of the in-memory transport.
     client.connect_stream(client_reader, client_writer).await?;

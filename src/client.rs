@@ -68,17 +68,22 @@ impl Client<()> {
     }
 
     /// Set the client connection handler
-    pub fn with_connection<C: ClientConn>(self, connection: C) -> Client<C> {
+    pub fn new_with_connection<C: ClientConn>(
+        name: impl Into<String>,
+        version: impl Into<String>,
+        connection: C,
+    ) -> Client<C> {
+        let (notification_tx, notification_rx) = mpsc::channel(100);
         Client {
-            transport_tx: self.transport_tx,
-            pending_requests: self.pending_requests,
-            notification_tx: self.notification_tx,
-            notification_rx: self.notification_rx,
-            next_request_id: self.next_request_id,
+            transport_tx: None,
+            pending_requests: Arc::new(Mutex::new(HashMap::new())),
+            notification_tx,
+            notification_rx: Some(notification_rx),
+            next_request_id: Arc::new(Mutex::new(1)),
             connection: Some(connection),
-            name: self.name,
-            version: self.version,
-            client_capabilities: self.client_capabilities,
+            name: name.into(),
+            version: version.into(),
+            client_capabilities: ClientCapabilities::default(),
         }
     }
 
@@ -906,10 +911,13 @@ mod tests {
             .expect("Failed to start server");
 
         // Create client with notif connection
-        let mut client =
-            Client::new("test-client", "1.0.0").with_connection(NotifClientConnection {
+        let mut client = Client::new_with_connection(
+            "test-client",
+            "1.0.0",
+            NotifClientConnection {
                 tx: Arc::new(Mutex::new(Some(tx_notif))),
-            });
+            },
+        );
 
         // Connect and initialize
         client
@@ -1010,7 +1018,7 @@ mod tests {
 
         // Create client with notifier connection
         let mut client =
-            Client::new("test-client", "1.0.0").with_connection(NotifierClientConnection);
+            Client::new_with_connection("test-client", "1.0.0", NotifierClientConnection);
 
         // Connect and initialize
         client
