@@ -365,61 +365,36 @@ async fn handle_request(
 async fn handle_request_inner(
     conn: &mut Box<dyn ServerConn>,
     request: JSONRPCRequest,
-    context: ServerCtx,
+    ctx: ServerCtx,
 ) -> Result<serde_json::Value> {
-    // Build a JSON object that includes the method for proper deserialization
     let mut request_obj = serde_json::Map::new();
-
-    // Add the method as a field (this is how the serde tag works)
     request_obj.insert(
         "method".to_string(),
         serde_json::Value::String(request.request.method.clone()),
     );
-
-    // Add all params fields if present
     if let Some(params) = request.request.params {
         for (key, value) in params.other {
             request_obj.insert(key, value);
         }
     }
 
-    let request_value = serde_json::Value::Object(request_obj);
-
-    // Try to deserialize into ClientRequest
-    let client_request = match serde_json::from_value::<ClientRequest>(request_value.clone()) {
-        Ok(req) => req,
-        Err(err) => {
-            // Check if this is a known method with invalid params
-            let known_methods = [
-                "initialize",
-                "ping",
-                "tools/list",
-                "tools/call",
-                "resources/list",
-                "resources/templates/list",
-                "resources/read",
-                "resources/subscribe",
-                "resources/unsubscribe",
-                "prompts/list",
-                "prompts/get",
-                "completion/complete",
-                "logging/setLevel",
-            ];
-
-            if known_methods.contains(&request.request.method.as_str()) {
-                // Known method but invalid parameters
-                return Err(Error::InvalidParams(format!(
-                    "Invalid parameters for {}: {}",
-                    request.request.method, err
-                )));
-            } else {
-                // Unknown method
-                return Err(Error::MethodNotFound(request.request.method.clone()));
+    let client_request =
+        match serde_json::from_value::<ClientRequest>(serde_json::Value::Object(request_obj)) {
+            Ok(req) => req,
+            Err(err) => {
+                // Check if it's an unknown method or invalid parameters
+                let err_str = err.to_string();
+                if err_str.contains("unknown variant") {
+                    return Err(Error::MethodNotFound(request.request.method.clone()));
+                } else {
+                    // It's a known method with invalid parameters
+                    return Err(Error::InvalidParams(format!(
+                        "Invalid parameters for {}: {}",
+                        request.request.method, err
+                    )));
+                }
             }
-        }
-    };
-
-    let ctx = context.clone();
+        };
 
     match client_request {
         ClientRequest::Initialize {

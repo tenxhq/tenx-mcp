@@ -641,44 +641,51 @@ async fn handle_server_request<C: ClientConn>(
 /// Inner handler that returns Result<serde_json::Value>
 async fn handle_server_request_inner<C: ClientConn>(
     connection: &mut C,
-    context: ClientCtx,
+    ctx: ClientCtx,
     request: JSONRPCRequest,
 ) -> Result<serde_json::Value> {
-    // Convert RequestParams to serde_json::Value
-    let params = request
-        .request
-        .params
-        .map(|p| serde_json::to_value(p.other))
-        .transpose()?;
+    let mut request_obj = serde_json::Map::new();
+    request_obj.insert(
+        "method".to_string(),
+        serde_json::Value::String(request.request.method.clone()),
+    );
+    if let Some(params) = request.request.params {
+        for (key, value) in params.other {
+            request_obj.insert(key, value);
+        }
+    }
 
-    match request.request.method.as_str() {
-        "ping" => {
+    let server_request =
+        match serde_json::from_value::<ServerRequest>(serde_json::Value::Object(request_obj)) {
+            Ok(req) => req,
+            Err(err) => {
+                // Check if it's an unknown method or invalid parameters
+                let err_str = err.to_string();
+                if err_str.contains("unknown variant") {
+                    return Err(Error::MethodNotFound(request.request.method.clone()));
+                } else {
+                    // It's a known method with invalid parameters
+                    return Err(Error::InvalidParams(format!(
+                        "Invalid parameters for {}: {}",
+                        request.request.method, err
+                    )));
+                }
+            }
+        };
+
+    match server_request {
+        ServerRequest::Ping => {
             info!("Server sent ping request, sending pong");
-            connection
-                .pong(context)
-                .await
-                .map(|_| serde_json::json!({}))
+            connection.pong(ctx).await.map(|_| serde_json::json!({}))
         }
-        "sampling/createMessage" => {
-            let p = params.ok_or_else(|| {
-                Error::InvalidParams(
-                    "sampling/createMessage: Missing required parameters".to_string(),
-                )
-            })?;
-            let params = serde_json::from_value::<CreateMessageParams>(p)
-                .map_err(|e| Error::InvalidParams(format!("sampling/createMessage: {e}")))?;
-            connection
-                .create_message(context, &request.request.method, params)
-                .await
-                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
-        }
-        "roots/list" => connection
-            .list_roots(context)
+        ServerRequest::CreateMessage(params) => connection
+            .create_message(ctx, &request.request.method, *params)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
-        method => Err(Error::MethodNotFound(format!(
-            "Unknown server method: {method}"
-        ))),
+        ServerRequest::ListRoots => connection
+            .list_roots(ctx)
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
     }
 }
 
