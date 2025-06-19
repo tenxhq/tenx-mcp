@@ -522,13 +522,41 @@ pub struct ProgressParams {
 }
 
 /// The server's response to a resources/list request from the client.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListResourcesResult {
     pub resources: Vec<Resource>,
     /// An opaque token representing the pagination position after the last
     /// returned result. If present, there may be more results available.
     #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
+}
+
+impl ListResourcesResult {
+    /// Create a new empty ListResourcesResult
+    pub fn new() -> Self {
+        Self {
+            resources: Vec::new(),
+            next_cursor: None,
+        }
+    }
+
+    /// Add a resource to the list
+    pub fn with_resource(mut self, resource: Resource) -> Self {
+        self.resources.push(resource);
+        self
+    }
+
+    /// Add multiple resources to the list
+    pub fn with_resources(mut self, resources: impl IntoIterator<Item = Resource>) -> Self {
+        self.resources.extend(resources);
+        self
+    }
+
+    /// Set the pagination cursor
+    pub fn with_cursor(mut self, cursor: impl Into<Cursor>) -> Self {
+        self.next_cursor = Some(cursor.into());
+        self
+    }
 }
 
 /// The server's response to a resources/templates/list request from the client.
@@ -550,13 +578,49 @@ pub struct ReadResourceParams {
 }
 
 /// The server's response to a resources/read request from the client.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ReadResourceResult {
     pub contents: Vec<ResourceContents>,
     /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
     /// to their responses.
     #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, Value>>,
+}
+
+impl ReadResourceResult {
+    /// Create a new empty ReadResourceResult
+    pub fn new() -> Self {
+        Self {
+            contents: Vec::new(),
+            meta: None,
+        }
+    }
+
+    /// Add content to the result
+    pub fn with_content(mut self, content: ResourceContents) -> Self {
+        self.contents.push(content);
+        self
+    }
+
+    /// Add multiple contents to the result
+    pub fn with_contents(mut self, contents: impl IntoIterator<Item = ResourceContents>) -> Self {
+        self.contents.extend(contents);
+        self
+    }
+
+    /// Set the metadata
+    pub fn with_meta(mut self, meta: HashMap<String, Value>) -> Self {
+        self.meta = Some(meta);
+        self
+    }
+
+    /// Add a single metadata entry
+    pub fn with_meta_entry(mut self, key: impl Into<String>, value: Value) -> Self {
+        self.meta
+            .get_or_insert_with(HashMap::new)
+            .insert(key.into(), value);
+        self
+    }
 }
 
 /// An optional notification from the server to the client, informing it that
@@ -676,13 +740,41 @@ pub struct BlobResourceContents {
 // Prompts
 
 /// The server's response to a prompts/list request from the client.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListPromptsResult {
     pub prompts: Vec<Prompt>,
     /// An opaque token representing the pagination position after the last
     /// returned result. If present, there may be more results available.
     #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
+}
+
+impl ListPromptsResult {
+    /// Create a new empty ListPromptsResult
+    pub fn new() -> Self {
+        Self {
+            prompts: Vec::new(),
+            next_cursor: None,
+        }
+    }
+
+    /// Add a prompt to the list
+    pub fn with_prompt(mut self, prompt: Prompt) -> Self {
+        self.prompts.push(prompt);
+        self
+    }
+
+    /// Add multiple prompts to the list
+    pub fn with_prompts(mut self, prompts: impl IntoIterator<Item = Prompt>) -> Self {
+        self.prompts.extend(prompts);
+        self
+    }
+
+    /// Set the pagination cursor
+    pub fn with_cursor(mut self, cursor: impl Into<Cursor>) -> Self {
+        self.next_cursor = Some(cursor.into());
+        self
+    }
 }
 
 /// The server's response to a prompts/get request from the client.

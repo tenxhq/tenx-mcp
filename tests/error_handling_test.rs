@@ -225,17 +225,16 @@ async fn test_successful_response() {
             _context: ServerCtx,
             _cursor: Option<schema::Cursor>,
         ) -> Result<schema::ListResourcesResult> {
-            Ok(schema::ListResourcesResult {
-                resources: vec![schema::Resource {
+            Ok(
+                schema::ListResourcesResult::new().with_resource(schema::Resource {
                     uri: "file:///test.txt".to_string(),
                     name: "test.txt".to_string(),
                     description: Some("A test file".to_string()),
                     mime_type: Some("text/plain".to_string()),
                     size: None,
                     annotations: None,
-                }],
-                next_cursor: None,
-            })
+                }),
+            )
         }
     }
 

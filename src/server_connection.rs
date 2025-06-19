@@ -92,10 +92,7 @@ pub trait ServerConn: Send + Sync {
         _context: ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListResourcesResult> {
-        Ok(ListResourcesResult {
-            resources: vec![],
-            next_cursor: None,
-        })
+        Ok(ListResourcesResult::new())
     }
 
     /// List resource templates
@@ -135,10 +132,7 @@ pub trait ServerConn: Send + Sync {
         _context: ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListPromptsResult> {
-        Ok(ListPromptsResult {
-            prompts: vec![],
-            next_cursor: None,
-        })
+        Ok(ListPromptsResult::new())
     }
 
     /// Get a prompt
