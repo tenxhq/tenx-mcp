@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use tenx_mcp::{schema::*, ClientConn, ClientCtx, Result};
 
 /// Test client connection that tracks method calls
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct TestClientConnection {
     calls: Arc<Mutex<Vec<String>>>,
 }

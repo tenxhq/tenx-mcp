@@ -82,8 +82,7 @@ where
 /// server in the background.
 pub async fn connected_client_and_server<F>(
     connection_factory: F,
-    client_connection: Option<Box<dyn ClientConn>>,
-) -> Result<(Client, ServerHandle)>
+) -> Result<(Client<()>, ServerHandle)>
 where
     F: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
 {
@@ -97,11 +96,34 @@ where
     let server_handle = ServerHandle::from_stream(server, server_reader, server_writer).await?;
 
     // Build client instance.
-    let mut client = if let Some(conn) = client_connection {
-        Client::new("test-client", "1.0.0").with_connection(conn)
-    } else {
-        Client::new("test-client", "1.0.0")
-    };
+    let mut client = Client::new("test-client", "1.0.0");
+
+    // Connect the client to its side of the in-memory transport.
+    client.connect_stream(client_reader, client_writer).await?;
+
+    Ok((client, server_handle))
+}
+
+/// Helper function to create a connected client and server with a custom client connection
+pub async fn connected_client_and_server_with_conn<F, C>(
+    connection_factory: F,
+    client_connection: C,
+) -> Result<(Client<C>, ServerHandle)>
+where
+    F: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
+    C: ClientConn + 'static,
+{
+    // Build server.
+    let server = Server::default().with_connection_factory(connection_factory);
+
+    // Two in-memory pipes to serve as the transport.
+    let (server_reader, server_writer, client_reader, client_writer) = make_duplex_pair();
+
+    // Start server.
+    let server_handle = ServerHandle::from_stream(server, server_reader, server_writer).await?;
+
+    // Build client instance.
+    let mut client = Client::new("test-client", "1.0.0").with_connection(client_connection);
 
     // Connect the client to its side of the in-memory transport.
     client.connect_stream(client_reader, client_writer).await?;
@@ -113,7 +135,10 @@ where
 /// [`connected_client_and_server`]. The helper first drops the client so that
 /// the underlying transport is closed and then waits (with a short timeout) for
 /// the server task to notice the closed connection and terminate.
-pub async fn shutdown_client_and_server(client: Client, server: ServerHandle) {
+pub async fn shutdown_client_and_server<C>(client: Client<C>, server: ServerHandle) 
+where
+    C: ClientConn + 'static,
+{
     use tokio::time::{timeout, Duration};
 
     // Explicitly drop so that the transport is closed *before* we await the

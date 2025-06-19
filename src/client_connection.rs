@@ -31,7 +31,7 @@ impl ClientCtx {
 /// Connection trait that server implementers must implement
 /// Each client connection will have its own instance of the implementation
 #[async_trait]
-pub trait ClientConn: Send + Sync {
+pub trait ClientConn: Send + Sync + Clone {
     /// Called when a new connection is established
     async fn on_connect(&mut self, _context: ClientCtx) -> Result<()> {
         Ok(())

@@ -17,6 +17,7 @@ use crate::{
         TransportStream,
     },
 };
+use async_trait::async_trait;
 
 /// Type for handling either a response or error from JSON-RPC
 #[derive(Debug)]
@@ -27,20 +28,29 @@ enum ResponseOrError {
 
 type TransportSink = Arc<Mutex<SplitSink<Box<dyn TransportStream>, JSONRPCMessage>>>;
 
+/// Default no-op implementation of ClientConn for unit type
+#[async_trait]
+impl ClientConn for () {
+    // All methods use default implementations
+}
+
 /// MCP Client implementation
-pub struct Client {
+pub struct Client<C = ()>
+where
+    C: ClientConn,
+{
     transport_tx: Option<TransportSink>,
     pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<ResponseOrError>>>>,
     notification_tx: mpsc::Sender<JSONRPCNotification>,
     notification_rx: Option<mpsc::Receiver<JSONRPCNotification>>,
     next_request_id: Arc<Mutex<u64>>,
-    connection: Option<Box<dyn ClientConn>>,
+    connection: Option<C>,
     name: String,
     version: String,
     client_capabilities: ClientCapabilities,
 }
 
-impl Client {
+impl Client<()> {
     /// Create a new MCP client with default configuration
     pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
         let (notification_tx, notification_rx) = mpsc::channel(100);
@@ -58,9 +68,18 @@ impl Client {
     }
 
     /// Set the client connection handler
-    pub fn with_connection(mut self, connection: Box<dyn ClientConn>) -> Self {
-        self.connection = Some(connection);
-        self
+    pub fn with_connection<C: ClientConn>(self, connection: C) -> Client<C> {
+        Client {
+            transport_tx: self.transport_tx,
+            pending_requests: self.pending_requests,
+            notification_tx: self.notification_tx,
+            notification_rx: self.notification_rx,
+            next_request_id: self.next_request_id,
+            connection: Some(connection),
+            name: self.name,
+            version: self.version,
+            client_capabilities: self.client_capabilities,
+        }
     }
 
     /// Set the client capabilities
@@ -68,7 +87,12 @@ impl Client {
         self.client_capabilities = capabilities;
         self
     }
+}
 
+impl<C> Client<C>
+where
+    C: ClientConn + 'static,
+{
     /// Connect using the provided transport
     pub async fn connect(&mut self, mut transport: Box<dyn Transport>) -> Result<()> {
         transport.connect().await?;
@@ -600,8 +624,8 @@ impl Client {
 }
 
 /// Handle a request from the server using the ClientConnection trait
-async fn handle_server_request(
-    connection: &mut Box<dyn ClientConn>,
+async fn handle_server_request<C: ClientConn>(
+    connection: &mut C,
     context: ClientCtx,
     request: JSONRPCRequest,
 ) -> JSONRPCMessage {
@@ -610,8 +634,8 @@ async fn handle_server_request(
 }
 
 /// Inner handler that returns Result<serde_json::Value>
-async fn handle_server_request_inner(
-    connection: &mut Box<dyn ClientConn>,
+async fn handle_server_request_inner<C: ClientConn>(
+    connection: &mut C,
     context: ClientCtx,
     request: JSONRPCRequest,
 ) -> Result<serde_json::Value> {
@@ -655,8 +679,8 @@ async fn handle_server_request_inner(
 
 /// Convert a JSON-RPC notification into a typed ServerNotification and pass it
 /// to the connection implementation for further handling.
-async fn handle_server_notification(
-    connection: &mut Box<dyn ClientConn>,
+async fn handle_server_notification<C: ClientConn>(
+    connection: &mut C,
     context: ClientCtx,
     notification: JSONRPCNotification,
 ) -> Result<()> {
@@ -823,7 +847,15 @@ mod tests {
 
         // Custom client connection that records notifications
         struct NotifClientConnection {
-            tx: Option<oneshot::Sender<()>>,
+            tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+        }
+
+        impl Clone for NotifClientConnection {
+            fn clone(&self) -> Self {
+                Self {
+                    tx: self.tx.clone(),
+                }
+            }
         }
 
         #[async_trait::async_trait]
@@ -837,7 +869,8 @@ mod tests {
                     notification,
                     crate::schema::ClientNotification::RootsListChanged
                 ) {
-                    if let Some(tx) = self.tx.take() {
+                    let mut tx_guard = self.tx.lock().await;
+                    if let Some(tx) = tx_guard.take() {
                         let _ = tx.send(());
                     }
                 }
@@ -871,8 +904,10 @@ mod tests {
             .expect("Failed to start server");
 
         // Create client with notif connection
-        let mut client = Client::new("test-client", "1.0.0")
-            .with_connection(Box::new(NotifClientConnection { tx: Some(tx_notif) }));
+        let mut client =
+            Client::new("test-client", "1.0.0").with_connection(NotifClientConnection {
+                tx: Arc::new(Mutex::new(Some(tx_notif))),
+            });
 
         // Connect and initialize
         client
@@ -939,6 +974,7 @@ mod tests {
         }
 
         // Client connection that sends a notification on connect
+        #[derive(Clone)]
         struct NotifierClientConnection;
 
         #[async_trait::async_trait]
@@ -973,7 +1009,7 @@ mod tests {
 
         // Create client with notifier connection
         let mut client =
-            Client::new("test-client", "1.0.0").with_connection(Box::new(NotifierClientConnection));
+            Client::new("test-client", "1.0.0").with_connection(NotifierClientConnection);
 
         // Connect and initialize
         client

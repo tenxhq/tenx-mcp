@@ -2,11 +2,12 @@ use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
 use tenx_mcp::{
     schema::*,
-    testutils::{connected_client_and_server, shutdown_client_and_server},
+    testutils::{connected_client_and_server_with_conn, shutdown_client_and_server},
     ClientConn, ClientCtx, Result, ServerConn, ServerCtx,
 };
 
 /// Test client connection that tracks method calls
+#[derive(Clone)]
 struct TestClientConnection {
     calls: Arc<Mutex<Vec<String>>>,
 }
@@ -101,11 +102,11 @@ async fn test_server_to_client_ping_integration() {
     let calls = Arc::new(Mutex::new(Vec::<String>::new()));
 
     // Create client and server connected via in-memory duplex streams.
-    let (mut client, server_handle) = connected_client_and_server(
+    let (mut client, server_handle) = connected_client_and_server_with_conn(
         || Box::new(TestServerConnection { context: None }),
-        Some(Box::new(TestClientConnection {
+        TestClientConnection {
             calls: calls.clone(),
-        })),
+        },
     )
     .await
     .expect("failed to set up test client/server pair");

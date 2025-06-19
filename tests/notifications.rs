@@ -5,13 +5,14 @@ use tenx_mcp::{schema, ClientConn, ClientCtx, Result, ServerConn, ServerCtx};
 async fn test_server_to_client_notifications() {
     let _ = tracing_subscriber::fmt::try_init();
 
-    use tenx_mcp::testutils::connected_client_and_server;
+    use tenx_mcp::testutils::connected_client_and_server_with_conn;
     use tokio::sync::oneshot;
 
     let (tx_notif, rx_notif) = oneshot::channel::<()>();
 
+    #[derive(Clone)]
     struct NotificationRecorder {
-        tx: Option<oneshot::Sender<()>>,
+        tx: std::sync::Arc<std::sync::Mutex<Option<oneshot::Sender<()>>>>,
     }
 
     #[async_trait]
@@ -26,7 +27,7 @@ async fn test_server_to_client_notifications() {
                 notification,
                 tenx_mcp::schema::ClientNotification::RootsListChanged
             ) {
-                if let Some(tx) = self.tx.take() {
+                if let Some(tx) = self.tx.lock().unwrap().take() {
                     let _ = tx.send(());
                 }
             }
@@ -75,7 +76,7 @@ async fn test_server_to_client_notifications() {
     let sent_notification = std::sync::Arc::new(std::sync::Mutex::new(false));
 
     // Create connected client and server
-    let (client, server_handle) = connected_client_and_server(
+    let (client, server_handle) = connected_client_and_server_with_conn(
         {
             let sent_notification = sent_notification.clone();
             move || {
@@ -84,7 +85,7 @@ async fn test_server_to_client_notifications() {
                 })
             }
         },
-        Some(Box::new(NotificationRecorder { tx: Some(tx_notif) })),
+        NotificationRecorder { tx: std::sync::Arc::new(std::sync::Mutex::new(Some(tx_notif))) },
     )
     .await
     .expect("Failed to connect client and server");

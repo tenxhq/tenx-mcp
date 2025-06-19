@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use tenx_mcp::{schema, Client, ClientConn, ClientCtx, Result};
 
 /// Example client connection that handles server requests
+#[derive(Clone)]
 struct MyClientConnection {
     name: String,
 }
@@ -81,9 +82,9 @@ async fn main() -> Result<()> {
 
     // Create a client with a custom connection handler
     let mut client = Client::new("example-client", "1.0.0")
-        .with_connection(Box::new(MyClientConnection {
+        .with_connection(MyClientConnection {
             name: "ExampleClient".to_string(),
-        }));
+        });
 
     // Connect to a server via TCP
     let server_info = client.connect_tcp("127.0.0.1:3000").await?;
