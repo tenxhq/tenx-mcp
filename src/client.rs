@@ -13,7 +13,6 @@ use crate::{
     client_connection::{ClientConnection, ClientConnectionContext},
     connection::{create_empty_response, result_to_jsonrpc_response},
     error::{Error, Result},
-    retry::RetryConfig,
     schema::*,
     transport::{
         GenericDuplex, StdioTransport, StreamTransport, TcpClientTransport, Transport,
@@ -30,8 +29,6 @@ enum ResponseOrError {
 /// Configuration for the MCP client
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
-    /// Retry configuration for requests
-    pub retry: RetryConfig,
     /// Default timeout for requests
     pub request_timeout: Duration,
 }
@@ -39,7 +36,6 @@ pub struct ClientConfig {
 impl Default for ClientConfig {
     fn default() -> Self {
         Self {
-            retry: RetryConfig::default(),
             request_timeout: Duration::from_secs(30),
         }
     }
@@ -77,12 +73,6 @@ impl Client {
             config,
             connection: None,
         }
-    }
-
-    /// Set the retry configuration
-    pub fn with_retry(mut self, retry: RetryConfig) -> Self {
-        self.config.retry = retry;
-        self
     }
 
     /// Set the request timeout

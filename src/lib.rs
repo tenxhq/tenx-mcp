@@ -1,7 +1,6 @@
 pub mod client;
 pub mod client_connection;
 pub mod error;
-pub mod retry;
 pub mod schema;
 pub mod server;
 pub mod server_connection;
