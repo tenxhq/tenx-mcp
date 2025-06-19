@@ -10,9 +10,10 @@ use tenx_mcp::{
     schema::*,
     server::Server,
     server_connection::ServerConnection,
+    testutils::{make_duplex_pair, read_message, send_message},
     ServerHandle,
 };
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio::io::BufReader;
 
 /// A very small test connection implementation that exposes a single `test`
 /// tool which requires a single `required_field` string parameter. Everything
@@ -87,52 +88,6 @@ impl ServerConnection for TestConnection {
             .with_text_content("Success")
             .is_error(false))
     }
-}
-
-/// Convenience helper that creates two independent in-memory duplex pipes that
-/// together form a bidirectional channel. The returned tuple is laid out so
-/// that the first element can be given to the server as its reader, the second
-/// as the server writer, and the remaining two are the reader/writer pair for
-/// the client side of the connection.
-fn make_duplex_pair() -> (
-    impl AsyncRead + Send + Sync + Unpin + 'static,
-    impl AsyncWrite + Send + Sync + Unpin + 'static,
-    impl AsyncRead + Send + Sync + Unpin + 'static,
-    impl AsyncWrite + Send + Sync + Unpin + 'static,
-) {
-    let (server_reader, client_writer) = tokio::io::duplex(8 * 1024);
-    let (client_reader, server_writer) = tokio::io::duplex(8 * 1024);
-    (server_reader, server_writer, client_reader, client_writer)
-}
-
-/// Serialise a `JSONRPCMessage`, append a `\n` delimiter and send it over the
-/// provided writer.
-async fn send_message<W>(writer: &mut W, message: &JSONRPCMessage) -> Result<()>
-where
-    W: AsyncWrite + Unpin,
-{
-    let json = serde_json::to_vec(message)?;
-    writer.write_all(&json).await?;
-    writer.write_all(b"\n").await?;
-    writer.flush().await?;
-    Ok(())
-}
-
-/// Read a single newline-delimited JSON-RPC message from the reader.
-async fn read_message<R>(reader: &mut BufReader<R>) -> Result<JSONRPCMessage>
-where
-    R: AsyncRead + Unpin,
-{
-    let mut buf = Vec::new();
-    reader.read_until(b'\n', &mut buf).await?;
-    if buf.is_empty() {
-        return Err(Error::Transport("Stream closed".into()));
-    }
-    // Remove the trailing '\n'.
-    if buf.last() == Some(&b'\n') {
-        buf.pop();
-    }
-    Ok(serde_json::from_slice(&buf)?)
 }
 
 #[tokio::test]

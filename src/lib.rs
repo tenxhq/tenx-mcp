@@ -10,6 +10,11 @@ mod codec;
 mod connection;
 mod transport;
 
+// Test utilities (available unconditionally; they are handy for downstream
+// users that want to integration-test their own `ServerConnection` /
+// `ClientConnection` implementations).
+pub mod testutils;
+
 // Re-export commonly used types
 pub use client::Client;
 pub use client_connection::{ClientConnection, ClientConnectionContext};

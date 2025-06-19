@@ -10,7 +10,9 @@ use rmcp::model::{CallToolRequestParam, PaginatedRequestParam};
 use rmcp::ServiceExt;
 use serde_json::json;
 use tenx_mcp::error::{Error, Result};
-use tenx_mcp::{schema::*, server_connection::ServerConnection, Client, Server};
+use tenx_mcp::{
+    schema::*, server_connection::ServerConnection, testutils::make_duplex_pair, Client, Server,
+};
 
 struct EchoConnection;
 
@@ -83,9 +85,9 @@ async fn test_tenx_server_with_rmcp_client() {
     // this test fails or hangs. We deliberately call `try_init` so that it's
     // no-op when a subscriber has already been installed by another test.
     let _ = tracing_subscriber::fmt::try_init();
-    // Create bidirectional streams for communication
-    let (server_reader, client_writer) = tokio::io::duplex(8192);
-    let (client_reader, server_writer) = tokio::io::duplex(8192);
+    // Create bidirectional streams for communication using the shared test
+    // utility.
+    let (server_reader, server_writer, client_reader, client_writer) = make_duplex_pair();
 
     // Create and configure tenx-mcp server
     let server = Server::default()
