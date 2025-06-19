@@ -80,48 +80,18 @@ impl Client {
     }
 
     /// Set the retry configuration
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use tenx_mcp::{Client, retry::RetryConfig};
-    /// # use std::time::Duration;
-    /// let client = Client::new()
-    ///     .with_retry(RetryConfig {
-    ///         max_attempts: 5,
-    ///         initial_delay: Duration::from_millis(100),
-    ///         max_delay: Duration::from_secs(10),
-    ///         ..Default::default()
-    ///     });
-    /// ```
     pub fn with_retry(mut self, retry: RetryConfig) -> Self {
         self.config.retry = retry;
         self
     }
 
     /// Set the request timeout
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use tenx_mcp::Client;
-    /// # use std::time::Duration;
-    /// let client = Client::new()
-    ///     .with_request_timeout(Duration::from_secs(60));
-    /// ```
     pub fn with_request_timeout(mut self, timeout: Duration) -> Self {
         self.config.request_timeout = timeout;
         self
     }
 
     /// Set the client connection handler
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use tenx_mcp::{Client, client_connection::ClientConnection};
-    /// # struct MyConnection;
-    /// # impl ClientConnection for MyConnection {}
-    /// let client = Client::new()
-    ///     .with_connection(Box::new(MyConnection));
-    /// ```
     pub fn with_connection(mut self, connection: Box<dyn ClientConnection>) -> Self {
         self.connection = Some(connection);
         self
@@ -231,15 +201,6 @@ impl Client {
     /// Call a tool on the server without arguments
     ///
     /// This is a convenience method for calling tools that don't require arguments.
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use tenx_mcp::{Client, Result};
-    /// # async fn example(client: &mut Client) -> Result<()> {
-    /// client.call_tool_without_args("ping").await?;
-    /// # Ok(())
-    /// # }
-    /// ```
     pub async fn call_tool_without_args(
         &mut self,
         name: impl Into<String>,
@@ -252,25 +213,6 @@ impl Client {
     }
 
     /// Call a tool on the server with arguments
-    ///
-    /// # Arguments
-    /// * `name` - The name of the tool to call
-    /// * `arguments` - The arguments to pass to the tool. Can be any type that implements `Serialize`
-    ///
-    /// # Examples
-    /// ```no_run
-    /// # use tenx_mcp::{Client, Result};
-    /// # async fn example(client: &mut Client) -> Result<()> {
-    /// // With a struct
-    /// #[derive(serde::Serialize)]
-    /// struct Args { message: String }
-    /// client.call_tool("echo", &Args { message: "hello".into() }).await?;
-    ///
-    /// // With serde_json::Value
-    /// client.call_tool("echo", &serde_json::json!({"message": "hello"})).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
     pub async fn call_tool<T>(
         &mut self,
         name: impl Into<String>,
@@ -308,20 +250,6 @@ impl Client {
     ///
     /// This is a convenience method that creates a TCP transport,
     /// connects to the server, and performs the initialization handshake.
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use tenx_mcp::{Client, ClientCapabilities, Implementation, Result};
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<()> {
-    /// let mut client = Client::new();
-    /// let server_info = client
-    ///     .connect_tcp("127.0.0.1:3000", "my-client", "1.0.0")
-    ///     .await?;
-    /// println!("Connected to: {}", server_info.server_info.name);
-    /// # Ok(())
-    /// # }
-    /// ```
     pub async fn connect_tcp(
         &mut self,
         addr: impl Into<String>,
@@ -360,20 +288,6 @@ impl Client {
     ///
     /// This is a convenience method that creates a stdio transport,
     /// connects to the server, and performs the initialization handshake.
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use tenx_mcp::{Client, ClientCapabilities, Result};
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<()> {
-    /// let mut client = Client::new();
-    /// let server_info = client
-    ///     .connect_stdio("my-client", "1.0.0")
-    ///     .await?;
-    /// println!("Connected to: {}", server_info.server_info.name);
-    /// # Ok(())
-    /// # }
-    /// ```
     pub async fn connect_stdio(
         &mut self,
         client_name: impl Into<String>,
@@ -410,20 +324,6 @@ impl Client {
     /// This method allows you to connect to a server using any pair of
     /// AsyncRead and AsyncWrite streams, such as process stdio, pipes,
     /// or custom implementations.
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use tenx_mcp::{Client, Result};
-    /// # use tokio::io::{AsyncRead, AsyncWrite};
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<()> {
-    /// // Using concrete types (e.g., from tokio::io::duplex)
-    /// let (reader, writer) = tokio::io::duplex(8192);
-    /// let mut client = Client::new();
-    /// client.connect_stream(reader, writer).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
     pub async fn connect_stream<R, W>(&mut self, reader: R, writer: W) -> Result<()>
     where
         R: tokio::io::AsyncRead + Send + Sync + Unpin + 'static,
@@ -445,26 +345,6 @@ impl Client {
     /// # Returns
     /// Returns the spawned Child process handle, allowing you to manage the
     /// process lifecycle (e.g., wait for completion, kill it, etc.)
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use tenx_mcp::{Client, Result};
-    /// # use tokio::process::Command;
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<()> {
-    /// let mut client = Client::new();
-    ///
-    /// // Spawn a process and connect to it
-    /// let mut cmd = Command::new("my-mcp-server");
-    /// cmd.arg("--some-flag");
-    ///
-    /// let child = client.connect_process(cmd).await?;
-    ///
-    /// // Now you can use the client to communicate with the process
-    /// // The child handle can be used to manage the process
-    /// # Ok(())
-    /// # }
-    /// ```
     pub async fn connect_process(&mut self, mut command: Command) -> Result<Child> {
         // Configure the command to use piped stdio
         command
@@ -846,7 +726,7 @@ async fn handle_server_request_inner(
         "ping" => {
             info!("Server sent ping request, sending pong");
             connection
-                .ping(context)
+                .pong(context)
                 .await
                 .map(|_| serde_json::json!({}))
         }

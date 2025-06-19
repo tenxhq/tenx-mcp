@@ -28,7 +28,7 @@ impl ClientConnection for MyClientConnection {
         Ok(())
     }
 
-    async fn ping(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    async fn pong(&mut self, _context: ClientConnectionContext) -> Result<()> {
         println!("Server pinged us!");
         Ok(())
     }

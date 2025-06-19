@@ -4,16 +4,13 @@ use tenx_mcp::{schema::*, server_connection::ServerConnection};
 
 #[tokio::test]
 async fn test_server_to_client_notifications() {
-    // Initialize tracing for debugging
     let _ = tracing_subscriber::fmt::try_init();
 
     use tenx_mcp::testutils::connected_client_and_server;
     use tokio::sync::oneshot;
 
-    // Channel to signal when notification is received
     let (tx_notif, rx_notif) = oneshot::channel::<()>();
 
-    // Custom client connection that records notifications
     struct NotificationRecorder {
         tx: Option<oneshot::Sender<()>>,
     }

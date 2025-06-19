@@ -20,7 +20,7 @@ impl ClientConnection for TestClientConnection {
         Ok(())
     }
 
-    async fn ping(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    async fn pong(&mut self, _context: ClientConnectionContext) -> Result<()> {
         self.calls.lock().unwrap().push("ping".to_string());
         Ok(())
     }
@@ -69,7 +69,7 @@ async fn test_client_connection_trait_methods() {
     let context = ClientConnectionContext::new(notification_tx);
 
     // Test ping
-    connection.ping(context.clone()).await.expect("Ping failed");
+    connection.pong(context.clone()).await.expect("Ping failed");
 
     // Test create_message
     let params = CreateMessageParams {
@@ -96,7 +96,10 @@ async fn test_client_connection_trait_methods() {
     assert_eq!(result.model, "test-model");
 
     // Test list_roots
-    let roots = connection.list_roots(context.clone()).await.expect("List roots failed");
+    let roots = connection
+        .list_roots(context.clone())
+        .await
+        .expect("List roots failed");
     assert_eq!(roots.roots.len(), 1);
     assert_eq!(roots.roots[0].uri, "test://root");
 

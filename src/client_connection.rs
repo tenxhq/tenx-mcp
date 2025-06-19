@@ -42,7 +42,8 @@ pub trait ClientConnection: Send + Sync {
         Ok(())
     }
 
-    async fn ping(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    /// Responde to a ping request from the server
+    async fn pong(&mut self, _context: ClientConnectionContext) -> Result<()> {
         Ok(())
     }
 
@@ -57,7 +58,10 @@ pub trait ClientConnection: Send + Sync {
         ))
     }
 
-    async fn list_roots(&mut self, _context: ClientConnectionContext) -> Result<schema::ListRootsResult> {
+    async fn list_roots(
+        &mut self,
+        _context: ClientConnectionContext,
+    ) -> Result<schema::ListRootsResult> {
         Err(Error::InvalidRequest("list_roots not implemented".into()))
     }
 
@@ -65,7 +69,11 @@ pub trait ClientConnection: Send + Sync {
     ///
     /// The default implementation ignores the notification. Implementations
     /// can override this method to react to server-initiated notifications.
-    async fn notification(&mut self, _context: ClientConnectionContext, _notification: schema::ClientNotification) -> Result<()> {
+    async fn notification(
+        &mut self,
+        _context: ClientConnectionContext,
+        _notification: schema::ClientNotification,
+    ) -> Result<()> {
         Ok(())
     }
 }

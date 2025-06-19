@@ -60,7 +60,7 @@ pub trait ServerConnection: Send + Sync {
         _client_info: crate::schema::Implementation,
     ) -> Result<InitializeResult>;
 
-    /// Respond to a ping request
+    /// Respond to a ping request from the client
     async fn pong(&mut self, _context: ServerConnectionContext) -> Result<()> {
         Ok(())
     }
