@@ -49,7 +49,33 @@ pub enum ProgressToken {
 }
 
 /// An opaque token used to represent a cursor for pagination.
-pub type Cursor = String;
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(transparent)]
+pub struct Cursor(pub String);
+
+impl From<&str> for Cursor {
+    fn from(s: &str) -> Self {
+        Cursor(s.to_string())
+    }
+}
+
+impl From<String> for Cursor {
+    fn from(s: String) -> Self {
+        Cursor(s)
+    }
+}
+
+impl From<&String> for Cursor {
+    fn from(s: &String) -> Self {
+        Cursor(s.clone())
+    }
+}
+
+impl std::fmt::Display for Cursor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Request {
@@ -1579,7 +1605,7 @@ mod pagination_tests {
     fn test_paginated_request_serialization() {
         // Test ListTools with cursor
         let request = ClientRequest::ListTools {
-            cursor: Some("test-cursor".to_string()),
+            cursor: Some("test-cursor".into()),
         };
         let json = serde_json::to_value(&request).unwrap();
         assert_eq!(json["method"], "tools/list");
@@ -1593,7 +1619,7 @@ mod pagination_tests {
 
         // Test ListResources with cursor
         let request = ClientRequest::ListResources {
-            cursor: Some("res-cursor".to_string()),
+            cursor: Some("res-cursor".into()),
         };
         let json = serde_json::to_value(&request).unwrap();
         assert_eq!(json["method"], "resources/list");
@@ -1601,7 +1627,7 @@ mod pagination_tests {
 
         // Test ListPrompts with cursor
         let request = ClientRequest::ListPrompts {
-            cursor: Some("prompt-cursor".to_string()),
+            cursor: Some("prompt-cursor".into()),
         };
         let json = serde_json::to_value(&request).unwrap();
         assert_eq!(json["method"], "prompts/list");
@@ -1609,7 +1635,7 @@ mod pagination_tests {
 
         // Test ListResourceTemplates with cursor
         let request = ClientRequest::ListResourceTemplates {
-            cursor: Some("template-cursor".to_string()),
+            cursor: Some("template-cursor".into()),
         };
         let json = serde_json::to_value(&request).unwrap();
         assert_eq!(json["method"], "resources/templates/list");

@@ -141,7 +141,7 @@ where
     /// List available tools from the server with pagination cursor
     pub async fn list_tools_with_cursor(
         &mut self,
-        cursor: impl Into<String>,
+        cursor: impl Into<Cursor>,
     ) -> Result<ListToolsResult> {
         self.request(ClientRequest::ListTools {
             cursor: Some(cursor.into()),
@@ -158,7 +158,7 @@ where
     /// List available resources from the server with pagination cursor
     pub async fn list_resources_with_cursor(
         &mut self,
-        cursor: impl Into<String>,
+        cursor: impl Into<Cursor>,
     ) -> Result<ListResourcesResult> {
         self.request(ClientRequest::ListResources {
             cursor: Some(cursor.into()),
@@ -175,7 +175,7 @@ where
     /// List available resource templates from the server with pagination cursor
     pub async fn list_resource_templates_with_cursor(
         &mut self,
-        cursor: impl Into<String>,
+        cursor: impl Into<Cursor>,
     ) -> Result<ListResourceTemplatesResult> {
         self.request(ClientRequest::ListResourceTemplates {
             cursor: Some(cursor.into()),
@@ -192,7 +192,7 @@ where
     /// List available prompts from the server with pagination cursor
     pub async fn list_prompts_with_cursor(
         &mut self,
-        cursor: impl Into<String>,
+        cursor: impl Into<Cursor>,
     ) -> Result<ListPromptsResult> {
         self.request(ClientRequest::ListPrompts {
             cursor: Some(cursor.into()),
