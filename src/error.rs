@@ -2,7 +2,6 @@ use crate::schema::{
     ErrorObject, JSONRPCError, RequestId, INVALID_PARAMS, INVALID_REQUEST, JSONRPC_VERSION,
     METHOD_NOT_FOUND, PARSE_ERROR,
 };
-use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
@@ -15,9 +14,6 @@ pub enum Error {
 
     #[error("Transport error: {0}")]
     Transport(String),
-
-    #[error("Transport connection failed: {message}")]
-    TransportConnectionFailed { message: String },
 
     #[error("Transport disconnected unexpectedly")]
     TransportDisconnected,
@@ -40,15 +36,6 @@ pub enum Error {
     #[error("Connection closed")]
     ConnectionClosed,
 
-    #[error("Request timeout after {duration:?} for request id: {request_id}")]
-    Timeout {
-        duration: Duration,
-        request_id: String,
-    },
-
-    #[error("Request with id {0} not found")]
-    RequestNotFound(String),
-
     #[error("Handler error for {handler_type}: {message}")]
     HandlerError {
         handler_type: String,
@@ -69,14 +56,6 @@ pub enum Error {
 }
 
 impl Error {
-    /// Create a Timeout error with duration and request context
-    pub fn timeout(duration: Duration, request_id: impl Into<String>) -> Self {
-        Self::Timeout {
-            duration,
-            request_id: request_id.into(),
-        }
-    }
-
     /// Create a HandlerError with type context
     pub fn handler_error(handler_type: impl Into<String>, message: impl Into<String>) -> Self {
         Self::HandlerError {
@@ -97,11 +76,7 @@ impl Error {
     pub fn is_retryable(&self) -> bool {
         matches!(
             self,
-            Self::Io { .. }
-                | Self::TransportConnectionFailed { .. }
-                | Self::TransportDisconnected
-                | Self::ConnectionClosed
-                | Self::Timeout { .. }
+            Self::Io { .. } | Self::TransportDisconnected | Self::ConnectionClosed
         )
     }
 

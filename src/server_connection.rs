@@ -3,12 +3,11 @@ use serde_json::Value;
 use tokio::sync::broadcast;
 
 use crate::{
-    error::Result,
     schema::{
-        self, CallToolResult, CompleteResult, GetPromptResult, InitializeResult, ListPromptsResult,
-        ListResourceTemplatesResult, ListResourcesResult, ListRootsResult, ListToolsResult,
-        LoggingLevel, ReadResourceResult,
+        self, GetPromptResult, InitializeResult, ListPromptsResult, ListResourceTemplatesResult,
+        ListResourcesResult, ListRootsResult, ListToolsResult, LoggingLevel, ReadResourceResult,
     },
+    Error, Result,
 };
 
 /// Factory function type for creating Connection instances
@@ -30,9 +29,9 @@ impl ServerConnectionContext {
 
     /// Send a notification to the client
     pub fn send_notification(&self, notification: schema::ClientNotification) -> Result<()> {
-        self.notification_tx.send(notification).map_err(|_| {
-            crate::error::Error::InternalError("Failed to send notification".into())
-        })?;
+        self.notification_tx
+            .send(notification)
+            .map_err(|_| Error::InternalError("Failed to send notification".into()))?;
         Ok(())
     }
 }
@@ -56,8 +55,8 @@ pub trait ServerConnection: Send + Sync {
         &mut self,
         _context: ServerConnectionContext,
         _protocol_version: String,
-        _capabilities: crate::schema::ClientCapabilities,
-        _client_info: crate::schema::Implementation,
+        _capabilities: schema::ClientCapabilities,
+        _client_info: schema::Implementation,
     ) -> Result<InitializeResult>;
 
     /// Respond to a ping request from the client
@@ -76,8 +75,8 @@ pub trait ServerConnection: Send + Sync {
         _context: ServerConnectionContext,
         name: String,
         _arguments: Option<Value>,
-    ) -> Result<CallToolResult> {
-        Err(crate::error::Error::ToolExecutionFailed {
+    ) -> Result<schema::CallToolResult> {
+        Err(Error::ToolExecutionFailed {
             tool: name,
             message: "Tool not found".to_string(),
         })
@@ -111,7 +110,7 @@ pub trait ServerConnection: Send + Sync {
         _context: ServerConnectionContext,
         uri: String,
     ) -> Result<ReadResourceResult> {
-        Err(crate::error::Error::ResourceNotFound { uri })
+        Err(Error::ResourceNotFound { uri })
     }
 
     /// Subscribe to resource updates
@@ -150,7 +149,7 @@ pub trait ServerConnection: Send + Sync {
         name: String,
         _arguments: Option<std::collections::HashMap<String, serde_json::Value>>,
     ) -> Result<GetPromptResult> {
-        Err(crate::error::Error::handler_error(
+        Err(Error::handler_error(
             "prompt",
             format!("Prompt '{name}' not found"),
         ))
@@ -160,11 +159,11 @@ pub trait ServerConnection: Send + Sync {
     async fn completion_complete(
         &mut self,
         _context: ServerConnectionContext,
-        _reference: crate::schema::Reference,
-        _argument: crate::schema::ArgumentInfo,
-    ) -> Result<CompleteResult> {
-        Ok(CompleteResult {
-            completion: crate::schema::CompletionInfo {
+        _reference: schema::Reference,
+        _argument: schema::ArgumentInfo,
+    ) -> Result<schema::CompleteResult> {
+        Ok(schema::CompleteResult {
+            completion: schema::CompletionInfo {
                 values: vec![],
                 total: None,
                 has_more: None,
@@ -194,11 +193,9 @@ pub trait ServerConnection: Send + Sync {
     async fn sampling_create_message(
         &mut self,
         _context: ServerConnectionContext,
-        _params: crate::schema::CreateMessageParams,
-    ) -> Result<crate::schema::CreateMessageResult> {
-        Err(crate::error::Error::MethodNotFound(
-            "sampling/createMessage".to_string(),
-        ))
+        _params: schema::CreateMessageParams,
+    ) -> Result<schema::CreateMessageResult> {
+        Err(Error::MethodNotFound("sampling/createMessage".to_string()))
     }
 
     /// Handle a notification sent from the client

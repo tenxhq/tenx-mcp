@@ -297,9 +297,7 @@ async fn test_error_propagation() {
             _client_info: schema::Implementation,
         ) -> Result<schema::InitializeResult> {
             // Simulate an internal error during initialization
-            Err(Error::InternalError(
-                "Database connection failed".to_string(),
-            ))
+            Err(Error::InternalError("Connection failed".to_string()))
         }
 
         async fn resources_read(
@@ -340,7 +338,7 @@ async fn test_error_propagation() {
 
     match init_result {
         Err(Error::InternalError(msg)) => {
-            assert!(msg.contains("Database connection failed"));
+            assert!(msg.contains("Connection failed"));
         }
         _ => panic!("Expected InternalError"),
     }
