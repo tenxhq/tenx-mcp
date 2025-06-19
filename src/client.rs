@@ -805,6 +805,7 @@ mod tests {
         let (client_transport, server_transport) = TestTransport::create_pair();
 
         // Create a minimal test connection
+        #[derive(Debug, Default)]
         struct TestConnection;
 
         #[async_trait::async_trait]
@@ -820,7 +821,7 @@ mod tests {
             }
         }
 
-        let server = Server::default().with_connection_factory(|| Box::new(TestConnection));
+        let server = Server::default().with_connection(TestConnection::default);
         let server_handle = ServerHandle::new(server, server_transport)
             .await
             .expect("Failed to start server");
@@ -879,6 +880,7 @@ mod tests {
         }
 
         // Minimal server connection
+        #[derive(Debug, Default)]
         struct DummyServerConnection;
 
         #[async_trait::async_trait]
@@ -898,7 +900,7 @@ mod tests {
         let (client_transport, server_transport) = TestTransport::create_pair();
 
         // Start server
-        let server = Server::default().with_connection_factory(|| Box::new(DummyServerConnection));
+        let server = Server::default().with_connection(DummyServerConnection::default);
         let server_handle = ServerHandle::new(server, server_transport)
             .await
             .expect("Failed to start server");
@@ -939,6 +941,7 @@ mod tests {
         use std::sync::{Arc, Mutex as StdMutex};
 
         // Server connection that records notification
+        #[derive(Debug, Default)]
         struct NotifServerConnection {
             tx: Arc<StdMutex<Option<oneshot::Sender<()>>>>,
         }
@@ -997,10 +1000,8 @@ mod tests {
         // Start server with notif connection
         let server = {
             let tx_clone = shared_tx.clone();
-            Server::default().with_connection_factory(move || {
-                Box::new(NotifServerConnection {
-                    tx: tx_clone.clone(),
-                })
+            Server::default().with_connection(move || NotifServerConnection {
+                tx: tx_clone.clone(),
             })
         };
         let server_handle = ServerHandle::new(server, server_transport)
@@ -1085,6 +1086,7 @@ mod tests {
         let (server_reader, client_writer) = tokio::io::duplex(8192);
 
         // Create a minimal test connection
+        #[derive(Debug, Default)]
         struct TestStreamConnection;
 
         #[async_trait::async_trait]
@@ -1102,7 +1104,7 @@ mod tests {
 
         // Create and configure server
         let server = Server::default()
-            .with_connection_factory(|| Box::new(TestStreamConnection))
+            .with_connection(TestStreamConnection::default)
             .with_capabilities(ServerCapabilities {
                 tools: Some(ToolsCapability {
                     list_changed: Some(true),

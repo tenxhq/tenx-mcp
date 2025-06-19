@@ -135,7 +135,7 @@ where
 /// [`connected_client_and_server`]. The helper first drops the client so that
 /// the underlying transport is closed and then waits (with a short timeout) for
 /// the server task to notice the closed connection and terminate.
-pub async fn shutdown_client_and_server<C>(client: Client<C>, server: ServerHandle) 
+pub async fn shutdown_client_and_server<C>(client: Client<C>, server: ServerHandle)
 where
     C: ClientConn + 'static,
 {

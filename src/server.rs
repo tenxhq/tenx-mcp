@@ -9,30 +9,59 @@ use crate::{
     connection::create_jsonrpc_notification,
     error::{Error, Result},
     schema::{self, *},
-    server_connection::{ServerConn, ServerConnectionFactory, ServerCtx},
+    server_connection::{ServerConn, ServerCtx},
     transport::{Transport, TransportStream},
 };
-
-/// MCP Server implementation
-#[derive(Default)]
-pub struct Server {
-    capabilities: ServerCapabilities,
-    connection_factory: Option<ServerConnectionFactory>,
-}
 
 pub struct ServerHandle {
     pub handle: JoinHandle<()>,
     notification_tx: broadcast::Sender<ClientNotification>,
 }
 
-impl Server {
+/// MCP Server implementation
+pub struct Server<F = fn() -> Box<dyn ServerConn>> {
+    capabilities: ServerCapabilities,
+    connection_factory: Option<F>,
+}
+
+impl Default for Server<fn() -> Box<dyn ServerConn>> {
+    fn default() -> Self {
+        Self {
+            capabilities: ServerCapabilities::default(),
+            connection_factory: None,
+        }
+    }
+}
+
+impl<F> Server<F>
+where
+    F: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
+{
     /// Set the connection factory for creating Connection instances
-    pub fn with_connection_factory<F>(mut self, factory: F) -> Self
+    pub(crate) fn with_connection_factory<G>(self, factory: G) -> Server<G>
     where
-        F: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
+        G: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
     {
-        self.connection_factory = Some(Box::new(factory));
-        self
+        Server {
+            capabilities: self.capabilities,
+            connection_factory: Some(factory),
+        }
+    }
+
+    /// Set a connection factory that creates concrete connection types
+    /// This method automatically boxes the connection type for you.
+    pub fn with_connection<C, G>(
+        self,
+        factory: G,
+    ) -> Server<impl Fn() -> Box<dyn ServerConn> + Clone + Send + Sync + 'static>
+    where
+        C: ServerConn + 'static,
+        G: Fn() -> C + Clone + Send + Sync + 'static,
+    {
+        Server {
+            capabilities: self.capabilities,
+            connection_factory: Some(move || Box::new(factory()) as Box<dyn ServerConn>),
+        }
     }
 
     /// Set server capabilities
@@ -74,7 +103,10 @@ impl Server {
 
     /// Serve TCP connections by accepting them in a loop
     /// This is a convenience method for the common TCP server use case
-    pub async fn serve_tcp(self, addr: impl tokio::net::ToSocketAddrs) -> Result<()> {
+    pub async fn serve_tcp(self, addr: impl tokio::net::ToSocketAddrs) -> Result<()>
+    where
+        F: Clone,
+    {
         use std::sync::Arc;
         use tokio::net::TcpListener;
 
@@ -97,16 +129,10 @@ impl Server {
 
                     // Handle each connection in a separate task
                     tokio::spawn(async move {
-                        // Create a new connection factory that clones the Arc'd factory
+                        // Create a new server with cloned factory
                         let server = Server {
                             capabilities: (*caps).clone(),
-                            connection_factory: factory.as_ref().as_ref().map(|_f| {
-                                let factory = factory.clone();
-                                Box::new(move || {
-                                    // Call the original factory through the Arc
-                                    factory.as_ref().as_ref().unwrap()()
-                                }) as ServerConnectionFactory
-                            }),
+                            connection_factory: factory.as_ref().clone(),
                         };
 
                         let transport = Box::new(crate::transport::StreamTransport::new(stream));
@@ -127,7 +153,10 @@ impl Server {
 
 impl ServerHandle {
     /// Start serving connections using the provided transport, returning a handle for runtime operations
-    pub async fn new(server: Server, mut transport: Box<dyn Transport>) -> Result<Self> {
+    pub(crate) async fn new<F>(server: Server<F>, mut transport: Box<dyn Transport>) -> Result<Self>
+    where
+        F: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
+    {
         transport.connect().await?;
         let stream = transport.framed()?;
         let (mut sink_tx, mut stream_rx) = stream.split();
@@ -222,8 +251,9 @@ impl ServerHandle {
 
     /// Create a ServerHandle using generic AsyncRead and AsyncWrite streams
     /// This is a convenience method that creates a StreamTransport from the provided streams
-    pub async fn from_stream<R, W>(server: Server, reader: R, writer: W) -> Result<Self>
+    pub async fn from_stream<F, R, W>(server: Server<F>, reader: R, writer: W) -> Result<Self>
     where
+        F: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
         R: tokio::io::AsyncRead + Send + Sync + Unpin + 'static,
         W: tokio::io::AsyncWrite + Send + Sync + Unpin + 'static,
     {

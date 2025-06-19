@@ -85,7 +85,9 @@ async fn test_server_to_client_notifications() {
                 })
             }
         },
-        NotificationRecorder { tx: std::sync::Arc::new(std::sync::Mutex::new(Some(tx_notif))) },
+        NotificationRecorder {
+            tx: std::sync::Arc::new(std::sync::Mutex::new(Some(tx_notif))),
+        },
     )
     .await
     .expect("Failed to connect client and server");

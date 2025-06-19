@@ -184,13 +184,13 @@ async fn main() -> Result<()> {
 
     // Use the new simplified API to serve TCP connections
     Server::default()
-        .with_connection_factory(move || {
-            Box::new(TimeoutTestConnection::new(
+        .with_connection(move || {
+            TimeoutTestConnection::new(
                 server_info.clone(),
                 capabilities.clone(),
                 2, // Fails first 2 attempts
                 5, // Takes 5 seconds
-            ))
+            )
         })
         .serve_tcp(addr)
         .await?;

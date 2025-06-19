@@ -16,6 +16,7 @@ use tokio::io::BufReader;
 /// tool which requires a single `required_field` string parameter. Everything
 /// else purposefully fails so that we can exercise the server's error
 /// responses.
+#[derive(Debug, Default)]
 struct TestConnection;
 
 #[async_trait]
@@ -96,7 +97,7 @@ async fn test_error_responses() {
     let _ = tracing_subscriber::fmt::try_init();
 
     // Spin up our test server backed by the `TestConnection` implementation.
-    let server = Server::default().with_connection_factory(|| Box::new(TestConnection));
+    let server = Server::default().with_connection(TestConnection::default);
 
     let (server_reader, server_writer, client_reader, mut client_writer) = make_duplex_pair();
 

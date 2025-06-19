@@ -87,7 +87,7 @@ async fn main() -> Result<()> {
     if is_stdio {
         // Run in stdio mode - no logging to avoid interfering with JSON-RPC
         Server::default()
-            .with_connection_factory(|| Box::new(BasicConnection::default()))
+            .with_connection(BasicConnection::default)
             .serve_stdio()
             .await?;
     } else {
@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
         info!("Starting basic MCP server on {}", addr);
 
         Server::default()
-            .with_connection_factory(|| Box::new(BasicConnection::default()))
+            .with_connection(BasicConnection::default)
             .serve_tcp(addr)
             .await?;
     }

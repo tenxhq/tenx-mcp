@@ -92,7 +92,7 @@ async fn test_tenx_server_with_rmcp_client() {
 
     // Create and configure tenx-mcp server
     let server = Server::default()
-        .with_connection_factory(|| Box::new(EchoConnection))
+        .with_connection(|| EchoConnection)
         .with_capabilities(ServerCapabilities {
             tools: Some(ToolsCapability {
                 list_changed: Some(true),
@@ -273,8 +273,7 @@ async fn test_rmcp_server_with_tenx_client() {
         .unwrap();
 
     // Initialize
-    let init_result = client.initialize().await
-        .unwrap();
+    let init_result = client.initialize().await.unwrap();
 
     // Check server info is valid
     assert!(!init_result.server_info.name.is_empty());

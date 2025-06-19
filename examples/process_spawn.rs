@@ -38,8 +38,7 @@ async fn main() -> Result<()> {
     };
 
     // Initialize the connection
-    match client.initialize().await
-    {
+    match client.initialize().await {
         Ok(result) => {
             info!(
                 "Connected to server: {} v{}",

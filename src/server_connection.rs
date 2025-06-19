@@ -10,9 +10,6 @@ use crate::{
     Error, Result,
 };
 
-/// Factory function type for creating Connection instances
-pub type ServerConnectionFactory = Box<dyn Fn() -> Box<dyn ServerConn> + Send + Sync>;
-
 /// Context provided to Connection implementations for interacting with the client
 #[derive(Debug, Clone)]
 pub struct ServerCtx {
