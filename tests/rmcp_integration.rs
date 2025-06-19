@@ -27,7 +27,11 @@ impl ServerConn for EchoConnection {
         Ok(InitializeResult::new("test-server", "0.1.0").with_tools(true))
     }
 
-    async fn tools_list(&mut self, _context: ServerCtx) -> Result<ListToolsResult> {
+    async fn tools_list(
+        &mut self,
+        _context: ServerCtx,
+        _cursor: Option<Cursor>,
+    ) -> Result<ListToolsResult> {
         tracing::info!("EchoConnection.tools_list called");
         let schema = ToolInputSchema {
             schema_type: "object".to_string(),
@@ -53,7 +57,7 @@ impl ServerConn for EchoConnection {
         &mut self,
         _context: ServerCtx,
         name: String,
-        arguments: Option<serde_json::Value>,
+        arguments: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<CallToolResult> {
         if name != "echo" {
             return Err(Error::ToolExecutionFailed {

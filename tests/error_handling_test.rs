@@ -88,7 +88,11 @@ async fn test_invalid_params() {
             })
         }
 
-        async fn tools_list(&mut self, _context: ServerCtx) -> Result<schema::ListToolsResult> {
+        async fn tools_list(
+            &mut self,
+            _context: ServerCtx,
+            _cursor: Option<schema::Cursor>,
+        ) -> Result<schema::ListToolsResult> {
             let schema = schema::ToolInputSchema {
                 schema_type: "object".to_string(),
                 properties: Some({
@@ -115,7 +119,7 @@ async fn test_invalid_params() {
             &mut self,
             _context: ServerCtx,
             name: String,
-            arguments: Option<serde_json::Value>,
+            arguments: Option<HashMap<String, serde_json::Value>>,
         ) -> Result<schema::CallToolResult> {
             if name != "test_tool" {
                 return Err(Error::ToolNotFound(name));
@@ -125,11 +129,7 @@ async fn test_invalid_params() {
             let args =
                 arguments.ok_or_else(|| Error::InvalidParams("Missing arguments".to_string()))?;
 
-            let args_obj = args
-                .as_object()
-                .ok_or_else(|| Error::InvalidParams("Arguments must be an object".to_string()))?;
-
-            if !args_obj.contains_key("required_param") {
+            if !args.contains_key("required_param") {
                 return Err(Error::InvalidParams("Missing required_param".to_string()));
             }
 
@@ -151,11 +151,7 @@ async fn test_invalid_params() {
     // Test 2: Call with empty object (missing required param)
     let context = create_test_context();
     let result = conn
-        .tools_call(
-            context,
-            "test_tool".to_string(),
-            Some(serde_json::json!({})),
-        )
+        .tools_call(context, "test_tool".to_string(), Some(HashMap::new()))
         .await;
     match result {
         Err(Error::InvalidParams(msg)) => {
@@ -166,12 +162,10 @@ async fn test_invalid_params() {
 
     // Test 3: Call with correct parameters should succeed
     let context = create_test_context();
+    let mut args = HashMap::new();
+    args.insert("required_param".to_string(), serde_json::json!("test"));
     let result = conn
-        .tools_call(
-            context,
-            "test_tool".to_string(),
-            Some(serde_json::json!({ "required_param": "test" })),
-        )
+        .tools_call(context, "test_tool".to_string(), Some(args))
         .await;
     assert!(result.is_ok());
 }
@@ -210,7 +204,11 @@ async fn test_successful_response() {
             })
         }
 
-        async fn tools_list(&mut self, _context: ServerCtx) -> Result<schema::ListToolsResult> {
+        async fn tools_list(
+            &mut self,
+            _context: ServerCtx,
+            _cursor: Option<schema::Cursor>,
+        ) -> Result<schema::ListToolsResult> {
             Ok(schema::ListToolsResult::new()
                 .with_tool(
                     schema::Tool::new("echo", schema::ToolInputSchema::default())
@@ -225,6 +223,7 @@ async fn test_successful_response() {
         async fn list_resources(
             &mut self,
             _context: ServerCtx,
+            _cursor: Option<schema::Cursor>,
         ) -> Result<schema::ListResourcesResult> {
             Ok(schema::ListResourcesResult {
                 resources: vec![schema::Resource {
@@ -263,14 +262,14 @@ async fn test_successful_response() {
 
     // Test successful tools listing
     let context = create_test_context();
-    let tools = conn.tools_list(context).await.unwrap();
+    let tools = conn.tools_list(context, None).await.unwrap();
     assert_eq!(tools.tools.len(), 2);
     assert_eq!(tools.tools[0].name, "echo");
     assert_eq!(tools.tools[1].name, "add");
 
     // Test successful resources listing
     let context = create_test_context();
-    let resources = conn.list_resources(context).await.unwrap();
+    let resources = conn.list_resources(context, None).await.unwrap();
     assert_eq!(resources.resources.len(), 1);
     assert_eq!(resources.resources[0].uri, "file:///test.txt");
 }
@@ -307,7 +306,7 @@ async fn test_error_propagation() {
             &mut self,
             _context: ServerCtx,
             name: String,
-            _arguments: Option<HashMap<String, serde_json::Value>>,
+            _arguments: Option<HashMap<String, String>>,
         ) -> Result<schema::GetPromptResult> {
             // Simulate prompt not found - using MethodNotFound as PromptNotFound doesn't exist
             Err(Error::MethodNotFound(format!("prompt/{name}")))

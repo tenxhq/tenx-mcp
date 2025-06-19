@@ -1,11 +1,14 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use serde_json::Value;
 use tokio::sync::broadcast;
 
 use crate::{
     schema::{
-        self, GetPromptResult, InitializeResult, ListPromptsResult, ListResourceTemplatesResult,
-        ListResourcesResult, ListRootsResult, ListToolsResult, LoggingLevel, ReadResourceResult,
+        self, Cursor, GetPromptResult, InitializeResult, ListPromptsResult,
+        ListResourceTemplatesResult, ListResourcesResult, ListRootsResult, ListToolsResult,
+        LoggingLevel, ReadResourceResult,
     },
     Error, Result,
 };
@@ -62,7 +65,11 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// List available tools
-    async fn list_tools(&mut self, _context: ServerCtx) -> Result<ListToolsResult> {
+    async fn tools_list(
+        &mut self,
+        _context: ServerCtx,
+        _cursor: Option<Cursor>,
+    ) -> Result<ListToolsResult> {
         Ok(ListToolsResult::default())
     }
 
@@ -71,7 +78,7 @@ pub trait ServerConn: Send + Sync {
         &mut self,
         _context: ServerCtx,
         name: String,
-        _arguments: Option<Value>,
+        _arguments: Option<HashMap<String, Value>>,
     ) -> Result<schema::CallToolResult> {
         Err(Error::ToolExecutionFailed {
             tool: name,
@@ -80,7 +87,11 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// List available resources
-    async fn list_resources(&mut self, _context: ServerCtx) -> Result<ListResourcesResult> {
+    async fn list_resources(
+        &mut self,
+        _context: ServerCtx,
+        _cursor: Option<Cursor>,
+    ) -> Result<ListResourcesResult> {
         Ok(ListResourcesResult {
             resources: vec![],
             next_cursor: None,
@@ -91,6 +102,7 @@ pub trait ServerConn: Send + Sync {
     async fn list_resource_templates(
         &mut self,
         _context: ServerCtx,
+        _cursor: Option<Cursor>,
     ) -> Result<ListResourceTemplatesResult> {
         Ok(ListResourceTemplatesResult {
             resource_templates: vec![],
@@ -118,7 +130,11 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// List available prompts
-    async fn list_prompts(&mut self, _context: ServerCtx) -> Result<ListPromptsResult> {
+    async fn list_prompts(
+        &mut self,
+        _context: ServerCtx,
+        _cursor: Option<Cursor>,
+    ) -> Result<ListPromptsResult> {
         Ok(ListPromptsResult {
             prompts: vec![],
             next_cursor: None,
@@ -130,7 +146,7 @@ pub trait ServerConn: Send + Sync {
         &mut self,
         _context: ServerCtx,
         name: String,
-        _arguments: Option<std::collections::HashMap<String, serde_json::Value>>,
+        _arguments: Option<std::collections::HashMap<String, String>>,
     ) -> Result<GetPromptResult> {
         Err(Error::handler_error(
             "prompt",

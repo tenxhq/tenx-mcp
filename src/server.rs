@@ -1,5 +1,4 @@
 use futures::{stream::SplitSink, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
@@ -364,153 +363,124 @@ async fn handle_request(
 
 /// Inner handler that returns Result<serde_json::Value>
 async fn handle_request_inner(
-    connection: &mut Box<dyn ServerConn>,
+    conn: &mut Box<dyn ServerConn>,
     request: JSONRPCRequest,
     context: ServerCtx,
 ) -> Result<serde_json::Value> {
-    // Convert RequestParams to serde_json::Value
-    let params = request
-        .request
-        .params
-        .map(|p| serde_json::to_value(p.other))
-        .transpose()?;
+    // Build a JSON object that includes the method for proper deserialization
+    let mut request_obj = serde_json::Map::new();
 
-    match request.request.method.as_str() {
-        "initialize" => {
-            let p = params.ok_or_else(|| {
-                Error::InvalidParams("initialize: Missing required parameters".to_string())
-            })?;
-            let params = serde_json::from_value::<InitializeParams>(p)
-                .map_err(|e| Error::InvalidParams(format!("initialize: {e}")))?;
-            connection
-                .initialize(
-                    context.clone(),
-                    params.protocol_version,
-                    params.capabilities,
-                    params.client_info,
-                )
-                .await
-                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
+    // Add the method as a field (this is how the serde tag works)
+    request_obj.insert(
+        "method".to_string(),
+        serde_json::Value::String(request.request.method.clone()),
+    );
+
+    // Add all params fields if present
+    if let Some(params) = request.request.params {
+        for (key, value) in params.other {
+            request_obj.insert(key, value);
         }
-        "ping" => {
+    }
+
+    let request_value = serde_json::Value::Object(request_obj);
+
+    // Try to deserialize into ClientRequest
+    let client_request = match serde_json::from_value::<ClientRequest>(request_value.clone()) {
+        Ok(req) => req,
+        Err(err) => {
+            // Check if this is a known method with invalid params
+            let known_methods = [
+                "initialize",
+                "ping",
+                "tools/list",
+                "tools/call",
+                "resources/list",
+                "resources/templates/list",
+                "resources/read",
+                "resources/subscribe",
+                "resources/unsubscribe",
+                "prompts/list",
+                "prompts/get",
+                "completion/complete",
+                "logging/setLevel",
+            ];
+
+            if known_methods.contains(&request.request.method.as_str()) {
+                // Known method but invalid parameters
+                return Err(Error::InvalidParams(format!(
+                    "Invalid parameters for {}: {}",
+                    request.request.method, err
+                )));
+            } else {
+                // Unknown method
+                return Err(Error::MethodNotFound(request.request.method.clone()));
+            }
+        }
+    };
+
+    let ctx = context.clone();
+
+    match client_request {
+        ClientRequest::Initialize {
+            protocol_version,
+            capabilities,
+            client_info,
+        } => conn
+            .initialize(ctx, protocol_version, capabilities, client_info)
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
+        ClientRequest::Ping => {
             info!("Server received ping request, sending automatic response");
-            connection
-                .pong(context.clone())
-                .await
-                .map(|_| serde_json::json!({}))
+            conn.pong(ctx).await.map(|_| serde_json::json!({}))
         }
-        "tools/list" => connection
-            .tools_list(context.clone())
+        ClientRequest::ListTools { cursor } => conn
+            .tools_list(ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
-        "tools/call" => {
-            let p = params.ok_or_else(|| {
-                Error::InvalidParams("tools/call: Missing required parameters".to_string())
-            })?;
-            let params = serde_json::from_value::<CallToolParams>(p)
-                .map_err(|e| Error::InvalidParams(format!("tools/call: {e}")))?;
-            let arguments = params
-                .arguments
-                .map(serde_json::to_value)
-                .transpose()
-                .map_err(|e| {
-                    Error::InvalidParams(format!("tools/call: Invalid arguments format: {e}"))
-                })?;
-            connection
-                .tools_call(context.clone(), params.name, arguments)
-                .await
-                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
-        }
-        "resources/list" => connection
-            .list_resources(context.clone())
+        ClientRequest::CallTool { name, arguments } => conn
+            .tools_call(ctx, name, arguments)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
-        "resources/templates/list" => connection
-            .list_resource_templates(context.clone())
+        ClientRequest::ListResources { cursor } => conn
+            .list_resources(ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
-        "resources/read" => {
-            let p = params.ok_or_else(|| {
-                Error::InvalidParams("resources/read: Missing required parameters".to_string())
-            })?;
-            let params = serde_json::from_value::<ReadResourceParams>(p)
-                .map_err(|e| Error::InvalidParams(format!("resources/read: {e}")))?;
-            connection
-                .resources_read(context.clone(), params.uri)
-                .await
-                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
-        }
-        "resources/subscribe" => {
-            let p = params.ok_or_else(|| {
-                Error::InvalidParams("resources/subscribe: Missing required parameters".to_string())
-            })?;
-            let params = serde_json::from_value::<HashMap<String, String>>(p)
-                .map_err(|e| Error::InvalidParams(format!("resources/subscribe: {e}")))?;
-            let uri = params.get("uri").ok_or_else(|| {
-                Error::InvalidParams("resources/subscribe: Missing uri parameter".to_string())
-            })?;
-            connection
-                .resources_subscribe(context.clone(), uri.clone())
-                .await
-                .map(|_| serde_json::json!({}))
-        }
-        "resources/unsubscribe" => {
-            let p = params.ok_or_else(|| {
-                Error::InvalidParams(
-                    "resources/unsubscribe: Missing required parameters".to_string(),
-                )
-            })?;
-            let params = serde_json::from_value::<HashMap<String, String>>(p)
-                .map_err(|e| Error::InvalidParams(format!("resources/unsubscribe: {e}")))?;
-            let uri = params.get("uri").ok_or_else(|| {
-                Error::InvalidParams("resources/unsubscribe: Missing uri parameter".to_string())
-            })?;
-            connection
-                .resources_unsubscribe(context.clone(), uri.clone())
-                .await
-                .map(|_| serde_json::json!({}))
-        }
-        "prompts/list" => connection
-            .list_prompts(context.clone())
+        ClientRequest::ListResourceTemplates { cursor } => conn
+            .list_resource_templates(ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
-        "prompts/get" => {
-            let p = params.ok_or_else(|| {
-                Error::InvalidParams("prompts/get: Missing required parameters".to_string())
-            })?;
-            let params = serde_json::from_value::<GetPromptParams>(p)
-                .map_err(|e| Error::InvalidParams(format!("prompts/get: {e}")))?;
-            connection
-                .prompts_get(context.clone(), params.name, params.arguments)
-                .await
-                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
-        }
-        "completion/complete" => {
-            let p = params.ok_or_else(|| {
-                Error::InvalidParams("completion/complete: Missing required parameters".to_string())
-            })?;
-            let params = serde_json::from_value::<CompleteParams>(p)
-                .map_err(|e| Error::InvalidParams(format!("completion/complete: {e}")))?;
-            connection
-                .completion_complete(context.clone(), params.reference, params.argument)
-                .await
-                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
-        }
-        "logging/setLevel" => {
-            let p = params.ok_or_else(|| {
-                Error::InvalidParams("logging/setLevel: Missing required parameters".to_string())
-            })?;
-            let params = serde_json::from_value::<HashMap<String, LoggingLevel>>(p)
-                .map_err(|e| Error::InvalidParams(format!("logging/setLevel: {e}")))?;
-            let level = params.get("level").ok_or_else(|| {
-                Error::InvalidParams("logging/setLevel: Missing level parameter".to_string())
-            })?;
-            connection
-                .logging_set_level(context.clone(), *level)
-                .await
-                .map(|_| serde_json::json!({}))
-        }
-        _ => Err(Error::MethodNotFound(request.request.method.clone())),
+        ClientRequest::ReadResource { uri } => conn
+            .resources_read(ctx, uri)
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
+        ClientRequest::Subscribe { uri } => conn
+            .resources_subscribe(ctx, uri)
+            .await
+            .map(|_| serde_json::json!({})),
+        ClientRequest::Unsubscribe { uri } => conn
+            .resources_unsubscribe(ctx, uri)
+            .await
+            .map(|_| serde_json::json!({})),
+        ClientRequest::ListPrompts { cursor } => conn
+            .list_prompts(ctx, cursor)
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
+        ClientRequest::GetPrompt { name, arguments } => conn
+            .prompts_get(ctx, name, arguments)
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
+        ClientRequest::Complete {
+            reference,
+            argument,
+        } => conn
+            .completion_complete(ctx, reference, argument)
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
+        ClientRequest::SetLevel { level } => conn
+            .logging_set_level(ctx, level)
+            .await
+            .map(|_| serde_json::json!({})),
     }
 }
 
@@ -547,12 +517,4 @@ async fn handle_notification(
             Ok(())
         }
     }
-}
-
-// Add CompleteParams struct
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct CompleteParams {
-    #[serde(rename = "ref")]
-    reference: Reference,
-    argument: ArgumentInfo,
 }

@@ -55,7 +55,11 @@ impl ServerConn for TimeoutTestConnection {
         )
     }
 
-    async fn tools_list(&mut self, _context: ServerCtx) -> Result<schema::ListToolsResult> {
+    async fn tools_list(
+        &mut self,
+        _context: ServerCtx,
+        _cursor: Option<schema::Cursor>,
+    ) -> Result<schema::ListToolsResult> {
         let object_schema = schema::ToolInputSchema {
             schema_type: "object".to_string(),
             properties: None,
@@ -85,7 +89,7 @@ impl ServerConn for TimeoutTestConnection {
         &mut self,
         _context: ServerCtx,
         name: String,
-        _arguments: Option<serde_json::Value>,
+        _arguments: Option<std::collections::HashMap<String, serde_json::Value>>,
     ) -> Result<schema::CallToolResult> {
         match name.as_str() {
             "flakey_operation" => {

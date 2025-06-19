@@ -45,7 +45,11 @@ impl ServerConn for TestConnection {
         })
     }
 
-    async fn tools_list(&mut self, _context: ServerCtx) -> Result<schema::ListToolsResult> {
+    async fn tools_list(
+        &mut self,
+        _context: ServerCtx,
+        _cursor: Option<schema::Cursor>,
+    ) -> Result<schema::ListToolsResult> {
         let schema = schema::ToolInputSchema {
             schema_type: "object".to_string(),
             properties: Some({
@@ -67,7 +71,7 @@ impl ServerConn for TestConnection {
         &mut self,
         _context: ServerCtx,
         name: String,
-        arguments: Option<serde_json::Value>,
+        arguments: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<schema::CallToolResult> {
         // We only handle the `test` tool in this fake implementation.
         if name != "test" {

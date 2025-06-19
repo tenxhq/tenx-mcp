@@ -102,7 +102,11 @@ impl ServerConn for TestConnection {
         })
     }
 
-    async fn tools_list(&mut self, _context: ServerCtx) -> Result<ListToolsResult> {
+    async fn tools_list(
+        &mut self,
+        _context: ServerCtx,
+        _cursor: Option<Cursor>,
+    ) -> Result<ListToolsResult> {
         let mut result = ListToolsResult::new();
         for tool in self.tools.values() {
             result = result.with_tool(tool.clone());
@@ -114,7 +118,7 @@ impl ServerConn for TestConnection {
         &mut self,
         _context: ServerCtx,
         name: String,
-        arguments: Option<serde_json::Value>,
+        arguments: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<CallToolResult> {
         match name.as_str() {
             "echo" => {
@@ -171,7 +175,7 @@ mod tests {
 
         // Test tools list
         let context = create_test_context();
-        let tools_result = conn.tools_list(context).await.unwrap();
+        let tools_result = conn.tools_list(context, None).await.unwrap();
         assert_eq!(tools_result.tools.len(), 2);
         let echo_tool = tools_result
             .tools
@@ -183,12 +187,10 @@ mod tests {
 
         // Test execution
         let context = create_test_context();
+        let mut args = HashMap::new();
+        args.insert("message".to_string(), json!("Hello, World!"));
         let result = conn
-            .tools_call(
-                context,
-                "echo".to_string(),
-                Some(json!({ "message": "Hello, World!" })),
-            )
+            .tools_call(context, "echo".to_string(), Some(args))
             .await
             .unwrap();
         assert_eq!(result.content.len(), 1);
@@ -210,12 +212,10 @@ mod tests {
 
         // Test error on missing message field
         let context = create_test_context();
+        let mut args = HashMap::new();
+        args.insert("wrong_field".to_string(), json!("value"));
         let error = conn
-            .tools_call(
-                context,
-                "echo".to_string(),
-                Some(json!({ "wrong_field": "value" })),
-            )
+            .tools_call(context, "echo".to_string(), Some(args))
             .await
             .unwrap_err();
         match error {
@@ -230,15 +230,18 @@ mod tests {
 
         // Test tools list contains add tool
         let context = create_test_context();
-        let tools_result = conn.tools_list(context).await.unwrap();
+        let tools_result = conn.tools_list(context, None).await.unwrap();
         let add_tool = tools_result.tools.iter().find(|t| t.name == "add").unwrap();
         assert_eq!(add_tool.name, "add");
         assert!(add_tool.description.is_some());
 
         // Test integer addition
         let context = create_test_context();
+        let mut args = HashMap::new();
+        args.insert("a".to_string(), json!(5));
+        args.insert("b".to_string(), json!(3));
         let result = conn
-            .tools_call(context, "add".to_string(), Some(json!({ "a": 5, "b": 3 })))
+            .tools_call(context, "add".to_string(), Some(args))
             .await
             .unwrap();
         assert_eq!(result.content.len(), 1);
@@ -249,12 +252,11 @@ mod tests {
 
         // Test float addition
         let context = create_test_context();
+        let mut args = HashMap::new();
+        args.insert("a".to_string(), json!(1.5));
+        args.insert("b".to_string(), json!(2.5));
         let result = conn
-            .tools_call(
-                context,
-                "add".to_string(),
-                Some(json!({ "a": 1.5, "b": 2.5 })),
-            )
+            .tools_call(context, "add".to_string(), Some(args))
             .await
             .unwrap();
         assert_eq!(result.content.len(), 1);
@@ -265,8 +267,11 @@ mod tests {
 
         // Test negative numbers
         let context = create_test_context();
+        let mut args = HashMap::new();
+        args.insert("a".to_string(), json!(-5));
+        args.insert("b".to_string(), json!(3));
         let result = conn
-            .tools_call(context, "add".to_string(), Some(json!({ "a": -5, "b": 3 })))
+            .tools_call(context, "add".to_string(), Some(args))
             .await
             .unwrap();
         assert_eq!(result.content.len(), 1);
@@ -288,8 +293,10 @@ mod tests {
 
         // Test error on missing 'a' field
         let context = create_test_context();
+        let mut args = HashMap::new();
+        args.insert("b".to_string(), json!(5));
         let error = conn
-            .tools_call(context, "add".to_string(), Some(json!({ "b": 5 })))
+            .tools_call(context, "add".to_string(), Some(args))
             .await
             .unwrap_err();
         match error {
@@ -299,8 +306,10 @@ mod tests {
 
         // Test error on missing 'b' field
         let context = create_test_context();
+        let mut args = HashMap::new();
+        args.insert("a".to_string(), json!(5));
         let error = conn
-            .tools_call(context, "add".to_string(), Some(json!({ "a": 5 })))
+            .tools_call(context, "add".to_string(), Some(args))
             .await
             .unwrap_err();
         match error {
@@ -314,7 +323,7 @@ mod tests {
         // Test that our tools follow the MCP protocol specification
         let mut conn = TestConnection::new();
         let context = create_test_context();
-        let tools_result = conn.tools_list(context).await.unwrap();
+        let tools_result = conn.tools_list(context, None).await.unwrap();
 
         for tool in &tools_result.tools {
             // Verify tool has a name
