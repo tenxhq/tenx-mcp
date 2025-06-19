@@ -540,7 +540,7 @@ async fn handle_request_inner(
 
 /// Handle a notification using the Connection trait
 async fn handle_notification(
-    _connection: &mut Box<dyn ServerConnection>,
+    connection: &mut Box<dyn ServerConnection>,
     notification: JSONRPCNotification,
 ) -> Result<()> {
     debug!(
@@ -548,39 +548,28 @@ async fn handle_notification(
         notification.notification.method
     );
 
-    // Convert notification params if needed
-    let _params = notification
-        .notification
-        .params
-        .map(|p| serde_json::to_value(p.other))
-        .transpose()?;
+    // Build a value that matches the shape expected by ClientNotification.
+    let mut object = serde_json::Map::new();
+    object.insert(
+        "method".to_string(),
+        serde_json::Value::String(notification.notification.method.clone()),
+    );
 
-    match notification.notification.method.as_str() {
-        "notifications/cancelled" => {
-            // Handle cancellation notification if needed
-            debug!("Received cancellation notification");
-        }
-        "notifications/progress" => {
-            // Handle progress notification if needed
-            debug!("Received progress notification");
-        }
-        "notifications/initialized" => {
-            // Client has completed initialization
-            debug!("Client initialization complete");
-        }
-        "notifications/roots/list_changed" => {
-            // Roots list has changed
-            debug!("Roots list changed");
-        }
-        _ => {
-            debug!(
-                "Unknown notification method: {}",
-                notification.notification.method
-            );
+    if let Some(params) = notification.notification.params {
+        for (k, v) in params.other {
+            object.insert(k, v);
         }
     }
 
-    Ok(())
+    let value = serde_json::Value::Object(object);
+
+    match serde_json::from_value::<ServerNotification>(value) {
+        Ok(typed) => connection.notification(typed).await,
+        Err(e) => {
+            warn!("Failed to deserialize client notification: {}", e);
+            Ok(())
+        }
+    }
 }
 
 // Add CompleteParams struct

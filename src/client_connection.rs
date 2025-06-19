@@ -53,4 +53,12 @@ pub trait ClientConnection: Send + Sync {
     async fn list_roots(&mut self) -> Result<schema::ListRootsResult> {
         Err(Error::InvalidRequest("list_roots not implemented".into()))
     }
+
+    /// Handle a notification sent from the server
+    ///
+    /// The default implementation ignores the notification. Implementations
+    /// can override this method to react to server-initiated notifications.
+    async fn notification(&mut self, _notification: schema::ClientNotification) -> Result<()> {
+        Ok(())
+    }
 }

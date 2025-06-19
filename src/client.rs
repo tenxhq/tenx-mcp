@@ -703,10 +703,20 @@ impl Client {
                                         }
                                     }
                                     JSONRPCMessage::Notification(notification) => {
-                                        // Forward notifications to the notification channel
+                                        // Attempt to convert the JSON-RPC notification into a typed
+                                        // ServerNotification so that custom connection handlers can
+                                        // react to it.
+                                        if let Some(conn) = &mut connection {
+                                            if let Err(err) = handle_server_notification(conn, notification.clone()).await {
+                                                error!("Failed to handle server notification: {}", err);
+                                            }
+                                        }
+
+                                        // Always forward raw notifications to the public channel so
+                                        // that users that are not using a ClientConnection can still
+                                        // receive them.
                                         if let Err(e) = notification_tx.send(notification).await {
                                             error!("Failed to send notification: {}", e);
-                                            // If the receiver is dropped, we should stop
                                             break;
                                         }
                                     }
@@ -858,6 +868,38 @@ async fn handle_server_request_inner(
     }
 }
 
+/// Convert a JSON-RPC notification into a typed ServerNotification and pass it
+/// to the connection implementation for further handling.
+async fn handle_server_notification(
+    connection: &mut Box<dyn ClientConnection>,
+    notification: JSONRPCNotification,
+) -> Result<()> {
+    // Build a serde_json::Value representing the notification in the shape
+    // expected by the ServerNotification enum (which is `{"method": "...", ...}`).
+    use serde_json::Value;
+
+    let mut obj = serde_json::Map::new();
+    obj.insert(
+        "method".to_string(),
+        Value::String(notification.notification.method.clone()),
+    );
+
+    if let Some(params) = notification.notification.params {
+        for (k, v) in params.other {
+            obj.insert(k, v);
+        }
+    }
+
+    let value = Value::Object(obj);
+
+    match serde_json::from_value::<ClientNotification>(value) {
+        Ok(typed) => connection.notification(typed).await,
+        Err(e) => Err(Error::InvalidParams(format!(
+            "Failed to parse server notification: {e}",
+        ))),
+    }
+}
+
 impl Default for Client {
     fn default() -> Self {
         Self::new()
@@ -994,6 +1036,194 @@ mod tests {
             .expect("Failed to initialize");
 
         (client, server_handle)
+    }
+
+    // Test that a ClientConnection implementation receives notifications sent
+    // by the server.
+    #[tokio::test]
+    async fn test_client_receives_server_notification() {
+        use tokio::sync::oneshot;
+
+        // Channel to signal when notification is received
+        let (tx_notif, rx_notif) = oneshot::channel::<()>();
+
+        // Custom client connection that records notifications
+        struct NotifClientConnection {
+            tx: Option<oneshot::Sender<()>>,
+        }
+
+        #[async_trait::async_trait]
+        impl crate::client_connection::ClientConnection for NotifClientConnection {
+            async fn notification(
+                &mut self,
+                notification: crate::schema::ClientNotification,
+            ) -> Result<()> {
+                if matches!(
+                    notification,
+                    crate::schema::ClientNotification::RootsListChanged
+                ) {
+                    if let Some(tx) = self.tx.take() {
+                        let _ = tx.send(());
+                    }
+                }
+                Ok(())
+            }
+        }
+
+        // Minimal server connection
+        struct DummyServerConnection;
+
+        #[async_trait::async_trait]
+        impl crate::server_connection::ServerConnection for DummyServerConnection {
+            async fn initialize(
+                &mut self,
+                _protocol_version: String,
+                _capabilities: ClientCapabilities,
+                _client_info: Implementation,
+            ) -> Result<InitializeResult> {
+                Ok(InitializeResult::new("test-server", "1.0.0"))
+            }
+        }
+
+        // Create transport pair
+        let (client_transport, server_transport) = TestTransport::create_pair();
+
+        // Start server
+        let server = Server::default().with_connection_factory(|| Box::new(DummyServerConnection));
+        let server_handle = ServerHandle::new(server, server_transport)
+            .await
+            .expect("Failed to start server");
+
+        // Create client with notif connection
+        let mut client =
+            Client::new().with_connection(Box::new(NotifClientConnection { tx: Some(tx_notif) }));
+
+        // Connect and initialize
+        client
+            .connect(client_transport)
+            .await
+            .expect("Failed to connect");
+
+        let client_info = Implementation {
+            name: "test-client".to_string(),
+            version: "1.0.0".to_string(),
+        };
+        client
+            .initialize(client_info, ClientCapabilities::default())
+            .await
+            .expect("Failed to initialize");
+
+        // Send server notification
+        server_handle.send_server_notification(crate::schema::ClientNotification::RootsListChanged);
+
+        // Wait for notification to be received
+        tokio::time::timeout(std::time::Duration::from_secs(1), rx_notif)
+            .await
+            .expect("Notification not received")
+            .expect("Receiver dropped");
+    }
+
+    // Test that a ServerConnection implementation receives notifications sent
+    // by the client.
+    #[tokio::test]
+    async fn test_server_receives_client_notification() {
+        use tokio::sync::oneshot;
+
+        // Channel to notify when server receives notification
+        let (tx_notif, rx_notif) = oneshot::channel();
+
+        use std::sync::{Arc, Mutex as StdMutex};
+
+        // Server connection that records notification
+        struct NotifServerConnection {
+            tx: Arc<StdMutex<Option<oneshot::Sender<()>>>>,
+        }
+
+        #[async_trait::async_trait]
+        impl crate::server_connection::ServerConnection for NotifServerConnection {
+            async fn initialize(
+                &mut self,
+                _protocol_version: String,
+                _capabilities: ClientCapabilities,
+                _client_info: Implementation,
+            ) -> Result<InitializeResult> {
+                Ok(InitializeResult::new("test-server", "1.0.0"))
+            }
+
+            async fn notification(
+                &mut self,
+                notification: crate::schema::ServerNotification,
+            ) -> Result<()> {
+                if matches!(
+                    notification,
+                    crate::schema::ServerNotification::ToolListChanged
+                ) {
+                    let maybe_tx = self.tx.lock().unwrap().take();
+                    if let Some(tx) = maybe_tx {
+                        let _ = tx.send(());
+                    }
+                }
+                Ok(())
+            }
+        }
+
+        // Client connection that sends a notification on connect
+        struct NotifierClientConnection;
+
+        #[async_trait::async_trait]
+        impl crate::client_connection::ClientConnection for NotifierClientConnection {
+            async fn on_connect(
+                &mut self,
+                context: crate::client_connection::ClientConnectionContext,
+            ) -> Result<()> {
+                context.send_notification(crate::schema::ServerNotification::ToolListChanged)?;
+                Ok(())
+            }
+        }
+
+        // Create transport pair
+        let (client_transport, server_transport) = TestTransport::create_pair();
+
+        let shared_tx: Arc<StdMutex<Option<oneshot::Sender<()>>>> =
+            Arc::new(StdMutex::new(Some(tx_notif)));
+
+        // Start server with notif connection
+        let server = {
+            let tx_clone = shared_tx.clone();
+            Server::default().with_connection_factory(move || {
+                Box::new(NotifServerConnection {
+                    tx: tx_clone.clone(),
+                })
+            })
+        };
+        let server_handle = ServerHandle::new(server, server_transport)
+            .await
+            .expect("Failed to start server");
+
+        // Create client with notifier connection
+        let mut client = Client::new().with_connection(Box::new(NotifierClientConnection));
+
+        // Connect and initialize
+        client
+            .connect(client_transport)
+            .await
+            .expect("Failed to connect");
+
+        let client_info = Implementation {
+            name: "test-client".to_string(),
+            version: "1.0.0".to_string(),
+        };
+        client
+            .initialize(client_info, ClientCapabilities::default())
+            .await
+            .expect("Failed to initialize");
+
+        // Wait for server to receive notification
+        tokio::time::timeout(std::time::Duration::from_secs(1), rx_notif)
+            .await
+            .expect("Server did not receive notification")
+            .expect("Receiver dropped");
+        std::mem::drop(server_handle);
     }
 
     #[test]

@@ -163,4 +163,13 @@ pub trait ServerConnection: Send + Sync {
             "sampling/createMessage".to_string(),
         ))
     }
+
+    /// Handle a notification sent from the client
+    ///
+    /// The default implementation ignores the notification. Servers can
+    /// override this to react to client-initiated notifications such as
+    /// progress updates or cancellations.
+    async fn notification(&mut self, _notification: schema::ServerNotification) -> Result<()> {
+        Ok(())
+    }
 }
