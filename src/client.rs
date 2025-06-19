@@ -6,7 +6,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, oneshot, Mutex};
-use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 
 use crate::{
@@ -50,35 +49,21 @@ pub struct Client {
     notification_tx: mpsc::Sender<JSONRPCNotification>,
     notification_rx: Option<mpsc::Receiver<JSONRPCNotification>>,
     next_request_id: Arc<Mutex<u64>>,
-    config: ClientConfig,
     connection: Option<Box<dyn ClientConnection>>,
 }
 
 impl Client {
     /// Create a new MCP client with default configuration
     pub fn new() -> Self {
-        Self::with_config(ClientConfig::default())
-    }
-
-    /// Create a new MCP client with custom configuration
-    pub fn with_config(config: ClientConfig) -> Self {
         let (notification_tx, notification_rx) = mpsc::channel(100);
-
         Self {
             transport_tx: None,
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
             notification_tx,
             notification_rx: Some(notification_rx),
             next_request_id: Arc::new(Mutex::new(1)),
-            config,
             connection: None,
         }
-    }
-
-    /// Set the request timeout
-    pub fn with_request_timeout(mut self, timeout: Duration) -> Self {
-        self.config.request_timeout = timeout;
-        self
     }
 
     /// Set the client connection handler
@@ -199,7 +184,7 @@ impl Client {
             name: name.into(),
             arguments: None,
         };
-        self.request_with_retry(request).await
+        self.request(request).await
     }
 
     /// Call a tool on the server with arguments
@@ -222,7 +207,7 @@ impl Client {
             name: name.into(),
             arguments,
         };
-        self.request_with_retry(request).await
+        self.request(request).await
     }
 
     /// Send a ping to the server
@@ -365,16 +350,6 @@ impl Client {
         Ok(child)
     }
 
-    /// Send a request with retry logic
-    async fn request_with_retry<T>(&mut self, request: ClientRequest) -> Result<T>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        // For now, we'll just do a single request without retry
-        // TODO: Implement proper retry logic that doesn't require mutable self in closure
-        self.request(request).await
-    }
-
     /// Send a request and wait for response
     async fn request<T>(&mut self, request: ClientRequest) -> Result<T>
     where
@@ -411,8 +386,8 @@ impl Client {
             .await?;
 
         // Wait for response with timeout
-        match timeout(self.config.request_timeout, rx).await {
-            Ok(Ok(response_or_error)) => {
+        match rx.await {
+            Ok(response_or_error) => {
                 match response_or_error {
                     ResponseOrError::Response(response) => {
                         // Create a combined Value from the result's fields
@@ -450,21 +425,11 @@ impl Client {
                     }
                 }
             }
-            Ok(Err(e)) => {
+            Err(e) => {
                 error!("Response channel closed for request {}: {}", id, e);
                 // Remove the pending request
                 self.pending_requests.lock().await.remove(&id);
                 Err(Error::Protocol("Response channel closed".to_string()))
-            }
-            Err(_) => {
-                // Timeout occurred
-                error!(
-                    "Request {} timed out after {:?}",
-                    id, self.config.request_timeout
-                );
-                // Remove the pending request
-                self.pending_requests.lock().await.remove(&id);
-                Err(Error::timeout(self.config.request_timeout, id))
             }
         }
     }
