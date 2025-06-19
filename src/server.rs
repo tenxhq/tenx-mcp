@@ -22,7 +22,7 @@ pub struct Server {
 
 pub struct ServerHandle {
     pub handle: JoinHandle<()>,
-    notification_tx: broadcast::Sender<ServerNotification>,
+    notification_tx: broadcast::Sender<ClientNotification>,
 }
 
 impl Server {
@@ -303,7 +303,7 @@ impl ServerHandle {
     }
 
     /// Send a server notification
-    pub fn send_server_notification(&self, notification: ServerNotification) {
+    pub fn send_server_notification(&self, notification: ClientNotification) {
         // TODO Skip sending notifications if specific server capabilities are not enabled
         if let Err(e) = self.notification_tx.send(notification.clone()) {
             error!(

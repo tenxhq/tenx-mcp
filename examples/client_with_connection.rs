@@ -18,7 +18,7 @@ impl ClientConnection for MyClientConnection {
         println!("Client connection established for: {}", self.name);
 
         // Example: Send a notification when connected
-        context.send_notification(tenx_mcp::schema::ClientNotification::RootsListChanged)?;
+        context.send_notification(tenx_mcp::schema::ServerNotification::ToolListChanged)?;
 
         Ok(())
     }

@@ -5,9 +5,9 @@ use tokio::sync::broadcast;
 use crate::{
     error::Result,
     schema::{
-        CallToolResult, CompleteResult, GetPromptResult, InitializeResult, ListPromptsResult,
+        self, CallToolResult, CompleteResult, GetPromptResult, InitializeResult, ListPromptsResult,
         ListResourceTemplatesResult, ListResourcesResult, ListRootsResult, ListToolsResult,
-        LoggingLevel, ReadResourceResult, ServerNotification,
+        LoggingLevel, ReadResourceResult,
     },
 };
 
@@ -17,12 +17,12 @@ pub type ServerConnectionFactory = Box<dyn Fn() -> Box<dyn ServerConnection> + S
 /// Context provided to Connection implementations for interacting with the client
 pub struct ServerConnectionContext {
     /// Sender for server notifications
-    pub(crate) notification_tx: broadcast::Sender<ServerNotification>,
+    pub(crate) notification_tx: broadcast::Sender<schema::ClientNotification>,
 }
 
 impl ServerConnectionContext {
     /// Send a notification to the client
-    pub fn send_notification(&self, notification: ServerNotification) -> Result<()> {
+    pub fn send_notification(&self, notification: schema::ClientNotification) -> Result<()> {
         self.notification_tx.send(notification).map_err(|_| {
             crate::error::Error::InternalError("Failed to send notification".into())
         })?;

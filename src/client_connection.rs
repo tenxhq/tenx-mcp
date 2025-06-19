@@ -9,12 +9,12 @@ use crate::{
 /// Context provided to ClientConnection implementations for interacting with the client
 pub struct ClientConnectionContext {
     /// Sender for client notifications
-    pub(crate) notification_tx: broadcast::Sender<schema::ClientNotification>,
+    pub(crate) notification_tx: broadcast::Sender<schema::ServerNotification>,
 }
 
 impl ClientConnectionContext {
     /// Send a notification to the client
-    pub fn send_notification(&self, notification: schema::ClientNotification) -> Result<()> {
+    pub fn send_notification(&self, notification: schema::ServerNotification) -> Result<()> {
         self.notification_tx.send(notification).map_err(|_| {
             crate::error::Error::InternalError("Failed to send notification".into())
         })?;
