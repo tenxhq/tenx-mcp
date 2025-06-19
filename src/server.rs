@@ -76,7 +76,7 @@ where
 
     /// Serve a single connection using the provided transport
     /// This is a convenience method that starts the server and waits for completion
-    pub async fn serve(self, transport: Box<dyn Transport>) -> Result<()> {
+    pub(crate) async fn serve(self, transport: Box<dyn Transport>) -> Result<()> {
         let handle = ServerHandle::new(self, transport).await?;
         handle.stop().await
     }

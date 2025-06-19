@@ -14,13 +14,9 @@
 //! divergences, and gives downstream users example code they can re-use in
 //! their own test suites.
 
-use tokio::io::{self, AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio::io::{self, AsyncRead, AsyncWrite};
 
-use crate::{
-    error::{Error, Result},
-    schema::JSONRPCMessage,
-    Client, ClientConn, Server, ServerConn, ServerHandle,
-};
+use crate::{error::Result, Client, ClientConn, Server, ServerConn, ServerHandle};
 
 /// Conveniently create **two** independent in-memory duplex pipes that together
 /// form a bidirectional channel suitable for wiring up a test client and
@@ -41,36 +37,6 @@ pub fn make_duplex_pair() -> (
     let (server_reader, client_writer) = io::duplex(8 * 1024);
     let (client_reader, server_writer) = io::duplex(8 * 1024);
     (server_reader, server_writer, client_reader, client_writer)
-}
-
-/// Serialise a [`JSONRPCMessage`], append a `\n` delimiter and write it to the
-/// provided writer.
-pub async fn send_message<W>(writer: &mut W, message: &JSONRPCMessage) -> Result<()>
-where
-    W: AsyncWrite + Unpin,
-{
-    let json = serde_json::to_vec(message)?;
-    writer.write_all(&json).await?;
-    writer.write_all(b"\n").await?;
-    writer.flush().await?;
-    Ok(())
-}
-
-/// Read a single newline-delimited JSON-RPC message from the reader.
-pub async fn read_message<R>(reader: &mut BufReader<R>) -> Result<JSONRPCMessage>
-where
-    R: AsyncRead + Unpin,
-{
-    let mut buf = Vec::new();
-    reader.read_until(b'\n', &mut buf).await?;
-    if buf.is_empty() {
-        return Err(Error::Transport("Stream closed".into()));
-    }
-    // Strip trailing `\n` so that `serde_json` doesn't complain.
-    if buf.last() == Some(&b'\n') {
-        buf.pop();
-    }
-    Ok(serde_json::from_slice(&buf)?)
 }
 
 /// Spin up an in-memory server using the supplied [`ServerConnection`]

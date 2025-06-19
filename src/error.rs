@@ -73,7 +73,7 @@ impl Error {
     }
 
     /// Convert error to a specific JSONRPC response if applicable
-    pub fn to_jsonrpc_response(&self, request_id: RequestId) -> Option<JSONRPCError> {
+    pub(crate) fn to_jsonrpc_response(&self, request_id: RequestId) -> Option<JSONRPCError> {
         let (code, message) = match self {
             Self::ToolNotFound(tool_name) => {
                 (METHOD_NOT_FOUND, format!("Tool not found: {tool_name}"))

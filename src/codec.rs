@@ -9,7 +9,7 @@ use crate::{
 
 /// JSON-RPC codec for encoding/decoding messages over a stream
 /// Uses newline-delimited JSON format
-pub struct JsonRpcCodec;
+pub(crate) struct JsonRpcCodec;
 
 impl JsonRpcCodec {
     pub fn new() -> Self {

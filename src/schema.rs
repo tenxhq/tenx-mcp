@@ -10,7 +10,7 @@ pub const JSONRPC_VERSION: &str = "2.0";
 /// encoded to be sent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum JSONRPCMessage {
+pub(crate) enum JSONRPCMessage {
     Request(JSONRPCRequest),
     Notification(JSONRPCNotification),
     BatchRequest(JSONRPCBatchRequest),
@@ -20,21 +20,21 @@ pub enum JSONRPCMessage {
 }
 
 /// A JSON-RPC batch request, as described in https://www.jsonrpc.org/specification#batch.
-pub type JSONRPCBatchRequest = Vec<JSONRPCRequestOrNotification>;
+pub(crate) type JSONRPCBatchRequest = Vec<JSONRPCRequestOrNotification>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum JSONRPCRequestOrNotification {
+pub(crate) enum JSONRPCRequestOrNotification {
     Request(JSONRPCRequest),
     Notification(JSONRPCNotification),
 }
 
 /// A JSON-RPC batch response, as described in https://www.jsonrpc.org/specification#batch.
-pub type JSONRPCBatchResponse = Vec<JSONRPCResponseOrError>;
+pub(crate) type JSONRPCBatchResponse = Vec<JSONRPCResponseOrError>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum JSONRPCResponseOrError {
+pub(crate) enum JSONRPCResponseOrError {
     Response(JSONRPCResponse),
     Error(JSONRPCError),
 }
@@ -78,14 +78,14 @@ impl std::fmt::Display for Cursor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Request {
+pub(crate) struct Request {
     pub method: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<RequestParams>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RequestParams {
+pub(crate) struct RequestParams {
     #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
     pub meta: Option<RequestMeta>,
     #[serde(flatten)]
@@ -93,7 +93,7 @@ pub struct RequestParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RequestMeta {
+pub(crate) struct RequestMeta {
     /// If specified, the caller is requesting out-of-band progress
     /// notifications for this request (as represented by
     /// notifications/progress). The value of this parameter is an opaque token
@@ -104,14 +104,14 @@ pub struct RequestMeta {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Notification {
+pub(crate) struct Notification {
     pub method: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<NotificationParams>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NotificationParams {
+pub(crate) struct NotificationParams {
     /// This parameter name is reserved by MCP to allow clients and servers to
     /// attach additional metadata to their notifications.
     #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
@@ -121,7 +121,7 @@ pub struct NotificationParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Result {
+pub(crate) struct Result {
     /// This result property is reserved by the protocol to allow clients and
     /// servers to attach additional metadata to their responses.
     #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
@@ -140,7 +140,7 @@ pub enum RequestId {
 
 /// A request that expects a response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JSONRPCRequest {
+pub(crate) struct JSONRPCRequest {
     pub jsonrpc: String,
     pub id: RequestId,
     #[serde(flatten)]
@@ -149,7 +149,7 @@ pub struct JSONRPCRequest {
 
 /// A notification which does not expect a response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JSONRPCNotification {
+pub(crate) struct JSONRPCNotification {
     pub jsonrpc: String,
     #[serde(flatten)]
     pub notification: Notification,
@@ -157,22 +157,22 @@ pub struct JSONRPCNotification {
 
 /// A successful (non-error) response to a request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JSONRPCResponse {
+pub(crate) struct JSONRPCResponse {
     pub jsonrpc: String,
     pub id: RequestId,
     pub result: Result,
 }
 
 // Standard JSON-RPC error codes
-pub const PARSE_ERROR: i32 = -32700;
-pub const INVALID_REQUEST: i32 = -32600;
-pub const METHOD_NOT_FOUND: i32 = -32601;
-pub const INVALID_PARAMS: i32 = -32602;
-pub const INTERNAL_ERROR: i32 = -32603;
+pub(crate) const PARSE_ERROR: i32 = -32700;
+pub(crate) const INVALID_REQUEST: i32 = -32600;
+pub(crate) const METHOD_NOT_FOUND: i32 = -32601;
+pub(crate) const INVALID_PARAMS: i32 = -32602;
+pub(crate) const INTERNAL_ERROR: i32 = -32603;
 
 /// A response to a request that indicates an error occurred.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JSONRPCError {
+pub(crate) struct JSONRPCError {
     pub jsonrpc: String,
     pub id: RequestId,
     pub error: ErrorObject,
@@ -194,7 +194,7 @@ pub struct ErrorObject {
 
 // Empty result
 /// A response that indicates success but carries no data.
-pub type EmptyResult = Result;
+pub(crate) type EmptyResult = Result;
 
 // Cancellation
 /// This notification can be sent by either side to indicate that it is
@@ -209,13 +209,13 @@ pub type EmptyResult = Result;
 ///
 /// A client MUST NOT attempt to cancel its `initialize` request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CancelledNotification {
+pub(crate) struct CancelledNotification {
     pub method: String,
     pub params: CancelledParams,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CancelledParams {
+pub(crate) struct CancelledParams {
     /// The ID of the request to cancel.
     ///
     /// This MUST correspond to the ID of a request previously issued in the
@@ -1585,7 +1585,7 @@ pub struct RootsListChangedNotification {
 // Client messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
-pub enum ClientRequest {
+pub(crate) enum ClientRequest {
     #[serde(rename = "ping")]
     Ping,
     #[serde(rename = "initialize")]
@@ -1769,7 +1769,7 @@ pub enum ClientNotification {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum ClientResult {
+pub(crate) enum ClientResult {
     Empty(EmptyResult),
     CreateMessage(CreateMessageResult),
     ListRoots(ListRootsResult),
@@ -1838,7 +1838,7 @@ pub enum ServerNotification {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum ServerResult {
+pub(crate) enum ServerResult {
     Empty(EmptyResult),
     Initialize(InitializeResult),
     Complete(CompleteResult),

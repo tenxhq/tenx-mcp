@@ -81,18 +81,6 @@ pub fn create_jsonrpc_error(
     }
 }
 
-/// Create a JSONRPC response with empty result
-pub fn create_empty_response(id: RequestId) -> JSONRPCResponse {
-    JSONRPCResponse {
-        jsonrpc: JSONRPC_VERSION.to_string(),
-        id,
-        result: EmptyResult {
-            meta: None,
-            other: HashMap::new(),
-        },
-    }
-}
-
 /// Convert a Result<T> to a JSONRPC response
 pub fn result_to_jsonrpc_response<T>(id: RequestId, result: Result<T>) -> JSONRPCMessage
 where

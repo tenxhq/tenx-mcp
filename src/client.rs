@@ -91,7 +91,7 @@ where
     C: ClientConn + Send + 'static,
 {
     /// Connect using the provided transport
-    pub async fn connect(&mut self, mut transport: Box<dyn Transport>) -> Result<()> {
+    pub(crate) async fn connect(&mut self, mut transport: Box<dyn Transport>) -> Result<()> {
         transport.connect().await?;
         let stream = transport.framed()?;
 
