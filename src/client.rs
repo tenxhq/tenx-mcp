@@ -4,12 +4,12 @@ use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::Arc;
 use tokio::process::{Child, Command};
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex};
 use tracing::{debug, error, info, warn};
 
 use crate::{
     client_connection::{ClientConn, ClientCtx},
-    connection::{create_empty_response, result_to_jsonrpc_response},
+    connection::result_to_jsonrpc_response,
     error::{Error, Result},
     schema::*,
     transport::{
@@ -41,10 +41,8 @@ where
 {
     transport_tx: Option<TransportSink>,
     pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<ResponseOrError>>>>,
-    notification_tx: mpsc::Sender<JSONRPCNotification>,
-    notification_rx: Option<mpsc::Receiver<JSONRPCNotification>>,
     next_request_id: Arc<Mutex<u64>>,
-    connection: Option<C>,
+    connection: C,
     name: String,
     version: String,
     client_capabilities: ClientCapabilities,
@@ -53,14 +51,11 @@ where
 impl Client<()> {
     /// Create a new MCP client with default configuration
     pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
-        let (notification_tx, notification_rx) = mpsc::channel(100);
         Self {
             transport_tx: None,
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
-            notification_tx,
-            notification_rx: Some(notification_rx),
             next_request_id: Arc::new(Mutex::new(1)),
-            connection: None,
+            connection: (),
             name: name.into(),
             version: version.into(),
             client_capabilities: ClientCapabilities::default(),
@@ -73,14 +68,11 @@ impl Client<()> {
         version: impl Into<String>,
         connection: C,
     ) -> Client<C> {
-        let (notification_tx, notification_rx) = mpsc::channel(100);
         Client {
             transport_tx: None,
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
-            notification_tx,
-            notification_rx: Some(notification_rx),
             next_request_id: Arc::new(Mutex::new(1)),
-            connection: Some(connection),
+            connection,
             name: name.into(),
             version: version.into(),
             client_capabilities: ClientCapabilities::default(),
@@ -241,11 +233,6 @@ where
     pub async fn ping(&mut self) -> Result<()> {
         let _: EmptyResult = self.request(ClientRequest::Ping).await?;
         Ok(())
-    }
-
-    /// Take the notification receiver channel
-    pub fn take_notification_receiver(&mut self) -> Option<mpsc::Receiver<JSONRPCNotification>> {
-        self.notification_rx.take()
     }
 
     /// Connect to a TCP server and initialize the connection
@@ -457,7 +444,6 @@ where
     /// Start the background task that handles incoming messages
     async fn start_message_handler(&mut self, stream: Box<dyn TransportStream>) -> Result<()> {
         let pending_requests = self.pending_requests.clone();
-        let notification_tx = self.notification_tx.clone();
 
         // Split the transport stream into read and write halves
         let (tx, mut rx) = stream.split();
@@ -468,8 +454,8 @@ where
         // Store the sender half for sending messages
         self.transport_tx = Some(tx.clone());
 
-        // Take the connection if present
-        let mut connection = self.connection.take();
+        // Clone the connection for use in the handler
+        let mut connection = self.connection.clone();
 
         // Create broadcast channel for client notifications
         let (client_notification_tx, mut client_notification_rx) =
@@ -478,10 +464,8 @@ where
         // Create the context for the connection
         let context = ClientCtx::new(client_notification_tx.clone());
 
-        // Initialize connection if present
-        if let Some(conn) = &mut connection {
-            conn.on_connect(context.clone()).await?;
-        }
+        // Initialize connection
+        connection.on_connect(context.clone()).await?;
 
         // Clone sink for notification handler
         let notification_sink = tx.clone();
@@ -512,21 +496,10 @@ where
                                         }
                                     }
                                     JSONRPCMessage::Notification(notification) => {
-                                        // Attempt to convert the JSON-RPC notification into a typed
-                                        // ServerNotification so that custom connection handlers can
-                                        // react to it.
-                                        if let Some(conn) = &mut connection {
-                                            if let Err(err) = handle_server_notification(conn, context.clone(), notification.clone()).await {
-                                                error!("Failed to handle server notification: {}", err);
-                                            }
-                                        }
-
-                                        // Always forward raw notifications to the public channel so
-                                        // that users that are not using a ClientConnection can still
-                                        // receive them.
-                                        if let Err(e) = notification_tx.send(notification).await {
-                                            error!("Failed to send notification: {}", e);
-                                            break;
+                                        // Convert the JSON-RPC notification into a typed
+                                        // ServerNotification and pass it to the connection handler.
+                                        if let Err(err) = handle_server_notification(&mut connection, context.clone(), notification).await {
+                                            error!("Failed to handle server notification: {}", err);
                                         }
                                     }
                                     JSONRPCMessage::Error(error) => {
@@ -546,29 +519,11 @@ where
                                         }
                                     }
                                     JSONRPCMessage::Request(request) => {
-                                        if let Some(conn) = &mut connection {
-                                            let response = handle_server_request(conn, context.clone(), request).await;
-                                            let mut sink = tx.lock().await;
-                                            if let Err(e) = sink.send(response).await {
-                                                error!("Failed to send response to server: {}", e);
-                                                break;
-                                            }
-                                        } else {
-                                            // No connection handler, handle built-in requests only
-                                            if request.request.method == "ping" {
-                                                info!("Received ping request from server, sending response");
-                                                let response = create_empty_response(request.id);
-                                                let mut sink = tx.lock().await;
-                                                if let Err(e) = sink.send(JSONRPCMessage::Response(response)).await {
-                                                    error!("Failed to send ping response: {}", e);
-                                                    break;
-                                                }
-                                            } else {
-                                                warn!(
-                                                    "Received request from server but no connection handler: {}",
-                                                    request.request.method
-                                                );
-                                            }
+                                        let response = handle_server_request(&mut connection, context.clone(), request).await;
+                                        let mut sink = tx.lock().await;
+                                        if let Err(e) = sink.send(response).await {
+                                            error!("Failed to send response to server: {}", e);
+                                            break;
                                         }
                                     }
                                     JSONRPCMessage::BatchRequest(_batch) => {
@@ -615,10 +570,8 @@ where
             }
 
             // Clean up connection
-            if let Some(mut conn) = connection {
-                if let Err(e) = conn.on_disconnect(context).await {
-                    error!("Error during connection disconnect: {}", e);
-                }
+            if let Err(e) = connection.on_disconnect(context).await {
+                error!("Error during connection disconnect: {}", e);
             }
 
             info!("Message handler stopped");
@@ -1169,5 +1122,56 @@ mod tests {
         } else {
             panic!("Expected Transport error");
         }
+    }
+
+    #[tokio::test]
+    async fn test_reconnect_works() {
+        // Create a minimal test connection
+        #[derive(Debug, Default)]
+        struct TestConnection;
+
+        #[async_trait::async_trait]
+        impl crate::server_connection::ServerConn for TestConnection {
+            async fn initialize(
+                &mut self,
+                _context: crate::server_connection::ServerCtx,
+                _protocol_version: String,
+                _capabilities: ClientCapabilities,
+                _client_info: Implementation,
+            ) -> Result<InitializeResult> {
+                Ok(InitializeResult::new("test-server", "1.0.0"))
+            }
+        }
+
+        // Test that we can connect multiple times (e.g., after disconnect)
+        let (mut client, server1) = setup_client_server().await;
+
+        // First connection is already established by setup_client_server
+        client.ping().await.expect("First ping failed");
+
+        // Drop the first server to simulate disconnect
+        drop(server1);
+
+        // Wait a bit for the connection to close
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Now create a new server and reconnect
+        let (client_transport, server_transport) = TestTransport::create_pair();
+
+        // Create a new test server
+        let server = Server::default().with_connection(TestConnection::default);
+        let _server2 = ServerHandle::new(server, server_transport)
+            .await
+            .expect("Failed to start second server");
+
+        // Reconnect the client
+        client
+            .connect(client_transport)
+            .await
+            .expect("Reconnect failed");
+
+        // Initialize and test the new connection
+        client.initialize().await.expect("Re-initialize failed");
+        client.ping().await.expect("Ping after reconnect failed");
     }
 }
