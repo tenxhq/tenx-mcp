@@ -37,7 +37,7 @@ impl ClientConn for () {
 /// MCP Client implementation
 pub struct Client<C = ()>
 where
-    C: ClientConn,
+    C: ClientConn + Send,
 {
     transport_tx: Option<TransportSink>,
     pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<ResponseOrError>>>>,
@@ -96,7 +96,7 @@ impl Client<()> {
 
 impl<C> Client<C>
 where
-    C: ClientConn + 'static,
+    C: ClientConn + Send + 'static,
 {
     /// Connect using the provided transport
     pub async fn connect(&mut self, mut transport: Box<dyn Transport>) -> Result<()> {
@@ -708,7 +708,7 @@ async fn handle_server_notification<C: ClientConn>(
     let value = Value::Object(obj);
 
     match serde_json::from_value::<ClientNotification>(value) {
-        Ok(typed) => connection.notify(context, typed).await,
+        Ok(typed) => connection.notification(context, typed).await,
         Err(e) => Err(Error::InvalidParams(format!(
             "Failed to parse server notification: {e}",
         ))),
@@ -866,7 +866,7 @@ mod tests {
 
         #[async_trait::async_trait]
         impl crate::client_connection::ClientConn for NotifClientConnection {
-            async fn notify(
+            async fn notification(
                 &mut self,
                 _context: crate::client_connection::ClientCtx,
                 notification: crate::schema::ClientNotification,

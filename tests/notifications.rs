@@ -17,7 +17,7 @@ async fn test_server_to_client_notifications() {
 
     #[async_trait]
     impl ClientConn for NotificationRecorder {
-        async fn notify(
+        async fn notification(
             &mut self,
             _context: ClientCtx,
             notification: tenx_mcp::schema::ClientNotification,
