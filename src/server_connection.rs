@@ -62,7 +62,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// List available tools
-    async fn tools_list(&mut self, _context: ServerCtx) -> Result<ListToolsResult> {
+    async fn list_tools(&mut self, _context: ServerCtx) -> Result<ListToolsResult> {
         Ok(ListToolsResult::default())
     }
 
@@ -80,7 +80,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// List available resources
-    async fn resources_list(&mut self, _context: ServerCtx) -> Result<ListResourcesResult> {
+    async fn list_resources(&mut self, _context: ServerCtx) -> Result<ListResourcesResult> {
         Ok(ListResourcesResult {
             resources: vec![],
             next_cursor: None,
@@ -88,7 +88,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// List resource templates
-    async fn resources_templates_list(
+    async fn list_resource_templates(
         &mut self,
         _context: ServerCtx,
     ) -> Result<ListResourceTemplatesResult> {
@@ -118,7 +118,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// List available prompts
-    async fn prompts_list(&mut self, _context: ServerCtx) -> Result<ListPromptsResult> {
+    async fn list_prompts(&mut self, _context: ServerCtx) -> Result<ListPromptsResult> {
         Ok(ListPromptsResult {
             prompts: vec![],
             next_cursor: None,
@@ -161,7 +161,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// List roots (for server-initiated roots/list request)
-    async fn roots_list(&mut self, _context: ServerCtx) -> Result<ListRootsResult> {
+    async fn list_roots(&mut self, _context: ServerCtx) -> Result<ListRootsResult> {
         Ok(ListRootsResult {
             roots: vec![],
             meta: None,

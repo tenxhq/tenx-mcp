@@ -422,11 +422,11 @@ async fn handle_request_inner(
                 .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
         "resources/list" => connection
-            .resources_list(context.clone())
+            .list_resources(context.clone())
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         "resources/templates/list" => connection
-            .resources_templates_list(context.clone())
+            .list_resource_templates(context.clone())
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         "resources/read" => {
@@ -471,7 +471,7 @@ async fn handle_request_inner(
                 .map(|_| serde_json::json!({}))
         }
         "prompts/list" => connection
-            .prompts_list(context.clone())
+            .list_prompts(context.clone())
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         "prompts/get" => {

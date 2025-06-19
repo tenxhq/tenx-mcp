@@ -222,7 +222,7 @@ async fn test_successful_response() {
                 ))
         }
 
-        async fn resources_list(
+        async fn list_resources(
             &mut self,
             _context: ServerCtx,
         ) -> Result<schema::ListResourcesResult> {
@@ -270,7 +270,7 @@ async fn test_successful_response() {
 
     // Test successful resources listing
     let context = create_test_context();
-    let resources = conn.resources_list(context).await.unwrap();
+    let resources = conn.list_resources(context).await.unwrap();
     assert_eq!(resources.resources.len(), 1);
     assert_eq!(resources.resources[0].uri, "file:///test.txt");
 }
