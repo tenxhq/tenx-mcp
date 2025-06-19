@@ -23,18 +23,19 @@ impl ClientConnection for MyClientConnection {
         Ok(())
     }
 
-    async fn on_disconnect(&mut self) -> Result<()> {
+    async fn on_disconnect(&mut self, _context: ClientConnectionContext) -> Result<()> {
         println!("Client connection closed for: {}", self.name);
         Ok(())
     }
 
-    async fn ping(&mut self) -> Result<()> {
+    async fn ping(&mut self, _context: ClientConnectionContext) -> Result<()> {
         println!("Server pinged us!");
         Ok(())
     }
 
     async fn create_message(
         &mut self,
+        _context: ClientConnectionContext,
         method: &str,
         params: CreateMessageParams,
     ) -> Result<CreateMessageResult> {
@@ -66,7 +67,7 @@ impl ClientConnection for MyClientConnection {
         })
     }
 
-    async fn list_roots(&mut self) -> Result<ListRootsResult> {
+    async fn list_roots(&mut self, _context: ClientConnectionContext) -> Result<ListRootsResult> {
         println!("Server requested roots list");
 
         Ok(ListRootsResult {

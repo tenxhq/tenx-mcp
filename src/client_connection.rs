@@ -14,6 +14,11 @@ pub struct ClientConnectionContext {
 }
 
 impl ClientConnectionContext {
+    /// Create a new ClientConnectionContext with the given notification sender
+    pub fn new(notification_tx: broadcast::Sender<schema::ServerNotification>) -> Self {
+        Self { notification_tx }
+    }
+
     /// Send a notification to the client
     pub fn send_notification(&self, notification: schema::ServerNotification) -> Result<()> {
         self.notification_tx.send(notification).map_err(|_| {
@@ -33,16 +38,17 @@ pub trait ClientConnection: Send + Sync {
     }
 
     /// Called when the connection is being closed
-    async fn on_disconnect(&mut self) -> Result<()> {
+    async fn on_disconnect(&mut self, _context: ClientConnectionContext) -> Result<()> {
         Ok(())
     }
 
-    async fn ping(&mut self) -> Result<()> {
+    async fn ping(&mut self, _context: ClientConnectionContext) -> Result<()> {
         Ok(())
     }
 
     async fn create_message(
         &mut self,
+        _context: ClientConnectionContext,
         _method: &str,
         _params: schema::CreateMessageParams,
     ) -> Result<schema::CreateMessageResult> {
@@ -51,7 +57,7 @@ pub trait ClientConnection: Send + Sync {
         ))
     }
 
-    async fn list_roots(&mut self) -> Result<schema::ListRootsResult> {
+    async fn list_roots(&mut self, _context: ClientConnectionContext) -> Result<schema::ListRootsResult> {
         Err(Error::InvalidRequest("list_roots not implemented".into()))
     }
 
@@ -59,7 +65,7 @@ pub trait ClientConnection: Send + Sync {
     ///
     /// The default implementation ignores the notification. Implementations
     /// can override this method to react to server-initiated notifications.
-    async fn notification(&mut self, _notification: schema::ClientNotification) -> Result<()> {
+    async fn notification(&mut self, _context: ClientConnectionContext, _notification: schema::ClientNotification) -> Result<()> {
         Ok(())
     }
 }

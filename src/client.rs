@@ -666,12 +666,12 @@ impl Client {
         let (client_notification_tx, mut client_notification_rx) =
             tokio::sync::broadcast::channel(100);
 
+        // Create the context for the connection
+        let context = ClientConnectionContext::new(client_notification_tx.clone());
+
         // Initialize connection if present
         if let Some(conn) = &mut connection {
-            let context = ClientConnectionContext {
-                notification_tx: client_notification_tx.clone(),
-            };
-            conn.on_connect(context).await?;
+            conn.on_connect(context.clone()).await?;
         }
 
         // Clone sink for notification handler
@@ -707,7 +707,7 @@ impl Client {
                                         // ServerNotification so that custom connection handlers can
                                         // react to it.
                                         if let Some(conn) = &mut connection {
-                                            if let Err(err) = handle_server_notification(conn, notification.clone()).await {
+                                            if let Err(err) = handle_server_notification(conn, context.clone(), notification.clone()).await {
                                                 error!("Failed to handle server notification: {}", err);
                                             }
                                         }
@@ -738,7 +738,7 @@ impl Client {
                                     }
                                     JSONRPCMessage::Request(request) => {
                                         if let Some(conn) = &mut connection {
-                                            let response = handle_server_request(conn, request).await;
+                                            let response = handle_server_request(conn, context.clone(), request).await;
                                             let mut sink = tx.lock().await;
                                             if let Err(e) = sink.send(response).await {
                                                 error!("Failed to send response to server: {}", e);
@@ -807,7 +807,7 @@ impl Client {
 
             // Clean up connection
             if let Some(mut conn) = connection {
-                if let Err(e) = conn.on_disconnect().await {
+                if let Err(e) = conn.on_disconnect(context).await {
                     error!("Error during connection disconnect: {}", e);
                 }
             }
@@ -822,15 +822,17 @@ impl Client {
 /// Handle a request from the server using the ClientConnection trait
 async fn handle_server_request(
     connection: &mut Box<dyn ClientConnection>,
+    context: ClientConnectionContext,
     request: JSONRPCRequest,
 ) -> JSONRPCMessage {
-    let result = handle_server_request_inner(connection, request.clone()).await;
+    let result = handle_server_request_inner(connection, context, request.clone()).await;
     result_to_jsonrpc_response(request.id, result)
 }
 
 /// Inner handler that returns Result<serde_json::Value>
 async fn handle_server_request_inner(
     connection: &mut Box<dyn ClientConnection>,
+    context: ClientConnectionContext,
     request: JSONRPCRequest,
 ) -> Result<serde_json::Value> {
     // Convert RequestParams to serde_json::Value
@@ -843,7 +845,10 @@ async fn handle_server_request_inner(
     match request.request.method.as_str() {
         "ping" => {
             info!("Server sent ping request, sending pong");
-            connection.ping().await.map(|_| serde_json::json!({}))
+            connection
+                .ping(context)
+                .await
+                .map(|_| serde_json::json!({}))
         }
         "sampling/createMessage" => {
             let p = params.ok_or_else(|| {
@@ -854,12 +859,12 @@ async fn handle_server_request_inner(
             let params = serde_json::from_value::<CreateMessageParams>(p)
                 .map_err(|e| Error::InvalidParams(format!("sampling/createMessage: {e}")))?;
             connection
-                .create_message(&request.request.method, params)
+                .create_message(context, &request.request.method, params)
                 .await
                 .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
         "roots/list" => connection
-            .list_roots()
+            .list_roots(context)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         method => Err(Error::MethodNotFound(format!(
@@ -872,6 +877,7 @@ async fn handle_server_request_inner(
 /// to the connection implementation for further handling.
 async fn handle_server_notification(
     connection: &mut Box<dyn ClientConnection>,
+    context: ClientConnectionContext,
     notification: JSONRPCNotification,
 ) -> Result<()> {
     // Build a serde_json::Value representing the notification in the shape
@@ -893,7 +899,7 @@ async fn handle_server_notification(
     let value = Value::Object(obj);
 
     match serde_json::from_value::<ClientNotification>(value) {
-        Ok(typed) => connection.notification(typed).await,
+        Ok(typed) => connection.notification(context, typed).await,
         Err(e) => Err(Error::InvalidParams(format!(
             "Failed to parse server notification: {e}",
         ))),
@@ -1057,6 +1063,7 @@ mod tests {
         impl crate::client_connection::ClientConnection for NotifClientConnection {
             async fn notification(
                 &mut self,
+                _context: crate::client_connection::ClientConnectionContext,
                 notification: crate::schema::ClientNotification,
             ) -> Result<()> {
                 if matches!(
