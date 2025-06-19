@@ -84,6 +84,7 @@ impl TestConnection {
 impl ServerConnection for TestConnection {
     async fn initialize(
         &mut self,
+        _context: tenx_mcp::server_connection::ServerConnectionContext,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -105,7 +106,10 @@ impl ServerConnection for TestConnection {
         })
     }
 
-    async fn tools_list(&mut self) -> Result<ListToolsResult> {
+    async fn tools_list(
+        &mut self,
+        _context: tenx_mcp::server_connection::ServerConnectionContext,
+    ) -> Result<ListToolsResult> {
         let mut result = ListToolsResult::new();
         for tool in self.tools.values() {
             result = result.with_tool(tool.clone());
@@ -115,6 +119,7 @@ impl ServerConnection for TestConnection {
 
     async fn tools_call(
         &mut self,
+        _context: tenx_mcp::server_connection::ServerConnectionContext,
         name: String,
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
@@ -160,13 +165,20 @@ impl ServerConnection for TestConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::sync::broadcast;
+
+    fn create_test_context() -> tenx_mcp::server_connection::ServerConnectionContext {
+        let (notification_tx, _) = broadcast::channel(100);
+        tenx_mcp::server_connection::ServerConnectionContext::new(notification_tx)
+    }
 
     #[tokio::test]
     async fn test_echo_tool() {
         let mut conn = TestConnection::new();
 
         // Test tools list
-        let tools_result = conn.tools_list().await.unwrap();
+        let context = create_test_context();
+        let tools_result = conn.tools_list(context).await.unwrap();
         assert_eq!(tools_result.tools.len(), 2);
         let echo_tool = tools_result
             .tools
@@ -177,8 +189,10 @@ mod tests {
         assert!(echo_tool.description.is_some());
 
         // Test execution
+        let context = create_test_context();
         let result = conn
             .tools_call(
+                context,
                 "echo".to_string(),
                 Some(json!({ "message": "Hello, World!" })),
             )
@@ -191,15 +205,24 @@ mod tests {
         }
 
         // Test error on missing arguments
-        let error = conn.tools_call("echo".to_string(), None).await.unwrap_err();
+        let context = create_test_context();
+        let error = conn
+            .tools_call(context, "echo".to_string(), None)
+            .await
+            .unwrap_err();
         match error {
             Error::InvalidParams(_) => {}
             _ => panic!("Expected InvalidParams error"),
         }
 
         // Test error on missing message field
+        let context = create_test_context();
         let error = conn
-            .tools_call("echo".to_string(), Some(json!({ "wrong_field": "value" })))
+            .tools_call(
+                context,
+                "echo".to_string(),
+                Some(json!({ "wrong_field": "value" })),
+            )
             .await
             .unwrap_err();
         match error {
@@ -213,14 +236,16 @@ mod tests {
         let mut conn = TestConnection::new();
 
         // Test tools list contains add tool
-        let tools_result = conn.tools_list().await.unwrap();
+        let context = create_test_context();
+        let tools_result = conn.tools_list(context).await.unwrap();
         let add_tool = tools_result.tools.iter().find(|t| t.name == "add").unwrap();
         assert_eq!(add_tool.name, "add");
         assert!(add_tool.description.is_some());
 
         // Test integer addition
+        let context = create_test_context();
         let result = conn
-            .tools_call("add".to_string(), Some(json!({ "a": 5, "b": 3 })))
+            .tools_call(context, "add".to_string(), Some(json!({ "a": 5, "b": 3 })))
             .await
             .unwrap();
         assert_eq!(result.content.len(), 1);
@@ -230,8 +255,13 @@ mod tests {
         }
 
         // Test float addition
+        let context = create_test_context();
         let result = conn
-            .tools_call("add".to_string(), Some(json!({ "a": 1.5, "b": 2.5 })))
+            .tools_call(
+                context,
+                "add".to_string(),
+                Some(json!({ "a": 1.5, "b": 2.5 })),
+            )
             .await
             .unwrap();
         assert_eq!(result.content.len(), 1);
@@ -241,8 +271,9 @@ mod tests {
         }
 
         // Test negative numbers
+        let context = create_test_context();
         let result = conn
-            .tools_call("add".to_string(), Some(json!({ "a": -5, "b": 3 })))
+            .tools_call(context, "add".to_string(), Some(json!({ "a": -5, "b": 3 })))
             .await
             .unwrap();
         assert_eq!(result.content.len(), 1);
@@ -252,15 +283,20 @@ mod tests {
         }
 
         // Test error on missing arguments
-        let error = conn.tools_call("add".to_string(), None).await.unwrap_err();
+        let context = create_test_context();
+        let error = conn
+            .tools_call(context, "add".to_string(), None)
+            .await
+            .unwrap_err();
         match error {
             Error::InvalidParams(_) => {}
             _ => panic!("Expected InvalidParams error"),
         }
 
         // Test error on missing 'a' field
+        let context = create_test_context();
         let error = conn
-            .tools_call("add".to_string(), Some(json!({ "b": 5 })))
+            .tools_call(context, "add".to_string(), Some(json!({ "b": 5 })))
             .await
             .unwrap_err();
         match error {
@@ -269,8 +305,9 @@ mod tests {
         }
 
         // Test error on missing 'b' field
+        let context = create_test_context();
         let error = conn
-            .tools_call("add".to_string(), Some(json!({ "a": 5 })))
+            .tools_call(context, "add".to_string(), Some(json!({ "a": 5 })))
             .await
             .unwrap_err();
         match error {
@@ -283,7 +320,8 @@ mod tests {
     async fn test_protocol_compliance() {
         // Test that our tools follow the MCP protocol specification
         let mut conn = TestConnection::new();
-        let tools_result = conn.tools_list().await.unwrap();
+        let context = create_test_context();
+        let tools_result = conn.tools_list(context).await.unwrap();
 
         for tool in &tools_result.tools {
             // Verify tool has a name

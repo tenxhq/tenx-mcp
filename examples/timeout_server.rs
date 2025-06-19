@@ -49,6 +49,7 @@ impl TimeoutTestConnection {
 impl ServerConnection for TimeoutTestConnection {
     async fn initialize(
         &mut self,
+        _context: tenx_mcp::server_connection::ServerConnectionContext,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -59,7 +60,10 @@ impl ServerConnection for TimeoutTestConnection {
         )
     }
 
-    async fn tools_list(&mut self) -> Result<ListToolsResult> {
+    async fn tools_list(
+        &mut self,
+        _context: tenx_mcp::server_connection::ServerConnectionContext,
+    ) -> Result<ListToolsResult> {
         let object_schema = ToolInputSchema {
             schema_type: "object".to_string(),
             properties: None,
@@ -87,6 +91,7 @@ impl ServerConnection for TimeoutTestConnection {
 
     async fn tools_call(
         &mut self,
+        _context: tenx_mcp::server_connection::ServerConnectionContext,
         name: String,
         _arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {

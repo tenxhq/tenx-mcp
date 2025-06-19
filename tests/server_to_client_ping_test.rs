@@ -76,6 +76,7 @@ impl ServerConnection for TestServerConnection {
 
     async fn initialize(
         &mut self,
+        _context: ServerConnectionContext,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -83,7 +84,7 @@ impl ServerConnection for TestServerConnection {
         Ok(InitializeResult::new("test-server", "1.0.0"))
     }
 
-    async fn pong(&mut self) -> Result<()> {
+    async fn pong(&mut self, _context: ServerConnectionContext) -> Result<()> {
         Ok(())
     }
 }

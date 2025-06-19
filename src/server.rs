@@ -228,7 +228,10 @@ impl ServerHandle {
                         match result {
                             Some(Ok(message)) => {
                                 if let Some(conn) = &mut connection {
-                                    if let Err(e) = handle_message_with_connection(conn, message, &mut sink_tx).await {
+                                    let context = ServerConnectionContext {
+                                        notification_tx: notification_tx.clone(),
+                                    };
+                                    if let Err(e) = handle_message_with_connection(conn, message, &mut sink_tx, context).await {
                                         error!("Error handling message: {}", e);
                                     }
                                 } else {
@@ -319,15 +322,17 @@ async fn handle_message_with_connection(
     connection: &mut Box<dyn ServerConnection>,
     message: JSONRPCMessage,
     sink: &mut SplitSink<Box<dyn TransportStream>, JSONRPCMessage>,
+    context: ServerConnectionContext,
 ) -> Result<()> {
     match message {
         JSONRPCMessage::Request(request) => {
-            let response_message = handle_request(connection, request.clone()).await;
+            let response_message =
+                handle_request(connection, request.clone(), context.clone()).await;
             tracing::info!("Server sending response: {:?}", response_message);
             sink.send(response_message).await?;
         }
         JSONRPCMessage::Notification(notification) => {
-            handle_notification(connection, notification).await?;
+            handle_notification(connection, notification, context).await?;
         }
         JSONRPCMessage::Response(_) => {
             warn!("Server received unexpected response message");
@@ -350,8 +355,9 @@ async fn handle_message_with_connection(
 async fn handle_request(
     connection: &mut Box<dyn ServerConnection>,
     request: JSONRPCRequest,
+    context: ServerConnectionContext,
 ) -> JSONRPCMessage {
-    let result = handle_request_inner(connection, request.clone()).await;
+    let result = handle_request_inner(connection, request.clone(), context).await;
 
     match result {
         Ok(value) => {
@@ -395,6 +401,7 @@ async fn handle_request(
 async fn handle_request_inner(
     connection: &mut Box<dyn ServerConnection>,
     request: JSONRPCRequest,
+    context: ServerConnectionContext,
 ) -> Result<serde_json::Value> {
     // Convert RequestParams to serde_json::Value
     let params = request
@@ -412,6 +419,7 @@ async fn handle_request_inner(
                 .map_err(|e| Error::InvalidParams(format!("initialize: {e}")))?;
             connection
                 .initialize(
+                    context.clone(),
                     params.protocol_version,
                     params.capabilities,
                     params.client_info,
@@ -421,10 +429,13 @@ async fn handle_request_inner(
         }
         "ping" => {
             info!("Server received ping request, sending automatic response");
-            connection.pong().await.map(|_| serde_json::json!({}))
+            connection
+                .pong(context.clone())
+                .await
+                .map(|_| serde_json::json!({}))
         }
         "tools/list" => connection
-            .tools_list()
+            .tools_list(context.clone())
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         "tools/call" => {
@@ -441,16 +452,16 @@ async fn handle_request_inner(
                     Error::InvalidParams(format!("tools/call: Invalid arguments format: {e}"))
                 })?;
             connection
-                .tools_call(params.name, arguments)
+                .tools_call(context.clone(), params.name, arguments)
                 .await
                 .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
         "resources/list" => connection
-            .resources_list()
+            .resources_list(context.clone())
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         "resources/templates/list" => connection
-            .resources_templates_list()
+            .resources_templates_list(context.clone())
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         "resources/read" => {
@@ -460,7 +471,7 @@ async fn handle_request_inner(
             let params = serde_json::from_value::<ReadResourceParams>(p)
                 .map_err(|e| Error::InvalidParams(format!("resources/read: {e}")))?;
             connection
-                .resources_read(params.uri)
+                .resources_read(context.clone(), params.uri)
                 .await
                 .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
@@ -474,7 +485,7 @@ async fn handle_request_inner(
                 Error::InvalidParams("resources/subscribe: Missing uri parameter".to_string())
             })?;
             connection
-                .resources_subscribe(uri.clone())
+                .resources_subscribe(context.clone(), uri.clone())
                 .await
                 .map(|_| serde_json::json!({}))
         }
@@ -490,12 +501,12 @@ async fn handle_request_inner(
                 Error::InvalidParams("resources/unsubscribe: Missing uri parameter".to_string())
             })?;
             connection
-                .resources_unsubscribe(uri.clone())
+                .resources_unsubscribe(context.clone(), uri.clone())
                 .await
                 .map(|_| serde_json::json!({}))
         }
         "prompts/list" => connection
-            .prompts_list()
+            .prompts_list(context.clone())
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         "prompts/get" => {
@@ -505,7 +516,7 @@ async fn handle_request_inner(
             let params = serde_json::from_value::<GetPromptParams>(p)
                 .map_err(|e| Error::InvalidParams(format!("prompts/get: {e}")))?;
             connection
-                .prompts_get(params.name, params.arguments)
+                .prompts_get(context.clone(), params.name, params.arguments)
                 .await
                 .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
@@ -516,7 +527,7 @@ async fn handle_request_inner(
             let params = serde_json::from_value::<CompleteParams>(p)
                 .map_err(|e| Error::InvalidParams(format!("completion/complete: {e}")))?;
             connection
-                .completion_complete(params.reference, params.argument)
+                .completion_complete(context.clone(), params.reference, params.argument)
                 .await
                 .and_then(|result| serde_json::to_value(result).map_err(Into::into))
         }
@@ -530,7 +541,7 @@ async fn handle_request_inner(
                 Error::InvalidParams("logging/setLevel: Missing level parameter".to_string())
             })?;
             connection
-                .logging_set_level(*level)
+                .logging_set_level(context.clone(), *level)
                 .await
                 .map(|_| serde_json::json!({}))
         }
@@ -542,6 +553,7 @@ async fn handle_request_inner(
 async fn handle_notification(
     connection: &mut Box<dyn ServerConnection>,
     notification: JSONRPCNotification,
+    context: ServerConnectionContext,
 ) -> Result<()> {
     debug!(
         "Received notification: {}",
@@ -564,7 +576,7 @@ async fn handle_notification(
     let value = serde_json::Value::Object(object);
 
     match serde_json::from_value::<ServerNotification>(value) {
-        Ok(typed) => connection.notification(typed).await,
+        Ok(typed) => connection.notification(context, typed).await,
         Err(e) => {
             warn!("Failed to deserialize client notification: {}", e);
             Ok(())

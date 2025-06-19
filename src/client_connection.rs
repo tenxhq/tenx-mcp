@@ -7,6 +7,7 @@ use crate::{
 };
 
 /// Context provided to ClientConnection implementations for interacting with the client
+#[derive(Debug, Clone)]
 pub struct ClientConnectionContext {
     /// Sender for client notifications
     pub(crate) notification_tx: broadcast::Sender<schema::ServerNotification>,

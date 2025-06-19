@@ -1007,6 +1007,7 @@ mod tests {
         impl crate::server_connection::ServerConnection for TestConnection {
             async fn initialize(
                 &mut self,
+                _context: crate::server_connection::ServerConnectionContext,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -1077,6 +1078,7 @@ mod tests {
         impl crate::server_connection::ServerConnection for DummyServerConnection {
             async fn initialize(
                 &mut self,
+                _context: crate::server_connection::ServerConnectionContext,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -1143,6 +1145,7 @@ mod tests {
         impl crate::server_connection::ServerConnection for NotifServerConnection {
             async fn initialize(
                 &mut self,
+                _context: crate::server_connection::ServerConnectionContext,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -1152,6 +1155,7 @@ mod tests {
 
             async fn notification(
                 &mut self,
+                _context: crate::server_connection::ServerConnectionContext,
                 notification: crate::schema::ServerNotification,
             ) -> Result<()> {
                 if matches!(
@@ -1290,6 +1294,7 @@ mod tests {
         impl crate::server_connection::ServerConnection for TestStreamConnection {
             async fn initialize(
                 &mut self,
+                _context: crate::server_connection::ServerConnectionContext,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,

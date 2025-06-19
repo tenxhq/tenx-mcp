@@ -6,6 +6,11 @@
 use std::collections::HashMap;
 use tenx_mcp::{error::Error, schema::*, server_connection::ServerConnection, Result};
 
+fn create_test_context() -> tenx_mcp::server_connection::ServerConnectionContext {
+    let (notification_tx, _) = tokio::sync::broadcast::channel(100);
+    tenx_mcp::server_connection::ServerConnectionContext::new(notification_tx)
+}
+
 #[tokio::test]
 async fn test_method_not_found() {
     // Test that the default tools_call implementation returns ToolNotFound
@@ -16,6 +21,7 @@ async fn test_method_not_found() {
     impl ServerConnection for MinimalConnection {
         async fn initialize(
             &mut self,
+            _context: tenx_mcp::server_connection::ServerConnectionContext,
             _protocol_version: String,
             _capabilities: ClientCapabilities,
             _client_info: Implementation,
@@ -37,7 +43,10 @@ async fn test_method_not_found() {
 
     // Call a tool on a connection that doesn't implement tools_call
     // This should use the default implementation which returns ToolNotFound
-    let result = conn.tools_call("non_existent".to_string(), None).await;
+    let context = create_test_context();
+    let result = conn
+        .tools_call(context, "non_existent".to_string(), None)
+        .await;
 
     assert!(result.is_err());
     match result {
@@ -59,6 +68,7 @@ async fn test_invalid_params() {
     impl ServerConnection for ConnectionWithValidation {
         async fn initialize(
             &mut self,
+            _context: tenx_mcp::server_connection::ServerConnectionContext,
             _protocol_version: String,
             _capabilities: ClientCapabilities,
             _client_info: Implementation,
@@ -78,7 +88,10 @@ async fn test_invalid_params() {
             })
         }
 
-        async fn tools_list(&mut self) -> Result<ListToolsResult> {
+        async fn tools_list(
+            &mut self,
+            _context: tenx_mcp::server_connection::ServerConnectionContext,
+        ) -> Result<ListToolsResult> {
             let schema = ToolInputSchema {
                 schema_type: "object".to_string(),
                 properties: Some({
@@ -103,6 +116,7 @@ async fn test_invalid_params() {
 
         async fn tools_call(
             &mut self,
+            _context: tenx_mcp::server_connection::ServerConnectionContext,
             name: String,
             arguments: Option<serde_json::Value>,
         ) -> Result<CallToolResult> {
@@ -131,12 +145,20 @@ async fn test_invalid_params() {
     let mut conn = ConnectionWithValidation;
 
     // Test 1: Call with missing arguments
-    let result = conn.tools_call("test_tool".to_string(), None).await;
+    let context = create_test_context();
+    let result = conn
+        .tools_call(context, "test_tool".to_string(), None)
+        .await;
     assert!(matches!(result, Err(Error::InvalidParams(_))));
 
     // Test 2: Call with empty object (missing required param)
+    let context = create_test_context();
     let result = conn
-        .tools_call("test_tool".to_string(), Some(serde_json::json!({})))
+        .tools_call(
+            context,
+            "test_tool".to_string(),
+            Some(serde_json::json!({})),
+        )
         .await;
     match result {
         Err(Error::InvalidParams(msg)) => {
@@ -146,8 +168,10 @@ async fn test_invalid_params() {
     }
 
     // Test 3: Call with correct parameters should succeed
+    let context = create_test_context();
     let result = conn
         .tools_call(
+            context,
             "test_tool".to_string(),
             Some(serde_json::json!({ "required_param": "test" })),
         )
@@ -165,6 +189,7 @@ async fn test_successful_response() {
     impl ServerConnection for ConnectionWithTools {
         async fn initialize(
             &mut self,
+            _context: tenx_mcp::server_connection::ServerConnectionContext,
             _protocol_version: String,
             _capabilities: ClientCapabilities,
             _client_info: Implementation,
@@ -188,7 +213,10 @@ async fn test_successful_response() {
             })
         }
 
-        async fn tools_list(&mut self) -> Result<ListToolsResult> {
+        async fn tools_list(
+            &mut self,
+            _context: tenx_mcp::server_connection::ServerConnectionContext,
+        ) -> Result<ListToolsResult> {
             Ok(ListToolsResult::new()
                 .with_tool(
                     Tool::new("echo", ToolInputSchema::default())
@@ -200,7 +228,10 @@ async fn test_successful_response() {
                 ))
         }
 
-        async fn resources_list(&mut self) -> Result<ListResourcesResult> {
+        async fn resources_list(
+            &mut self,
+            _context: tenx_mcp::server_connection::ServerConnectionContext,
+        ) -> Result<ListResourcesResult> {
             Ok(ListResourcesResult {
                 resources: vec![Resource {
                     uri: "file:///test.txt".to_string(),
@@ -218,8 +249,10 @@ async fn test_successful_response() {
     let mut conn = ConnectionWithTools;
 
     // Test successful initialization
+    let context = create_test_context();
     let init_result = conn
         .initialize(
+            context,
             LATEST_PROTOCOL_VERSION.to_string(),
             ClientCapabilities::default(),
             Implementation {
@@ -235,13 +268,15 @@ async fn test_successful_response() {
     assert!(init_result.capabilities.resources.is_some());
 
     // Test successful tools listing
-    let tools = conn.tools_list().await.unwrap();
+    let context = create_test_context();
+    let tools = conn.tools_list(context).await.unwrap();
     assert_eq!(tools.tools.len(), 2);
     assert_eq!(tools.tools[0].name, "echo");
     assert_eq!(tools.tools[1].name, "add");
 
     // Test successful resources listing
-    let resources = conn.resources_list().await.unwrap();
+    let context = create_test_context();
+    let resources = conn.resources_list(context).await.unwrap();
     assert_eq!(resources.resources.len(), 1);
     assert_eq!(resources.resources[0].uri, "file:///test.txt");
 }
@@ -256,6 +291,7 @@ async fn test_error_propagation() {
     impl ServerConnection for FaultyConnection {
         async fn initialize(
             &mut self,
+            _context: tenx_mcp::server_connection::ServerConnectionContext,
             _protocol_version: String,
             _capabilities: ClientCapabilities,
             _client_info: Implementation,
@@ -266,13 +302,18 @@ async fn test_error_propagation() {
             ))
         }
 
-        async fn resources_read(&mut self, uri: String) -> Result<ReadResourceResult> {
+        async fn resources_read(
+            &mut self,
+            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            uri: String,
+        ) -> Result<ReadResourceResult> {
             // Simulate resource not found
             Err(Error::ResourceNotFound { uri })
         }
 
         async fn prompts_get(
             &mut self,
+            _context: tenx_mcp::server_connection::ServerConnectionContext,
             name: String,
             _arguments: Option<HashMap<String, serde_json::Value>>,
         ) -> Result<GetPromptResult> {
@@ -284,8 +325,10 @@ async fn test_error_propagation() {
     let mut conn = FaultyConnection;
 
     // Test initialization error
+    let context = create_test_context();
     let init_result = conn
         .initialize(
+            context,
             LATEST_PROTOCOL_VERSION.to_string(),
             ClientCapabilities::default(),
             Implementation {
@@ -303,7 +346,10 @@ async fn test_error_propagation() {
     }
 
     // Test resource not found
-    let read_result = conn.resources_read("file:///missing.txt".to_string()).await;
+    let context = create_test_context();
+    let read_result = conn
+        .resources_read(context, "file:///missing.txt".to_string())
+        .await;
     match read_result {
         Err(Error::ResourceNotFound { uri }) => {
             assert_eq!(uri, "file:///missing.txt");
@@ -312,7 +358,10 @@ async fn test_error_propagation() {
     }
 
     // Test prompt not found (using MethodNotFound)
-    let prompt_result = conn.prompts_get("missing_prompt".to_string(), None).await;
+    let context = create_test_context();
+    let prompt_result = conn
+        .prompts_get(context, "missing_prompt".to_string(), None)
+        .await;
     match prompt_result {
         Err(Error::MethodNotFound(method)) => {
             assert!(method.contains("missing_prompt"));
