@@ -3,7 +3,6 @@ use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tracing::{debug, error, info, warn};
@@ -20,24 +19,10 @@ use crate::{
 };
 
 /// Type for handling either a response or error from JSON-RPC
+#[derive(Debug)]
 enum ResponseOrError {
     Response(JSONRPCResponse),
     Error(JSONRPCError),
-}
-
-/// Configuration for the MCP client
-#[derive(Clone, Debug)]
-pub struct ClientConfig {
-    /// Default timeout for requests
-    pub request_timeout: Duration,
-}
-
-impl Default for ClientConfig {
-    fn default() -> Self {
-        Self {
-            request_timeout: Duration::from_secs(30),
-        }
-    }
 }
 
 type TransportSink = Arc<Mutex<SplitSink<Box<dyn TransportStream>, JSONRPCMessage>>>;

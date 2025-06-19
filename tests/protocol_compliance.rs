@@ -13,7 +13,7 @@ use serde_json::json;
 use tenx_mcp::{
     error::{Error, Result},
     schema::*,
-    server_connection::ServerConnection,
+    ServerConnection, ServerConnectionContext,
 };
 
 /// Test connection implementation with echo and add tools
@@ -84,7 +84,7 @@ impl TestConnection {
 impl ServerConnection for TestConnection {
     async fn initialize(
         &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
+        _context: ServerConnectionContext,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -106,10 +106,7 @@ impl ServerConnection for TestConnection {
         })
     }
 
-    async fn tools_list(
-        &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
-    ) -> Result<ListToolsResult> {
+    async fn tools_list(&mut self, _context: ServerConnectionContext) -> Result<ListToolsResult> {
         let mut result = ListToolsResult::new();
         for tool in self.tools.values() {
             result = result.with_tool(tool.clone());
@@ -119,7 +116,7 @@ impl ServerConnection for TestConnection {
 
     async fn tools_call(
         &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
+        _context: ServerConnectionContext,
         name: String,
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
@@ -167,9 +164,9 @@ mod tests {
     use super::*;
     use tokio::sync::broadcast;
 
-    fn create_test_context() -> tenx_mcp::server_connection::ServerConnectionContext {
+    fn create_test_context() -> ServerConnectionContext {
         let (notification_tx, _) = broadcast::channel(100);
-        tenx_mcp::server_connection::ServerConnectionContext::new(notification_tx)
+        ServerConnectionContext::new(notification_tx)
     }
 
     #[tokio::test]

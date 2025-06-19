@@ -1,9 +1,9 @@
-pub mod client;
-pub mod client_connection;
+mod client;
+mod client_connection;
 pub mod error;
 pub mod schema;
-pub mod server;
-pub mod server_connection;
+mod server;
+mod server_connection;
 
 mod codec;
 mod connection;
@@ -17,13 +17,14 @@ pub mod testutils;
 // Re-export commonly used types
 pub use client::Client;
 pub use client_connection::{ClientConnection, ClientConnectionContext};
+pub use server::{Server, ServerHandle};
+pub use server_connection::{ServerConnection, ServerConnectionContext};
+
 pub use error::{Error, Result};
 pub use schema::{
     ClientCapabilities, Content, Implementation, JSONRPCNotification, ResourceContents,
     ToolInputSchema, ToolsCapability,
 };
-pub use server::{Server, ServerHandle};
-pub use server_connection::{ServerConnection, ServerConnectionContext};
 
 // Re-export schemars for users
 pub use schemars;

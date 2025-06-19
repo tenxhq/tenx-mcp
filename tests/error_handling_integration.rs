@@ -7,11 +7,9 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use tenx_mcp::{
     error::{Error, Result},
-    schema::*,
-    server::Server,
-    server_connection::ServerConnection,
+    schema,
     testutils::{make_duplex_pair, read_message, send_message},
-    ServerHandle,
+    Server, ServerConnection, ServerConnectionContext, ServerHandle,
 };
 use tokio::io::BufReader;
 
@@ -25,20 +23,20 @@ struct TestConnection;
 impl ServerConnection for TestConnection {
     async fn initialize(
         &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
+        _context: ServerConnectionContext,
         _protocol_version: String,
-        _capabilities: ClientCapabilities,
-        _client_info: Implementation,
-    ) -> Result<InitializeResult> {
-        Ok(InitializeResult {
-            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-            capabilities: ServerCapabilities {
-                tools: Some(ToolsCapability {
+        _capabilities: schema::ClientCapabilities,
+        _client_info: schema::Implementation,
+    ) -> Result<schema::InitializeResult> {
+        Ok(schema::InitializeResult {
+            protocol_version: schema::LATEST_PROTOCOL_VERSION.to_string(),
+            capabilities: schema::ServerCapabilities {
+                tools: Some(schema::ToolsCapability {
                     list_changed: Some(true),
                 }),
                 ..Default::default()
             },
-            server_info: Implementation {
+            server_info: schema::Implementation {
                 name: "test-server".to_string(),
                 version: "1.0.0".to_string(),
             },
@@ -49,9 +47,9 @@ impl ServerConnection for TestConnection {
 
     async fn tools_list(
         &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
-    ) -> Result<ListToolsResult> {
-        let schema = ToolInputSchema {
+        _context: ServerConnectionContext,
+    ) -> Result<schema::ListToolsResult> {
+        let schema = schema::ToolInputSchema {
             schema_type: "object".to_string(),
             properties: Some({
                 let mut props = HashMap::new();
@@ -64,16 +62,16 @@ impl ServerConnection for TestConnection {
             required: Some(vec!["required_field".to_string()]),
         };
 
-        Ok(ListToolsResult::new()
-            .with_tool(Tool::new("test", schema).with_description("Test tool")))
+        Ok(schema::ListToolsResult::new()
+            .with_tool(schema::Tool::new("test", schema).with_description("Test tool")))
     }
 
     async fn tools_call(
         &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
+        _context: ServerConnectionContext,
         name: String,
         arguments: Option<serde_json::Value>,
-    ) -> Result<CallToolResult> {
+    ) -> Result<schema::CallToolResult> {
         // We only handle the `test` tool in this fake implementation.
         if name != "test" {
             return Err(Error::ToolExecutionFailed {
@@ -89,7 +87,7 @@ impl ServerConnection for TestConnection {
             .get("required_field")
             .ok_or_else(|| Error::InvalidParams("strict_params: Missing required_field".into()))?;
 
-        Ok(CallToolResult::new()
+        Ok(schema::CallToolResult::new()
             .with_text_content("Success")
             .is_error(false))
     }
@@ -114,10 +112,10 @@ async fn test_error_responses() {
             .expect("failed to start server");
 
     // --- Test 1: Unknown method ------------------------------------------------
-    let request_unknown = JSONRPCMessage::Request(JSONRPCRequest {
-        jsonrpc: JSONRPC_VERSION.to_string(),
-        id: RequestId::Number(1),
-        request: Request {
+    let request_unknown = schema::JSONRPCMessage::Request(schema::JSONRPCRequest {
+        jsonrpc: schema::JSONRPC_VERSION.to_string(),
+        id: schema::RequestId::Number(1),
+        request: schema::Request {
             method: "unknown".to_string(),
             params: None,
         },
@@ -132,8 +130,8 @@ async fn test_error_responses() {
     let response = read_message(&mut reader).await.expect("read failed");
 
     match response {
-        JSONRPCMessage::Error(err) => {
-            assert_eq!(err.error.code, METHOD_NOT_FOUND);
+        schema::JSONRPCMessage::Error(err) => {
+            assert_eq!(err.error.code, schema::METHOD_NOT_FOUND);
         }
         other => panic!("unexpected message: {other:?}"),
     }
@@ -145,10 +143,10 @@ async fn test_error_responses() {
     // buffered reader for the remainder of the test.
 
     // --- Test 2: Missing params for initialise --------------------------------
-    let request_init_missing = JSONRPCMessage::Request(JSONRPCRequest {
-        jsonrpc: JSONRPC_VERSION.to_string(),
-        id: RequestId::Number(2),
-        request: Request {
+    let request_init_missing = schema::JSONRPCMessage::Request(schema::JSONRPCRequest {
+        jsonrpc: schema::JSONRPC_VERSION.to_string(),
+        id: schema::RequestId::Number(2),
+        request: schema::Request {
             method: "initialize".to_string(),
             params: None,
         },
@@ -161,8 +159,8 @@ async fn test_error_responses() {
     let response = read_message(&mut reader).await.expect("read failed");
 
     match response {
-        JSONRPCMessage::Error(err) => {
-            assert_eq!(err.error.code, INVALID_PARAMS);
+        schema::JSONRPCMessage::Error(err) => {
+            assert_eq!(err.error.code, schema::INVALID_PARAMS);
         }
         other => panic!("unexpected message: {other:?}"),
     }
@@ -174,12 +172,12 @@ async fn test_error_responses() {
     params_map.insert("name".to_string(), serde_json::json!("test"));
     params_map.insert("arguments".to_string(), serde_json::json!({}));
 
-    let request_tool_missing = JSONRPCMessage::Request(JSONRPCRequest {
-        jsonrpc: JSONRPC_VERSION.to_string(),
-        id: RequestId::Number(3),
-        request: Request {
+    let request_tool_missing = schema::JSONRPCMessage::Request(schema::JSONRPCRequest {
+        jsonrpc: schema::JSONRPC_VERSION.to_string(),
+        id: schema::RequestId::Number(3),
+        request: schema::Request {
             method: "tools/call".to_string(),
-            params: Some(RequestParams {
+            params: Some(schema::RequestParams {
                 meta: None,
                 other: params_map,
             }),
@@ -193,8 +191,8 @@ async fn test_error_responses() {
     let response = read_message(&mut reader).await.expect("read failed");
 
     match response {
-        JSONRPCMessage::Error(err) => {
-            assert_eq!(err.error.code, INVALID_PARAMS);
+        schema::JSONRPCMessage::Error(err) => {
+            assert_eq!(err.error.code, schema::INVALID_PARAMS);
             assert!(err.error.message.contains("Missing required_field"));
         }
         other => panic!("unexpected message: {other:?}"),

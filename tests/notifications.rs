@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use tenx_mcp::error::Result;
-use tenx_mcp::{schema::*, server_connection::ServerConnection};
+use tenx_mcp::{
+    schema, ClientConnection, ClientConnectionContext, ServerConnection, ServerConnectionContext,
+};
 
 #[tokio::test]
 async fn test_server_to_client_notifications() {
@@ -16,10 +18,10 @@ async fn test_server_to_client_notifications() {
     }
 
     #[async_trait]
-    impl tenx_mcp::client_connection::ClientConnection for NotificationRecorder {
+    impl ClientConnection for NotificationRecorder {
         async fn notification(
             &mut self,
-            _context: tenx_mcp::client_connection::ClientConnectionContext,
+            _context: ClientConnectionContext,
             notification: tenx_mcp::schema::ClientNotification,
         ) -> Result<()> {
             tracing::info!("Client received notification: {:?}", notification);
@@ -42,18 +44,13 @@ async fn test_server_to_client_notifications() {
 
     #[async_trait]
     impl ServerConnection for NotifyingServer {
-        async fn on_connect(
-            &mut self,
-            context: tenx_mcp::server_connection::ServerConnectionContext,
-        ) -> Result<()> {
+        async fn on_connect(&mut self, context: ServerConnectionContext) -> Result<()> {
             // Send a notification after connection
             let sent_notification = self.sent_notification.clone();
             tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                 // Send roots list changed notification
-                match context
-                    .send_notification(tenx_mcp::schema::ClientNotification::RootsListChanged)
-                {
+                match context.send_notification(schema::ClientNotification::RootsListChanged) {
                     Ok(_) => {
                         tracing::info!("Server sent roots_list_changed notification");
                         *sent_notification.lock().unwrap() = true;
@@ -68,12 +65,12 @@ async fn test_server_to_client_notifications() {
 
         async fn initialize(
             &mut self,
-            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            _context: ServerConnectionContext,
             _protocol_version: String,
-            _capabilities: ClientCapabilities,
-            _client_info: Implementation,
-        ) -> Result<InitializeResult> {
-            Ok(InitializeResult::new("notifying-server", "0.1.0"))
+            _capabilities: schema::ClientCapabilities,
+            _client_info: schema::Implementation,
+        ) -> Result<schema::InitializeResult> {
+            Ok(schema::InitializeResult::new("notifying-server", "0.1.0"))
         }
     }
 

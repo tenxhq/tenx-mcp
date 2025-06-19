@@ -12,17 +12,15 @@ use std::sync::Arc;
 use std::time::Duration;
 use tenx_mcp::{
     error::{Error, Result},
-    schema::*,
-    server::Server,
-    server_connection::ServerConnection,
+    schema, Server, ServerConnection, ServerConnectionContext,
 };
 use tokio::time::sleep;
 use tracing::{info, warn};
 
 /// Connection that demonstrates various timeout and retry scenarios
 struct TimeoutTestConnection {
-    server_info: Implementation,
-    capabilities: ServerCapabilities,
+    server_info: schema::Implementation,
+    capabilities: schema::ServerCapabilities,
     flakey_fail_count: Arc<AtomicU32>,
     failures_before_success: u32,
     slow_delay_seconds: u64,
@@ -30,8 +28,8 @@ struct TimeoutTestConnection {
 
 impl TimeoutTestConnection {
     fn new(
-        server_info: Implementation,
-        capabilities: ServerCapabilities,
+        server_info: schema::Implementation,
+        capabilities: schema::ServerCapabilities,
         failures_before_success: u32,
         slow_delay_seconds: u64,
     ) -> Self {
@@ -49,52 +47,52 @@ impl TimeoutTestConnection {
 impl ServerConnection for TimeoutTestConnection {
     async fn initialize(
         &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
+        _context: ServerConnectionContext,
         _protocol_version: String,
-        _capabilities: ClientCapabilities,
-        _client_info: Implementation,
-    ) -> Result<InitializeResult> {
+        _capabilities: schema::ClientCapabilities,
+        _client_info: schema::Implementation,
+    ) -> Result<schema::InitializeResult> {
         Ok(
-            InitializeResult::new(&self.server_info.name, &self.server_info.version)
+            schema::InitializeResult::new(&self.server_info.name, &self.server_info.version)
                 .with_capabilities(self.capabilities.clone()),
         )
     }
 
     async fn tools_list(
         &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
-    ) -> Result<ListToolsResult> {
-        let object_schema = ToolInputSchema {
+        _context: ServerConnectionContext,
+    ) -> Result<schema::ListToolsResult> {
+        let object_schema = schema::ToolInputSchema {
             schema_type: "object".to_string(),
             properties: None,
             required: None,
         };
 
-        Ok(ListToolsResult::new()
+        Ok(schema::ListToolsResult::new()
             .with_tool(
-                Tool::new("flakey_operation", object_schema.clone())
+                schema::Tool::new("flakey_operation", object_schema.clone())
                     .with_description("Simulates a flaky network operation"),
             )
             .with_tool(
-                Tool::new("slow_operation", object_schema.clone())
+                schema::Tool::new("slow_operation", object_schema.clone())
                     .with_description("Simulates a slow operation that may timeout"),
             )
             .with_tool(
-                Tool::new("broken_operation", object_schema.clone())
+                schema::Tool::new("broken_operation", object_schema.clone())
                     .with_description("Always fails with a non-retryable error"),
             )
             .with_tool(
-                Tool::new("reliable_operation", object_schema)
+                schema::Tool::new("reliable_operation", object_schema)
                     .with_description("Always succeeds immediately"),
             ))
     }
 
     async fn tools_call(
         &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
+        _context: ServerConnectionContext,
         name: String,
         _arguments: Option<serde_json::Value>,
-    ) -> Result<CallToolResult> {
+    ) -> Result<schema::CallToolResult> {
         match name.as_str() {
             "flakey_operation" => {
                 let count = self.flakey_fail_count.fetch_add(1, Ordering::SeqCst);
@@ -109,7 +107,7 @@ impl ServerConnection for TimeoutTestConnection {
                     if count >= self.failures_before_success {
                         self.flakey_fail_count.store(0, Ordering::SeqCst);
                     }
-                    Ok(CallToolResult::new()
+                    Ok(schema::CallToolResult::new()
                         .with_text_content(format!("Success after {} attempts", count + 1))
                         .is_error(false))
                 }
@@ -122,7 +120,7 @@ impl ServerConnection for TimeoutTestConnection {
                 sleep(Duration::from_secs(self.slow_delay_seconds)).await;
                 info!("SlowTool completed");
 
-                Ok(CallToolResult::new()
+                Ok(schema::CallToolResult::new()
                     .with_text_content("Operation completed successfully")
                     .is_error(false))
             }
@@ -132,7 +130,7 @@ impl ServerConnection for TimeoutTestConnection {
                     "broken_operation: This operation is permanently broken".to_string(),
                 ))
             }
-            "reliable_operation" => Ok(CallToolResult::new()
+            "reliable_operation" => Ok(schema::CallToolResult::new()
                 .with_text_content("Reliable operation completed")
                 .is_error(false)),
             _ => Err(Error::ToolExecutionFailed {
@@ -169,12 +167,12 @@ async fn main() -> Result<()> {
     let addr = format!("{host}:{port}");
 
     // Create server configuration
-    let server_info = Implementation {
+    let server_info = schema::Implementation {
         name: "timeout-test-server".to_string(),
         version: "1.0.0".to_string(),
     };
 
-    let capabilities = ServerCapabilities::default();
+    let capabilities = schema::ServerCapabilities::default();
 
     // Log server capabilities
     info!("Starting timeout test server on {}", addr);

@@ -11,7 +11,8 @@ use rmcp::ServiceExt;
 use serde_json::json;
 use tenx_mcp::error::{Error, Result};
 use tenx_mcp::{
-    schema::*, server_connection::ServerConnection, testutils::make_duplex_pair, Client, Server,
+    schema::*, testutils::make_duplex_pair, Client, Server, ServerConnection,
+    ServerConnectionContext,
 };
 
 struct EchoConnection;
@@ -20,7 +21,7 @@ struct EchoConnection;
 impl ServerConnection for EchoConnection {
     async fn initialize(
         &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
+        _context: ServerConnectionContext,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -28,10 +29,7 @@ impl ServerConnection for EchoConnection {
         Ok(InitializeResult::new("test-server", "0.1.0").with_tools(true))
     }
 
-    async fn tools_list(
-        &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
-    ) -> Result<ListToolsResult> {
+    async fn tools_list(&mut self, _context: ServerConnectionContext) -> Result<ListToolsResult> {
         tracing::info!("EchoConnection.tools_list called");
         let schema = ToolInputSchema {
             schema_type: "object".to_string(),
@@ -55,7 +53,7 @@ impl ServerConnection for EchoConnection {
 
     async fn tools_call(
         &mut self,
-        _context: tenx_mcp::server_connection::ServerConnectionContext,
+        _context: ServerConnectionContext,
         name: String,
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {

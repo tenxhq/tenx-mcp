@@ -1,11 +1,5 @@
 use async_trait::async_trait;
-use tenx_mcp::{
-    client_connection::{ClientConnection, ClientConnectionContext},
-    schema::{
-        CreateMessageParams, CreateMessageResult, ListRootsResult, SamplingContent, TextContent,
-    },
-    Client, Result,
-};
+use tenx_mcp::{schema, Client, ClientConnection, ClientConnectionContext, Result};
 
 /// Example client connection that handles server requests
 struct MyClientConnection {
@@ -18,7 +12,7 @@ impl ClientConnection for MyClientConnection {
         println!("Client connection established for: {}", self.name);
 
         // Example: Send a notification when connected
-        context.send_notification(tenx_mcp::schema::ServerNotification::ToolListChanged)?;
+        context.send_notification(schema::ServerNotification::ToolListChanged)?;
 
         Ok(())
     }
@@ -37,8 +31,8 @@ impl ClientConnection for MyClientConnection {
         &mut self,
         _context: ClientConnectionContext,
         method: &str,
-        params: CreateMessageParams,
-    ) -> Result<CreateMessageResult> {
+        params: schema::CreateMessageParams,
+    ) -> Result<schema::CreateMessageResult> {
         println!(
             "Server requested message creation via {}: {:?}",
             method, params
@@ -50,14 +44,14 @@ impl ClientConnection for MyClientConnection {
             .messages
             .last()
             .and_then(|m| match &m.content {
-                SamplingContent::Text(text_content) => Some(text_content.text.as_str()),
+                schema::SamplingContent::Text(text_content) => Some(text_content.text.as_str()),
                 _ => None,
             })
             .unwrap_or("(no message)");
 
-        Ok(CreateMessageResult {
+        Ok(schema::CreateMessageResult {
             role: tenx_mcp::schema::Role::Assistant,
-            content: SamplingContent::Text(TextContent {
+            content: schema::SamplingContent::Text(schema::TextContent {
                 text: format!("Response to: {last_message_text}"),
                 annotations: None,
             }),
@@ -67,10 +61,13 @@ impl ClientConnection for MyClientConnection {
         })
     }
 
-    async fn list_roots(&mut self, _context: ClientConnectionContext) -> Result<ListRootsResult> {
+    async fn list_roots(
+        &mut self,
+        _context: ClientConnectionContext,
+    ) -> Result<schema::ListRootsResult> {
         println!("Server requested roots list");
 
-        Ok(ListRootsResult {
+        Ok(schema::ListRootsResult {
             roots: vec![tenx_mcp::schema::Root {
                 uri: "file:///home/user/project".to_string(),
                 name: Some("My Project".to_string()),

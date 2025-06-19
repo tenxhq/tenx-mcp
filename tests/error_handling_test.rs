@@ -4,11 +4,11 @@
 //! without the complexity of setting up full client-server communication.
 
 use std::collections::HashMap;
-use tenx_mcp::{error::Error, schema::*, server_connection::ServerConnection, Result};
+use tenx_mcp::{error::Error, schema::*, Result, ServerConnection, ServerConnectionContext};
 
-fn create_test_context() -> tenx_mcp::server_connection::ServerConnectionContext {
+fn create_test_context() -> ServerConnectionContext {
     let (notification_tx, _) = tokio::sync::broadcast::channel(100);
-    tenx_mcp::server_connection::ServerConnectionContext::new(notification_tx)
+    ServerConnectionContext::new(notification_tx)
 }
 
 #[tokio::test]
@@ -21,7 +21,7 @@ async fn test_method_not_found() {
     impl ServerConnection for MinimalConnection {
         async fn initialize(
             &mut self,
-            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            _context: ServerConnectionContext,
             _protocol_version: String,
             _capabilities: ClientCapabilities,
             _client_info: Implementation,
@@ -68,7 +68,7 @@ async fn test_invalid_params() {
     impl ServerConnection for ConnectionWithValidation {
         async fn initialize(
             &mut self,
-            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            _context: ServerConnectionContext,
             _protocol_version: String,
             _capabilities: ClientCapabilities,
             _client_info: Implementation,
@@ -90,7 +90,7 @@ async fn test_invalid_params() {
 
         async fn tools_list(
             &mut self,
-            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            _context: ServerConnectionContext,
         ) -> Result<ListToolsResult> {
             let schema = ToolInputSchema {
                 schema_type: "object".to_string(),
@@ -116,7 +116,7 @@ async fn test_invalid_params() {
 
         async fn tools_call(
             &mut self,
-            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            _context: ServerConnectionContext,
             name: String,
             arguments: Option<serde_json::Value>,
         ) -> Result<CallToolResult> {
@@ -189,7 +189,7 @@ async fn test_successful_response() {
     impl ServerConnection for ConnectionWithTools {
         async fn initialize(
             &mut self,
-            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            _context: ServerConnectionContext,
             _protocol_version: String,
             _capabilities: ClientCapabilities,
             _client_info: Implementation,
@@ -215,7 +215,7 @@ async fn test_successful_response() {
 
         async fn tools_list(
             &mut self,
-            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            _context: ServerConnectionContext,
         ) -> Result<ListToolsResult> {
             Ok(ListToolsResult::new()
                 .with_tool(
@@ -230,7 +230,7 @@ async fn test_successful_response() {
 
         async fn resources_list(
             &mut self,
-            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            _context: ServerConnectionContext,
         ) -> Result<ListResourcesResult> {
             Ok(ListResourcesResult {
                 resources: vec![Resource {
@@ -291,7 +291,7 @@ async fn test_error_propagation() {
     impl ServerConnection for FaultyConnection {
         async fn initialize(
             &mut self,
-            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            _context: ServerConnectionContext,
             _protocol_version: String,
             _capabilities: ClientCapabilities,
             _client_info: Implementation,
@@ -304,7 +304,7 @@ async fn test_error_propagation() {
 
         async fn resources_read(
             &mut self,
-            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            _context: ServerConnectionContext,
             uri: String,
         ) -> Result<ReadResourceResult> {
             // Simulate resource not found
@@ -313,7 +313,7 @@ async fn test_error_propagation() {
 
         async fn prompts_get(
             &mut self,
-            _context: tenx_mcp::server_connection::ServerConnectionContext,
+            _context: ServerConnectionContext,
             name: String,
             _arguments: Option<HashMap<String, serde_json::Value>>,
         ) -> Result<GetPromptResult> {
