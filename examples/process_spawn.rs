@@ -5,7 +5,7 @@
 //! - Connect to it using the process's stdin/stdout
 //! - Manage the process lifecycle
 
-use tenx_mcp::{Client, ClientCapabilities, Implementation, Result};
+use tenx_mcp::{schema, Client, Result};
 use tokio::process::Command;
 use tracing::{error, info, Level};
 
@@ -38,13 +38,13 @@ async fn main() -> Result<()> {
     };
 
     // Initialize the connection
-    let client_info = Implementation {
+    let client_info = schema::Implementation {
         name: "process-spawn-example".to_string(),
         version: "0.1.0".to_string(),
     };
 
     match client
-        .initialize(client_info, ClientCapabilities::default())
+        .initialize(client_info, schema::ClientCapabilities::default())
         .await
     {
         Ok(result) => {

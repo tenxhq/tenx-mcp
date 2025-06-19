@@ -10,11 +10,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use serde_json::json;
-use tenx_mcp::{
-    error::{Error, Result},
-    schema::*,
-    ServerConnection, ServerConnectionContext,
-};
+use tenx_mcp::{schema::*, Error, Result, ServerConnection, ServerConnectionContext};
 
 /// Test connection implementation with echo and add tools
 struct TestConnection {

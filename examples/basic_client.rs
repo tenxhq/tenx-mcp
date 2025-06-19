@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
-use tenx_mcp::{schemars, Client, Content, Result};
+use tenx_mcp::{schema, schemars, Client, Result};
 use tracing::info;
 
 /// Echo tool input parameters - must match the server definition
@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
         .await?;
 
     // Assume text response
-    if let Some(Content::Text(text_content)) = result.content.first() {
+    if let Some(schema::Content::Text(text_content)) = result.content.first() {
         info!("Response: {}", text_content.text);
     }
 

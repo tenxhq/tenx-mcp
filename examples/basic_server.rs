@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::env;
 use tenx_mcp::{
-    error::Error, schema::*, schemars, Result, Server, ServerConnection, ServerConnectionContext,
+    schema::*, schemars, Error, Result, Server, ServerConnection, ServerConnectionContext,
 };
 use tracing::info;
 

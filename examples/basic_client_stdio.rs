@@ -8,7 +8,7 @@
 //!   cargo run --example basic_client_stdio
 
 use serde::{Deserialize, Serialize};
-use tenx_mcp::{schemars, Client, ClientCapabilities, Implementation, Result};
+use tenx_mcp::{schema, schemars, Client, Result};
 use tokio::process::Command;
 use tracing::info;
 
@@ -36,13 +36,13 @@ async fn main() -> Result<()> {
     let mut child = client.connect_process(cmd).await?;
 
     // Initialize the connection
-    let client_info = Implementation {
+    let client_info = schema::Implementation {
         name: "basic-client-stdio".to_string(),
         version: "0.1.0".to_string(),
     };
 
     let init_result = client
-        .initialize(client_info, ClientCapabilities::default())
+        .initialize(client_info, schema::ClientCapabilities::default())
         .await?;
 
     // Get server info from initialization result

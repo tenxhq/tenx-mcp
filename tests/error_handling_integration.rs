@@ -6,10 +6,9 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use tenx_mcp::{
-    error::{Error, Result},
     schema,
     testutils::{make_duplex_pair, read_message, send_message},
-    Server, ServerConnection, ServerConnectionContext, ServerHandle,
+    Error, Result, Server, ServerConnection, ServerConnectionContext, ServerHandle,
 };
 use tokio::io::BufReader;
 

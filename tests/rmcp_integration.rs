@@ -9,9 +9,8 @@ use async_trait::async_trait;
 use rmcp::model::{CallToolRequestParam, PaginatedRequestParam};
 use rmcp::ServiceExt;
 use serde_json::json;
-use tenx_mcp::error::{Error, Result};
 use tenx_mcp::{
-    schema::*, testutils::make_duplex_pair, Client, Server, ServerConnection,
+    schema::*, testutils::make_duplex_pair, Client, Error, Result, Server, ServerConnection,
     ServerConnectionContext,
 };
 

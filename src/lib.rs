@@ -1,6 +1,6 @@
 mod client;
 mod client_connection;
-pub mod error;
+mod error;
 pub mod schema;
 mod server;
 mod server_connection;
@@ -21,10 +21,6 @@ pub use server::{Server, ServerHandle};
 pub use server_connection::{ServerConnection, ServerConnectionContext};
 
 pub use error::{Error, Result};
-pub use schema::{
-    ClientCapabilities, Content, Implementation, JSONRPCNotification, ResourceContents,
-    ToolInputSchema, ToolsCapability,
-};
 
 // Re-export schemars for users
 pub use schemars;

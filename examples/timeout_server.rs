@@ -10,10 +10,7 @@ use std::env;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tenx_mcp::{
-    error::{Error, Result},
-    schema, Server, ServerConnection, ServerConnectionContext,
-};
+use tenx_mcp::{schema, Error, Result, Server, ServerConnection, ServerConnectionContext};
 use tokio::time::sleep;
 use tracing::{info, warn};
 

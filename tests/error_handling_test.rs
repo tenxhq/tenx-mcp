@@ -4,7 +4,7 @@
 //! without the complexity of setting up full client-server communication.
 
 use std::collections::HashMap;
-use tenx_mcp::{error::Error, schema::*, Result, ServerConnection, ServerConnectionContext};
+use tenx_mcp::{schema, Error, Result, ServerConnection, ServerConnectionContext};
 
 fn create_test_context() -> ServerConnectionContext {
     let (notification_tx, _) = tokio::sync::broadcast::channel(100);
@@ -23,13 +23,13 @@ async fn test_method_not_found() {
             &mut self,
             _context: ServerConnectionContext,
             _protocol_version: String,
-            _capabilities: ClientCapabilities,
-            _client_info: Implementation,
-        ) -> Result<InitializeResult> {
-            Ok(InitializeResult {
-                protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-                capabilities: ServerCapabilities::default(),
-                server_info: Implementation {
+            _capabilities: schema::ClientCapabilities,
+            _client_info: schema::Implementation,
+        ) -> Result<schema::InitializeResult> {
+            Ok(schema::InitializeResult {
+                protocol_version: schema::LATEST_PROTOCOL_VERSION.to_string(),
+                capabilities: schema::ServerCapabilities::default(),
+                server_info: schema::Implementation {
                     name: "test-server".to_string(),
                     version: "1.0.0".to_string(),
                 },
@@ -70,16 +70,16 @@ async fn test_invalid_params() {
             &mut self,
             _context: ServerConnectionContext,
             _protocol_version: String,
-            _capabilities: ClientCapabilities,
-            _client_info: Implementation,
-        ) -> Result<InitializeResult> {
-            Ok(InitializeResult {
-                protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-                capabilities: ServerCapabilities {
-                    tools: Some(ToolsCapability { list_changed: None }),
+            _capabilities: schema::ClientCapabilities,
+            _client_info: schema::Implementation,
+        ) -> Result<schema::InitializeResult> {
+            Ok(schema::InitializeResult {
+                protocol_version: schema::LATEST_PROTOCOL_VERSION.to_string(),
+                capabilities: schema::ServerCapabilities {
+                    tools: Some(schema::ToolsCapability { list_changed: None }),
                     ..Default::default()
                 },
-                server_info: Implementation {
+                server_info: schema::Implementation {
                     name: "test-server".to_string(),
                     version: "1.0.0".to_string(),
                 },
@@ -91,8 +91,8 @@ async fn test_invalid_params() {
         async fn tools_list(
             &mut self,
             _context: ServerConnectionContext,
-        ) -> Result<ListToolsResult> {
-            let schema = ToolInputSchema {
+        ) -> Result<schema::ListToolsResult> {
+            let schema = schema::ToolInputSchema {
                 schema_type: "object".to_string(),
                 properties: Some({
                     let mut props = HashMap::new();
@@ -108,8 +108,8 @@ async fn test_invalid_params() {
                 required: Some(vec!["required_param".to_string()]),
             };
 
-            Ok(ListToolsResult::new().with_tool(
-                Tool::new("test_tool", schema)
+            Ok(schema::ListToolsResult::new().with_tool(
+                schema::Tool::new("test_tool", schema)
                     .with_description("A test tool that requires a parameter"),
             ))
         }
@@ -119,7 +119,7 @@ async fn test_invalid_params() {
             _context: ServerConnectionContext,
             name: String,
             arguments: Option<serde_json::Value>,
-        ) -> Result<CallToolResult> {
+        ) -> Result<schema::CallToolResult> {
             if name != "test_tool" {
                 return Err(Error::ToolNotFound(name));
             }
@@ -136,7 +136,7 @@ async fn test_invalid_params() {
                 return Err(Error::InvalidParams("Missing required_param".to_string()));
             }
 
-            Ok(CallToolResult::new()
+            Ok(schema::CallToolResult::new()
                 .with_text_content("Success")
                 .is_error(false))
         }
@@ -191,20 +191,20 @@ async fn test_successful_response() {
             &mut self,
             _context: ServerConnectionContext,
             _protocol_version: String,
-            _capabilities: ClientCapabilities,
-            _client_info: Implementation,
-        ) -> Result<InitializeResult> {
-            Ok(InitializeResult {
-                protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-                capabilities: ServerCapabilities {
-                    tools: Some(ToolsCapability { list_changed: None }),
-                    resources: Some(ResourcesCapability {
+            _capabilities: schema::ClientCapabilities,
+            _client_info: schema::Implementation,
+        ) -> Result<schema::InitializeResult> {
+            Ok(schema::InitializeResult {
+                protocol_version: schema::LATEST_PROTOCOL_VERSION.to_string(),
+                capabilities: schema::ServerCapabilities {
+                    tools: Some(schema::ToolsCapability { list_changed: None }),
+                    resources: Some(schema::ResourcesCapability {
                         subscribe: Some(true),
                         list_changed: None,
                     }),
                     ..Default::default()
                 },
-                server_info: Implementation {
+                server_info: schema::Implementation {
                     name: "test-server".to_string(),
                     version: "1.0.0".to_string(),
                 },
@@ -216,14 +216,14 @@ async fn test_successful_response() {
         async fn tools_list(
             &mut self,
             _context: ServerConnectionContext,
-        ) -> Result<ListToolsResult> {
-            Ok(ListToolsResult::new()
+        ) -> Result<schema::ListToolsResult> {
+            Ok(schema::ListToolsResult::new()
                 .with_tool(
-                    Tool::new("echo", ToolInputSchema::default())
+                    schema::Tool::new("echo", schema::ToolInputSchema::default())
                         .with_description("Echoes the input"),
                 )
                 .with_tool(
-                    Tool::new("add", ToolInputSchema::default())
+                    schema::Tool::new("add", schema::ToolInputSchema::default())
                         .with_description("Adds two numbers"),
                 ))
         }
@@ -231,9 +231,9 @@ async fn test_successful_response() {
         async fn resources_list(
             &mut self,
             _context: ServerConnectionContext,
-        ) -> Result<ListResourcesResult> {
-            Ok(ListResourcesResult {
-                resources: vec![Resource {
+        ) -> Result<schema::ListResourcesResult> {
+            Ok(schema::ListResourcesResult {
+                resources: vec![schema::Resource {
                     uri: "file:///test.txt".to_string(),
                     name: "test.txt".to_string(),
                     description: Some("A test file".to_string()),
@@ -253,9 +253,9 @@ async fn test_successful_response() {
     let init_result = conn
         .initialize(
             context,
-            LATEST_PROTOCOL_VERSION.to_string(),
-            ClientCapabilities::default(),
-            Implementation {
+            schema::LATEST_PROTOCOL_VERSION.to_string(),
+            schema::ClientCapabilities::default(),
+            schema::Implementation {
                 name: "test-client".to_string(),
                 version: "1.0.0".to_string(),
             },
@@ -293,9 +293,9 @@ async fn test_error_propagation() {
             &mut self,
             _context: ServerConnectionContext,
             _protocol_version: String,
-            _capabilities: ClientCapabilities,
-            _client_info: Implementation,
-        ) -> Result<InitializeResult> {
+            _capabilities: schema::ClientCapabilities,
+            _client_info: schema::Implementation,
+        ) -> Result<schema::InitializeResult> {
             // Simulate an internal error during initialization
             Err(Error::InternalError(
                 "Database connection failed".to_string(),
@@ -306,7 +306,7 @@ async fn test_error_propagation() {
             &mut self,
             _context: ServerConnectionContext,
             uri: String,
-        ) -> Result<ReadResourceResult> {
+        ) -> Result<schema::ReadResourceResult> {
             // Simulate resource not found
             Err(Error::ResourceNotFound { uri })
         }
@@ -316,7 +316,7 @@ async fn test_error_propagation() {
             _context: ServerConnectionContext,
             name: String,
             _arguments: Option<HashMap<String, serde_json::Value>>,
-        ) -> Result<GetPromptResult> {
+        ) -> Result<schema::GetPromptResult> {
             // Simulate prompt not found - using MethodNotFound as PromptNotFound doesn't exist
             Err(Error::MethodNotFound(format!("prompt/{name}")))
         }
@@ -329,9 +329,9 @@ async fn test_error_propagation() {
     let init_result = conn
         .initialize(
             context,
-            LATEST_PROTOCOL_VERSION.to_string(),
-            ClientCapabilities::default(),
-            Implementation {
+            schema::LATEST_PROTOCOL_VERSION.to_string(),
+            schema::ClientCapabilities::default(),
+            schema::Implementation {
                 name: "test-client".to_string(),
                 version: "1.0.0".to_string(),
             },
