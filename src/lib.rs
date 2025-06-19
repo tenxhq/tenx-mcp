@@ -7,10 +7,12 @@ pub mod server;
 pub mod server_connection;
 
 mod codec;
+mod connection;
 mod transport;
 
 // Re-export commonly used types
 pub use client::Client;
+pub use client_connection::{ClientConnection, ClientConnectionContext};
 pub use error::{Error, Result};
 pub use schema::{
     ClientCapabilities, Content, Implementation, JSONRPCNotification, ResourceContents,

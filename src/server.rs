@@ -6,6 +6,7 @@ use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 use crate::{
+    connection::create_jsonrpc_notification,
     error::{Error, Result},
     schema::{self, *},
     server_connection::{ServerConnection, ServerConnectionContext, ServerConnectionFactory},
@@ -580,97 +581,6 @@ async fn handle_notification(
     }
 
     Ok(())
-}
-
-// Helper function to create JSONRPC notifications
-fn create_jsonrpc_notification(notification: ServerNotification) -> JSONRPCNotification {
-    JSONRPCNotification {
-        jsonrpc: JSONRPC_VERSION.to_string(),
-        notification: Notification {
-            method: match &notification {
-                ServerNotification::ToolListChanged => "notifications/tools/list_changed",
-                ServerNotification::ResourceListChanged => "notifications/resources/list_changed",
-                ServerNotification::PromptListChanged => "notifications/prompts/list_changed",
-                ServerNotification::ResourceUpdated { .. } => "notifications/resources/updated",
-                ServerNotification::LoggingMessage { .. } => "notifications/message",
-                ServerNotification::Progress { .. } => "notifications/progress",
-                ServerNotification::Cancelled { .. } => "notifications/cancelled",
-            }
-            .to_string(),
-            params: match notification {
-                ServerNotification::ToolListChanged
-                | ServerNotification::ResourceListChanged
-                | ServerNotification::PromptListChanged => None,
-                ServerNotification::ResourceUpdated { uri } => {
-                    let mut params = HashMap::new();
-                    params.insert("uri".to_string(), serde_json::Value::String(uri));
-                    Some(NotificationParams {
-                        meta: None,
-                        other: params,
-                    })
-                }
-                ServerNotification::LoggingMessage {
-                    level,
-                    logger,
-                    data,
-                } => {
-                    let mut params = HashMap::new();
-                    params.insert("level".to_string(), serde_json::to_value(level).unwrap());
-                    if let Some(logger) = logger {
-                        params.insert("logger".to_string(), serde_json::Value::String(logger));
-                    }
-                    params.insert("data".to_string(), data);
-                    Some(NotificationParams {
-                        meta: None,
-                        other: params,
-                    })
-                }
-                ServerNotification::Progress {
-                    progress_token,
-                    progress,
-                    total,
-                    message,
-                } => {
-                    let mut params = HashMap::new();
-                    params.insert(
-                        "progressToken".to_string(),
-                        serde_json::to_value(progress_token).unwrap(),
-                    );
-                    params.insert(
-                        "progress".to_string(),
-                        serde_json::Value::Number(serde_json::Number::from_f64(progress).unwrap()),
-                    );
-                    if let Some(total) = total {
-                        params.insert(
-                            "total".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from_f64(total).unwrap()),
-                        );
-                    }
-                    if let Some(message) = message {
-                        params.insert("message".to_string(), serde_json::Value::String(message));
-                    }
-                    Some(NotificationParams {
-                        meta: None,
-                        other: params,
-                    })
-                }
-                ServerNotification::Cancelled { request_id, reason } => {
-                    let mut params = HashMap::new();
-                    params.insert(
-                        "requestId".to_string(),
-                        serde_json::to_value(request_id).unwrap(),
-                    );
-                    if let Some(reason) = reason {
-                        params.insert("reason".to_string(), serde_json::Value::String(reason));
-                    }
-                    Some(NotificationParams {
-                        meta: None,
-                        other: params,
-                    })
-                }
-            },
-        },
-    }
 }
 
 // Add CompleteParams struct

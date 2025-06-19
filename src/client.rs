@@ -10,6 +10,8 @@ use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 
 use crate::{
+    client_connection::{ClientConnection, ClientConnectionContext},
+    connection::{create_empty_response, result_to_jsonrpc_response},
     error::{Error, Result},
     retry::RetryConfig,
     schema::*,
@@ -53,6 +55,7 @@ pub struct Client {
     notification_rx: Option<mpsc::Receiver<JSONRPCNotification>>,
     next_request_id: Arc<Mutex<u64>>,
     config: ClientConfig,
+    connection: Option<Box<dyn ClientConnection>>,
 }
 
 impl Client {
@@ -72,6 +75,7 @@ impl Client {
             notification_rx: Some(notification_rx),
             next_request_id: Arc::new(Mutex::new(1)),
             config,
+            connection: None,
         }
     }
 
@@ -105,6 +109,21 @@ impl Client {
     /// ```
     pub fn with_request_timeout(mut self, timeout: Duration) -> Self {
         self.config.request_timeout = timeout;
+        self
+    }
+
+    /// Set the client connection handler
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use tenx_mcp::{Client, client_connection::ClientConnection};
+    /// # struct MyConnection;
+    /// # impl ClientConnection for MyConnection {}
+    /// let client = Client::new()
+    ///     .with_connection(Box::new(MyConnection));
+    /// ```
+    pub fn with_connection(mut self, connection: Box<dyn ClientConnection>) -> Self {
+        self.connection = Some(connection);
         self
     }
 
@@ -640,98 +659,146 @@ impl Client {
         // Store the sender half for sending messages
         self.transport_tx = Some(tx.clone());
 
+        // Take the connection if present
+        let mut connection = self.connection.take();
+
+        // Create broadcast channel for client notifications
+        let (client_notification_tx, mut client_notification_rx) =
+            tokio::sync::broadcast::channel(100);
+
+        // Initialize connection if present
+        if let Some(conn) = &mut connection {
+            let context = ClientConnectionContext {
+                notification_tx: client_notification_tx.clone(),
+            };
+            conn.on_connect(context).await?;
+        }
+
+        // Clone sink for notification handler
+        let notification_sink = tx.clone();
+
         // Spawn a task to handle incoming messages
         tokio::spawn(async move {
             debug!("Message handler started");
 
-            while let Some(result) = rx.next().await {
-                match result {
-                    Ok(message) => {
-                        debug!("Received message: {:?}", message);
+            loop {
+                tokio::select! {
+                    // Handle incoming messages from server
+                    result = rx.next() => {
+                        match result {
+                            Some(Ok(message)) => {
+                                debug!("Received message: {:?}", message);
 
-                        match message {
-                            JSONRPCMessage::Response(response) => {
-                                // Extract the ID and find the corresponding request
-                                if let RequestId::String(id) = &response.id {
-                                    let mut pending = pending_requests.lock().await;
-                                    if let Some(tx) = pending.remove(id) {
-                                        // Send the response to the waiting request
-                                        let _ = tx.send(ResponseOrError::Response(response));
-                                    } else {
-                                        warn!("Received response for unknown request ID: {}", id);
+                                match message {
+                                    JSONRPCMessage::Response(response) => {
+                                        // Extract the ID and find the corresponding request
+                                        if let RequestId::String(id) = &response.id {
+                                            let mut pending = pending_requests.lock().await;
+                                            if let Some(tx) = pending.remove(id) {
+                                                // Send the response to the waiting request
+                                                let _ = tx.send(ResponseOrError::Response(response));
+                                            } else {
+                                                warn!("Received response for unknown request ID: {}", id);
+                                            }
+                                        }
+                                    }
+                                    JSONRPCMessage::Notification(notification) => {
+                                        // Forward notifications to the notification channel
+                                        if let Err(e) = notification_tx.send(notification).await {
+                                            error!("Failed to send notification: {}", e);
+                                            // If the receiver is dropped, we should stop
+                                            break;
+                                        }
+                                    }
+                                    JSONRPCMessage::Error(error) => {
+                                        // Handle JSON-RPC errors
+                                        if let RequestId::String(id) = &error.id {
+                                            let mut pending = pending_requests.lock().await;
+                                            if let Some(tx) = pending.remove(id) {
+                                                let _ = tx.send(ResponseOrError::Error(error));
+                                            } else {
+                                                warn!("Received error for unknown request ID: {}", id);
+                                            }
+                                        } else {
+                                            error!(
+                                                "Received error with non-string request ID: {:?}",
+                                                error.id
+                                            );
+                                        }
+                                    }
+                                    JSONRPCMessage::Request(request) => {
+                                        if let Some(conn) = &mut connection {
+                                            let response = handle_server_request(conn, request).await;
+                                            let mut sink = tx.lock().await;
+                                            if let Err(e) = sink.send(response).await {
+                                                error!("Failed to send response to server: {}", e);
+                                                break;
+                                            }
+                                        } else {
+                                            // No connection handler, handle built-in requests only
+                                            if request.request.method == "ping" {
+                                                info!("Received ping request from server, sending response");
+                                                let response = create_empty_response(request.id);
+                                                let mut sink = tx.lock().await;
+                                                if let Err(e) = sink.send(JSONRPCMessage::Response(response)).await {
+                                                    error!("Failed to send ping response: {}", e);
+                                                    break;
+                                                }
+                                            } else {
+                                                warn!(
+                                                    "Received request from server but no connection handler: {}",
+                                                    request.request.method
+                                                );
+                                            }
+                                        }
+                                    }
+                                    JSONRPCMessage::BatchRequest(_batch) => {
+                                        // Clients typically don't receive batch requests from servers
+                                        warn!("Received unexpected batch request from server");
+                                    }
+                                    JSONRPCMessage::BatchResponse(_batch) => {
+                                        // TODO: Handle batch responses if we implement batch requests
+                                        warn!(
+                                            "Received batch response - batch requests not yet implemented"
+                                        );
                                     }
                                 }
                             }
-                            JSONRPCMessage::Notification(notification) => {
-                                // Forward notifications to the notification channel
-                                if let Err(e) = notification_tx.send(notification).await {
-                                    error!("Failed to send notification: {}", e);
-                                    // If the receiver is dropped, we should stop
-                                    break;
-                                }
+                            Some(Err(e)) => {
+                                error!("Error receiving message: {}", e);
+                                break;
                             }
-                            JSONRPCMessage::Error(error) => {
-                                // Handle JSON-RPC errors
-                                if let RequestId::String(id) = &error.id {
-                                    let mut pending = pending_requests.lock().await;
-                                    if let Some(tx) = pending.remove(id) {
-                                        let _ = tx.send(ResponseOrError::Error(error));
-                                    } else {
-                                        warn!("Received error for unknown request ID: {}", id);
-                                    }
-                                } else {
-                                    error!(
-                                        "Received error with non-string request ID: {:?}",
-                                        error.id
-                                    );
-                                }
-                            }
-                            JSONRPCMessage::Request(request) => {
-                                // Handle ping requests from server
-                                if request.request.method == "ping" {
-                                    info!("Received ping request from server with id: {:?}, sending response", request.id);
-
-                                    // Create a response with empty result
-                                    let response = JSONRPCResponse {
-                                        jsonrpc: crate::schema::JSONRPC_VERSION.to_string(),
-                                        id: request.id,
-                                        result: EmptyResult {
-                                            meta: None,
-                                            other: HashMap::new(),
-                                        },
-                                    };
-
-                                    // Send the response back through the transport
-                                    let mut sink = tx.lock().await;
-                                    match sink.send(JSONRPCMessage::Response(response)).await {
-                                        Ok(_) => info!("Successfully sent ping response to server"),
-                                        Err(e) => error!("Failed to send ping response: {}", e),
-                                    }
-                                } else {
-                                    // Other requests are unexpected
-                                    warn!(
-                                        "Received unexpected request from server: {}",
-                                        request.request.method
-                                    );
-                                }
-                            }
-                            JSONRPCMessage::BatchRequest(_batch) => {
-                                // Clients typically don't receive batch requests from servers
-                                warn!("Received unexpected batch request from server");
-                            }
-                            JSONRPCMessage::BatchResponse(_batch) => {
-                                // TODO: Handle batch responses if we implement batch requests
-                                warn!(
-                                    "Received batch response - batch requests not yet implemented"
-                                );
+                            None => {
+                                info!("Server disconnected");
+                                break;
                             }
                         }
                     }
-                    Err(e) => {
-                        error!("Error receiving message: {}", e);
-                        // On error, we should probably break the loop
-                        break;
+
+                    // Forward client notifications to server
+                    result = client_notification_rx.recv() => {
+                        match result {
+                            Ok(notification) => {
+                                let jsonrpc_notification = crate::connection::create_jsonrpc_notification(notification);
+                                let mut sink = notification_sink.lock().await;
+                                if let Err(e) = sink.send(JSONRPCMessage::Notification(jsonrpc_notification)).await {
+                                    error!("Error sending notification to server: {}", e);
+                                    break;
+                                }
+                            }
+                            Err(e) => {
+                                debug!("Client notification channel closed: {}", e);
+                                // This is expected when the client shuts down
+                            }
+                        }
                     }
+                }
+            }
+
+            // Clean up connection
+            if let Some(mut conn) = connection {
+                if let Err(e) = conn.on_disconnect().await {
+                    error!("Error during connection disconnect: {}", e);
                 }
             }
 
@@ -739,6 +806,55 @@ impl Client {
         });
 
         Ok(())
+    }
+}
+
+/// Handle a request from the server using the ClientConnection trait
+async fn handle_server_request(
+    connection: &mut Box<dyn ClientConnection>,
+    request: JSONRPCRequest,
+) -> JSONRPCMessage {
+    let result = handle_server_request_inner(connection, request.clone()).await;
+    result_to_jsonrpc_response(request.id, result)
+}
+
+/// Inner handler that returns Result<serde_json::Value>
+async fn handle_server_request_inner(
+    connection: &mut Box<dyn ClientConnection>,
+    request: JSONRPCRequest,
+) -> Result<serde_json::Value> {
+    // Convert RequestParams to serde_json::Value
+    let params = request
+        .request
+        .params
+        .map(|p| serde_json::to_value(p.other))
+        .transpose()?;
+
+    match request.request.method.as_str() {
+        "ping" => {
+            info!("Server sent ping request, sending pong");
+            connection.ping().await.map(|_| serde_json::json!({}))
+        }
+        "sampling/createMessage" => {
+            let p = params.ok_or_else(|| {
+                Error::InvalidParams(
+                    "sampling/createMessage: Missing required parameters".to_string(),
+                )
+            })?;
+            let params = serde_json::from_value::<CreateMessageParams>(p)
+                .map_err(|e| Error::InvalidParams(format!("sampling/createMessage: {e}")))?;
+            connection
+                .create_message(&request.request.method, params)
+                .await
+                .and_then(|result| serde_json::to_value(result).map_err(Into::into))
+        }
+        "roots/list" => connection
+            .list_roots()
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
+        method => Err(Error::MethodNotFound(format!(
+            "Unknown server method: {method}"
+        ))),
     }
 }
 
