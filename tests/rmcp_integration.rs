@@ -266,22 +266,14 @@ async fn test_rmcp_server_with_tenx_client() {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     // Create tenx-mcp client
-    let mut client = Client::new();
+    let mut client = Client::new("test-client", "0.1.0");
     client
         .connect_stream(client_reader, client_writer)
         .await
         .unwrap();
 
     // Initialize
-    let init_result = client
-        .initialize(
-            Implementation {
-                name: "test-client".to_string(),
-                version: "0.1.0".to_string(),
-            },
-            ClientCapabilities::default(),
-        )
-        .await
+    let init_result = client.initialize().await
         .unwrap();
 
     // Check server info is valid

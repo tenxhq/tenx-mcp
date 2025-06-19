@@ -98,9 +98,9 @@ where
 
     // Build client instance.
     let mut client = if let Some(conn) = client_connection {
-        Client::new().with_connection(conn)
+        Client::new("test-client", "1.0.0").with_connection(conn)
     } else {
-        Client::new()
+        Client::new("test-client", "1.0.0")
     };
 
     // Connect the client to its side of the in-memory transport.

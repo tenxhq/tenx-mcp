@@ -35,11 +35,14 @@ pub struct Client {
     notification_rx: Option<mpsc::Receiver<JSONRPCNotification>>,
     next_request_id: Arc<Mutex<u64>>,
     connection: Option<Box<dyn ClientConn>>,
+    name: String,
+    version: String,
+    client_capabilities: ClientCapabilities,
 }
 
 impl Client {
     /// Create a new MCP client with default configuration
-    pub fn new() -> Self {
+    pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
         let (notification_tx, notification_rx) = mpsc::channel(100);
         Self {
             transport_tx: None,
@@ -48,12 +51,21 @@ impl Client {
             notification_rx: Some(notification_rx),
             next_request_id: Arc::new(Mutex::new(1)),
             connection: None,
+            name: name.into(),
+            version: version.into(),
+            client_capabilities: ClientCapabilities::default(),
         }
     }
 
     /// Set the client connection handler
     pub fn with_connection(mut self, connection: Box<dyn ClientConn>) -> Self {
         self.connection = Some(connection);
+        self
+    }
+
+    /// Set the client capabilities
+    pub fn with_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
+        self.client_capabilities = capabilities;
         self
     }
 
@@ -70,14 +82,15 @@ impl Client {
     }
 
     /// Initialize the connection with the server
-    pub async fn initialize(
-        &mut self,
-        client_info: Implementation,
-        capabilities: ClientCapabilities,
-    ) -> Result<InitializeResult> {
+    pub async fn initialize(&mut self) -> Result<InitializeResult> {
+        let client_info = Implementation {
+            name: self.name.clone(),
+            version: self.version.clone(),
+        };
+
         let request = ClientRequest::Initialize {
             protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-            capabilities,
+            capabilities: self.client_capabilities.clone(),
             client_info,
         };
 
@@ -210,73 +223,20 @@ impl Client {
     ///
     /// This is a convenience method that creates a TCP transport,
     /// connects to the server, and performs the initialization handshake.
-    pub async fn connect_tcp(
-        &mut self,
-        addr: impl Into<String>,
-        client_name: impl Into<String>,
-        client_version: impl Into<String>,
-    ) -> Result<InitializeResult> {
-        self.connect_tcp_with_capabilities(
-            addr,
-            client_name,
-            client_version,
-            ClientCapabilities::default(),
-        )
-        .await
-    }
-
-    /// Connect to a TCP server with custom capabilities
-    pub async fn connect_tcp_with_capabilities(
-        &mut self,
-        addr: impl Into<String>,
-        client_name: impl Into<String>,
-        client_version: impl Into<String>,
-        capabilities: ClientCapabilities,
-    ) -> Result<InitializeResult> {
+    pub async fn connect_tcp(&mut self, addr: impl Into<String>) -> Result<InitializeResult> {
         let transport = Box::new(TcpClientTransport::new(addr));
         self.connect(transport).await?;
-
-        let client_info = Implementation {
-            name: client_name.into(),
-            version: client_version.into(),
-        };
-
-        self.initialize(client_info, capabilities).await
+        self.initialize().await
     }
 
     /// Connect via stdio and initialize the connection
     ///
     /// This is a convenience method that creates a stdio transport,
     /// connects to the server, and performs the initialization handshake.
-    pub async fn connect_stdio(
-        &mut self,
-        client_name: impl Into<String>,
-        client_version: impl Into<String>,
-    ) -> Result<InitializeResult> {
-        self.connect_stdio_with_capabilities(
-            client_name,
-            client_version,
-            ClientCapabilities::default(),
-        )
-        .await
-    }
-
-    /// Connect via stdio with custom capabilities
-    pub async fn connect_stdio_with_capabilities(
-        &mut self,
-        client_name: impl Into<String>,
-        client_version: impl Into<String>,
-        capabilities: ClientCapabilities,
-    ) -> Result<InitializeResult> {
+    pub async fn connect_stdio(&mut self) -> Result<InitializeResult> {
         let transport = Box::new(StdioTransport::new());
         self.connect(transport).await?;
-
-        let client_info = Implementation {
-            name: client_name.into(),
-            version: client_version.into(),
-        };
-
-        self.initialize(client_info, capabilities).await
+        self.initialize().await
     }
 
     /// Connect using generic AsyncRead and AsyncWrite streams
@@ -726,12 +686,6 @@ async fn handle_server_notification(
     }
 }
 
-impl Default for Client {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -739,7 +693,7 @@ mod tests {
     #[test]
     fn test_pagination_api() {
         // This test just verifies the API is ergonomic - it doesn't run async code
-        let mut client = Client::new();
+        let mut client = Client::new("test-client", "1.0.0");
 
         // These should all compile cleanly
         std::mem::drop(async {
@@ -779,7 +733,7 @@ mod tests {
     #[test]
     fn test_call_tool_api() {
         // This test just verifies the API is ergonomic - it doesn't run async code
-        let mut client = Client::new();
+        let mut client = Client::new("test-client", "1.0.0");
 
         // These should all compile cleanly
         std::mem::drop(async {
@@ -847,20 +801,13 @@ mod tests {
             .await
             .expect("Failed to start server");
 
-        let mut client = Client::new();
+        let mut client = Client::new("test-client", "1.0.0");
         client
             .connect(client_transport)
             .await
             .expect("Failed to connect");
 
-        let client_info = Implementation {
-            name: "test-client".to_string(),
-            version: "1.0.0".to_string(),
-        };
-        client
-            .initialize(client_info, ClientCapabilities::default())
-            .await
-            .expect("Failed to initialize");
+        client.initialize().await.expect("Failed to initialize");
 
         (client, server_handle)
     }
@@ -924,8 +871,8 @@ mod tests {
             .expect("Failed to start server");
 
         // Create client with notif connection
-        let mut client =
-            Client::new().with_connection(Box::new(NotifClientConnection { tx: Some(tx_notif) }));
+        let mut client = Client::new("test-client", "1.0.0")
+            .with_connection(Box::new(NotifClientConnection { tx: Some(tx_notif) }));
 
         // Connect and initialize
         client
@@ -933,14 +880,7 @@ mod tests {
             .await
             .expect("Failed to connect");
 
-        let client_info = Implementation {
-            name: "test-client".to_string(),
-            version: "1.0.0".to_string(),
-        };
-        client
-            .initialize(client_info, ClientCapabilities::default())
-            .await
-            .expect("Failed to initialize");
+        client.initialize().await.expect("Failed to initialize");
 
         // Send server notification
         server_handle.send_server_notification(crate::schema::ClientNotification::RootsListChanged);
@@ -1032,7 +972,8 @@ mod tests {
             .expect("Failed to start server");
 
         // Create client with notifier connection
-        let mut client = Client::new().with_connection(Box::new(NotifierClientConnection));
+        let mut client =
+            Client::new("test-client", "1.0.0").with_connection(Box::new(NotifierClientConnection));
 
         // Connect and initialize
         client
@@ -1040,14 +981,7 @@ mod tests {
             .await
             .expect("Failed to connect");
 
-        let client_info = Implementation {
-            name: "test-client".to_string(),
-            version: "1.0.0".to_string(),
-        };
-        client
-            .initialize(client_info, ClientCapabilities::default())
-            .await
-            .expect("Failed to initialize");
+        client.initialize().await.expect("Failed to initialize");
 
         // Wait for server to receive notification
         tokio::time::timeout(std::time::Duration::from_secs(1), rx_notif)
@@ -1059,13 +993,13 @@ mod tests {
 
     #[test]
     fn test_client_creation() {
-        let client = Client::new();
+        let client = Client::new("test-client", "1.0.0");
         assert!(client.transport_tx.is_none());
     }
 
     #[tokio::test]
     async fn test_next_request_id() {
-        let client = Client::new();
+        let client = Client::new("test-client", "1.0.0");
         assert_eq!(client.next_request_id().await, "req-1");
         assert_eq!(client.next_request_id().await, "req-2");
     }
@@ -1149,21 +1083,14 @@ mod tests {
             .expect("Failed to start server");
 
         // Create and connect client using connect_stream
-        let mut client = Client::new();
+        let mut client = Client::new("test-client", "1.0.0");
         client
             .connect_stream(client_reader, client_writer)
             .await
             .expect("Failed to connect client");
 
         // Test that we can initialize
-        let client_info = Implementation {
-            name: "test-client".to_string(),
-            version: "1.0.0".to_string(),
-        };
-        let result = client
-            .initialize(client_info, ClientCapabilities::default())
-            .await
-            .expect("Failed to initialize");
+        let result = client.initialize().await.expect("Failed to initialize");
 
         assert_eq!(result.server_info.name, "test-server");
 
@@ -1176,7 +1103,7 @@ mod tests {
         // This test would require an actual MCP server binary to spawn
         // For now, we'll just test that the API compiles and handles errors correctly
 
-        let mut client = Client::new();
+        let mut client = Client::new("test-client", "1.0.0");
 
         // Try to spawn a non-existent process
         let cmd = tokio::process::Command::new("non-existent-mcp-server");

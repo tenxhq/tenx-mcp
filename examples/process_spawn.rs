@@ -5,7 +5,7 @@
 //! - Connect to it using the process's stdin/stdout
 //! - Manage the process lifecycle
 
-use tenx_mcp::{schema, Client, Result};
+use tenx_mcp::{Client, Result};
 use tokio::process::Command;
 use tracing::{error, info, Level};
 
@@ -15,7 +15,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     // Create the client
-    let mut client = Client::new();
+    let mut client = Client::new("process-spawn-example", "0.1.0");
 
     // Configure the command to spawn
     // In this example, we'll spawn another example server from this crate
@@ -38,14 +38,7 @@ async fn main() -> Result<()> {
     };
 
     // Initialize the connection
-    let client_info = schema::Implementation {
-        name: "process-spawn-example".to_string(),
-        version: "0.1.0".to_string(),
-    };
-
-    match client
-        .initialize(client_info, schema::ClientCapabilities::default())
-        .await
+    match client.initialize().await
     {
         Ok(result) => {
             info!(

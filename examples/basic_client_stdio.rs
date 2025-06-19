@@ -8,7 +8,7 @@
 //!   cargo run --example basic_client_stdio
 
 use serde::{Deserialize, Serialize};
-use tenx_mcp::{schema, schemars, Client, Result};
+use tenx_mcp::{schemars, Client, Result};
 use tokio::process::Command;
 use tracing::info;
 
@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     // Create the client
-    let mut client = Client::new();
+    let mut client = Client::new("basic-client-stdio", "0.1.0");
 
     // Configure the command to spawn the basic_server in stdio mode
     let mut cmd = Command::new("cargo");
@@ -36,14 +36,7 @@ async fn main() -> Result<()> {
     let mut child = client.connect_process(cmd).await?;
 
     // Initialize the connection
-    let client_info = schema::Implementation {
-        name: "basic-client-stdio".to_string(),
-        version: "0.1.0".to_string(),
-    };
-
-    let init_result = client
-        .initialize(client_info, schema::ClientCapabilities::default())
-        .await?;
+    let init_result = client.initialize().await?;
 
     // Get server info from initialization result
     let server_info = &init_result.server_info;

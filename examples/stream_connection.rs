@@ -29,7 +29,7 @@ async fn example_duplex_streams() -> Result<()> {
     let (client_reader, _server_writer) = duplex(8192);
     let (_server_reader, client_writer) = duplex(8192);
 
-    let mut client = Client::new();
+    let mut client = Client::new("stream-example", "0.1.0");
 
     // Connect using the streams
     client.connect_stream(client_reader, client_writer).await?;
@@ -57,7 +57,7 @@ async fn example_custom_streams() -> Result<()> {
     let reader = create_custom_reader();
     let writer = create_custom_writer();
 
-    let mut client = Client::new();
+    let mut client = Client::new("stream-example", "0.1.0");
     client.connect_stream(reader, writer).await?;
 
     info!("Connected via custom streams");

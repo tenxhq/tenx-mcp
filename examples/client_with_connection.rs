@@ -80,14 +80,13 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     // Create a client with a custom connection handler
-    let mut client = Client::new().with_connection(Box::new(MyClientConnection {
-        name: "ExampleClient".to_string(),
-    }));
+    let mut client = Client::new("example-client", "1.0.0")
+        .with_connection(Box::new(MyClientConnection {
+            name: "ExampleClient".to_string(),
+        }));
 
     // Connect to a server via TCP
-    let server_info = client
-        .connect_tcp("127.0.0.1:3000", "example-client", "1.0.0")
-        .await?;
+    let server_info = client.connect_tcp("127.0.0.1:3000").await?;
 
     println!(
         "Connected to server: {} v{}",

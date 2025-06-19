@@ -26,8 +26,8 @@ async fn main() -> Result<()> {
     info!("Connecting to MCP server at {}", addr);
 
     // Create client and connect using the new convenience method
-    let mut client = Client::new();
-    let server_info = client.connect_tcp(&addr, "example-client", "0.1.0").await?;
+    let mut client = Client::new("example-client", "0.1.0");
+    let server_info = client.connect_tcp(&addr).await?;
     info!("Connected to server: {}", server_info.server_info.name);
 
     // List available tools
