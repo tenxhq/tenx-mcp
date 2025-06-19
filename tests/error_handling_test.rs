@@ -4,11 +4,11 @@
 //! without the complexity of setting up full client-server communication.
 
 use std::collections::HashMap;
-use tenx_mcp::{schema, Error, Result, ServerConnection, ServerConnectionContext};
+use tenx_mcp::{schema, Error, Result, ServerConn, ServerCtx};
 
-fn create_test_context() -> ServerConnectionContext {
+fn create_test_context() -> ServerCtx {
     let (notification_tx, _) = tokio::sync::broadcast::channel(100);
-    ServerConnectionContext::new(notification_tx)
+    ServerCtx::new(notification_tx)
 }
 
 #[tokio::test]
@@ -18,10 +18,10 @@ async fn test_method_not_found() {
     struct MinimalConnection;
 
     #[async_trait::async_trait]
-    impl ServerConnection for MinimalConnection {
+    impl ServerConn for MinimalConnection {
         async fn initialize(
             &mut self,
-            _context: ServerConnectionContext,
+            _context: ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
@@ -65,10 +65,10 @@ async fn test_invalid_params() {
     struct ConnectionWithValidation;
 
     #[async_trait::async_trait]
-    impl ServerConnection for ConnectionWithValidation {
+    impl ServerConn for ConnectionWithValidation {
         async fn initialize(
             &mut self,
-            _context: ServerConnectionContext,
+            _context: ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
@@ -88,10 +88,7 @@ async fn test_invalid_params() {
             })
         }
 
-        async fn tools_list(
-            &mut self,
-            _context: ServerConnectionContext,
-        ) -> Result<schema::ListToolsResult> {
+        async fn tools_list(&mut self, _context: ServerCtx) -> Result<schema::ListToolsResult> {
             let schema = schema::ToolInputSchema {
                 schema_type: "object".to_string(),
                 properties: Some({
@@ -116,7 +113,7 @@ async fn test_invalid_params() {
 
         async fn tools_call(
             &mut self,
-            _context: ServerConnectionContext,
+            _context: ServerCtx,
             name: String,
             arguments: Option<serde_json::Value>,
         ) -> Result<schema::CallToolResult> {
@@ -186,10 +183,10 @@ async fn test_successful_response() {
     struct ConnectionWithTools;
 
     #[async_trait::async_trait]
-    impl ServerConnection for ConnectionWithTools {
+    impl ServerConn for ConnectionWithTools {
         async fn initialize(
             &mut self,
-            _context: ServerConnectionContext,
+            _context: ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
@@ -213,10 +210,7 @@ async fn test_successful_response() {
             })
         }
 
-        async fn tools_list(
-            &mut self,
-            _context: ServerConnectionContext,
-        ) -> Result<schema::ListToolsResult> {
+        async fn tools_list(&mut self, _context: ServerCtx) -> Result<schema::ListToolsResult> {
             Ok(schema::ListToolsResult::new()
                 .with_tool(
                     schema::Tool::new("echo", schema::ToolInputSchema::default())
@@ -230,7 +224,7 @@ async fn test_successful_response() {
 
         async fn resources_list(
             &mut self,
-            _context: ServerConnectionContext,
+            _context: ServerCtx,
         ) -> Result<schema::ListResourcesResult> {
             Ok(schema::ListResourcesResult {
                 resources: vec![schema::Resource {
@@ -288,10 +282,10 @@ async fn test_error_propagation() {
     struct FaultyConnection;
 
     #[async_trait::async_trait]
-    impl ServerConnection for FaultyConnection {
+    impl ServerConn for FaultyConnection {
         async fn initialize(
             &mut self,
-            _context: ServerConnectionContext,
+            _context: ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
@@ -302,7 +296,7 @@ async fn test_error_propagation() {
 
         async fn resources_read(
             &mut self,
-            _context: ServerConnectionContext,
+            _context: ServerCtx,
             uri: String,
         ) -> Result<schema::ReadResourceResult> {
             // Simulate resource not found
@@ -311,7 +305,7 @@ async fn test_error_propagation() {
 
         async fn prompts_get(
             &mut self,
-            _context: ServerConnectionContext,
+            _context: ServerCtx,
             name: String,
             _arguments: Option<HashMap<String, serde_json::Value>>,
         ) -> Result<schema::GetPromptResult> {

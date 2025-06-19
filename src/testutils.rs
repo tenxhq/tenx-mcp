@@ -19,7 +19,7 @@ use tokio::io::{self, AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, Buf
 use crate::{
     error::{Error, Result},
     schema::JSONRPCMessage,
-    Client, ClientConnection, Server, ServerConnection, ServerHandle,
+    Client, ClientConn, Server, ServerConn, ServerHandle,
 };
 
 /// Conveniently create **two** independent in-memory duplex pipes that together
@@ -82,10 +82,10 @@ where
 /// server in the background.
 pub async fn connected_client_and_server<F>(
     connection_factory: F,
-    client_connection: Option<Box<dyn ClientConnection>>,
+    client_connection: Option<Box<dyn ClientConn>>,
 ) -> Result<(Client, ServerHandle)>
 where
-    F: Fn() -> Box<dyn ServerConnection> + Send + Sync + 'static,
+    F: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
 {
     // Build server.
     let server = Server::default().with_connection_factory(connection_factory);

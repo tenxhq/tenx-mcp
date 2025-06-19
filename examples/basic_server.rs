@@ -14,9 +14,7 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::env;
-use tenx_mcp::{
-    schema::*, schemars, Error, Result, Server, ServerConnection, ServerConnectionContext,
-};
+use tenx_mcp::{schema::*, schemars, Error, Result, Server, ServerConn, ServerCtx};
 use tracing::info;
 
 const NAME: &str = "basic-server";
@@ -34,10 +32,10 @@ struct EchoParams {
 struct BasicConnection {}
 
 #[async_trait]
-impl ServerConnection for BasicConnection {
+impl ServerConn for BasicConnection {
     async fn initialize(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -46,7 +44,7 @@ impl ServerConnection for BasicConnection {
             .with_capabilities(ServerCapabilities::default().with_tools(None)))
     }
 
-    async fn tools_list(&mut self, _context: ServerConnectionContext) -> Result<ListToolsResult> {
+    async fn tools_list(&mut self, _context: ServerCtx) -> Result<ListToolsResult> {
         Ok(ListToolsResult::default().with_tool(
             Tool::new("echo", ToolInputSchema::from_json_schema::<EchoParams>())
                 .with_description("Echoes back the provided message"),
@@ -55,7 +53,7 @@ impl ServerConnection for BasicConnection {
 
     async fn tools_call(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         name: String,
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tenx_mcp::{schema, Client, ClientConnection, ClientConnectionContext, Result};
+use tenx_mcp::{schema, Client, ClientConn, ClientCtx, Result};
 
 /// Example client connection that handles server requests
 struct MyClientConnection {
@@ -7,8 +7,8 @@ struct MyClientConnection {
 }
 
 #[async_trait]
-impl ClientConnection for MyClientConnection {
-    async fn on_connect(&mut self, context: ClientConnectionContext) -> Result<()> {
+impl ClientConn for MyClientConnection {
+    async fn on_connect(&mut self, context: ClientCtx) -> Result<()> {
         println!("Client connection established for: {}", self.name);
 
         // Example: Send a notification when connected
@@ -17,19 +17,19 @@ impl ClientConnection for MyClientConnection {
         Ok(())
     }
 
-    async fn on_disconnect(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    async fn on_disconnect(&mut self, _context: ClientCtx) -> Result<()> {
         println!("Client connection closed for: {}", self.name);
         Ok(())
     }
 
-    async fn pong(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    async fn pong(&mut self, _context: ClientCtx) -> Result<()> {
         println!("Server pinged us!");
         Ok(())
     }
 
     async fn create_message(
         &mut self,
-        _context: ClientConnectionContext,
+        _context: ClientCtx,
         method: &str,
         params: schema::CreateMessageParams,
     ) -> Result<schema::CreateMessageResult> {
@@ -61,10 +61,7 @@ impl ClientConnection for MyClientConnection {
         })
     }
 
-    async fn list_roots(
-        &mut self,
-        _context: ClientConnectionContext,
-    ) -> Result<schema::ListRootsResult> {
+    async fn list_roots(&mut self, _context: ClientCtx) -> Result<schema::ListRootsResult> {
         println!("Server requested roots list");
 
         Ok(schema::ListRootsResult {

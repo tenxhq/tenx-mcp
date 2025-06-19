@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use tenx_mcp::{
     schema::*,
     testutils::{connected_client_and_server, shutdown_client_and_server},
-    ClientConnection, ClientConnectionContext, Result, ServerConnection, ServerConnectionContext,
+    ClientConn, ClientCtx, Result, ServerConn, ServerCtx,
 };
 
 /// Test client connection that tracks method calls
@@ -12,18 +12,18 @@ struct TestClientConnection {
 }
 
 #[async_trait]
-impl ClientConnection for TestClientConnection {
-    async fn on_connect(&mut self, _context: ClientConnectionContext) -> Result<()> {
+impl ClientConn for TestClientConnection {
+    async fn on_connect(&mut self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_connect".to_string());
         Ok(())
     }
 
-    async fn on_disconnect(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    async fn on_disconnect(&mut self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_disconnect".to_string());
         Ok(())
     }
 
-    async fn pong(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    async fn pong(&mut self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("ping".to_string());
         println!("Client received ping from server!");
         Ok(())
@@ -31,7 +31,7 @@ impl ClientConnection for TestClientConnection {
 
     async fn create_message(
         &mut self,
-        _context: ClientConnectionContext,
+        _context: ClientCtx,
         _method: &str,
         _params: CreateMessageParams,
     ) -> Result<CreateMessageResult> {
@@ -51,7 +51,7 @@ impl ClientConnection for TestClientConnection {
         })
     }
 
-    async fn list_roots(&mut self, _context: ClientConnectionContext) -> Result<ListRootsResult> {
+    async fn list_roots(&mut self, _context: ClientCtx) -> Result<ListRootsResult> {
         self.calls.lock().unwrap().push("list_roots".to_string());
         Ok(ListRootsResult {
             roots: vec![Root {
@@ -65,19 +65,19 @@ impl ClientConnection for TestClientConnection {
 
 /// Test server connection
 struct TestServerConnection {
-    context: Option<ServerConnectionContext>,
+    context: Option<ServerCtx>,
 }
 
 #[async_trait]
-impl ServerConnection for TestServerConnection {
-    async fn on_connect(&mut self, context: ServerConnectionContext) -> Result<()> {
+impl ServerConn for TestServerConnection {
+    async fn on_connect(&mut self, context: ServerCtx) -> Result<()> {
         self.context = Some(context);
         Ok(())
     }
 
     async fn initialize(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -85,7 +85,7 @@ impl ServerConnection for TestServerConnection {
         Ok(InitializeResult::new("test-server", "1.0.0"))
     }
 
-    async fn pong(&mut self, _context: ServerConnectionContext) -> Result<()> {
+    async fn pong(&mut self, _context: ServerCtx) -> Result<()> {
         Ok(())
     }
 }
@@ -144,7 +144,7 @@ async fn test_client_handles_server_requests_unit() {
 
     // Create a dummy context for testing
     let (notification_tx, _) = tokio::sync::broadcast::channel(10);
-    let context = ClientConnectionContext::new(notification_tx);
+    let context = ClientCtx::new(notification_tx);
 
     // Test ping
     connection.pong(context.clone()).await.expect("Ping failed");

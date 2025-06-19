@@ -16,9 +16,9 @@ pub mod testutils;
 
 // Re-export commonly used types
 pub use client::Client;
-pub use client_connection::{ClientConnection, ClientConnectionContext};
+pub use client_connection::{ClientConn, ClientCtx};
 pub use server::{Server, ServerHandle};
-pub use server_connection::{ServerConnection, ServerConnectionContext};
+pub use server_connection::{ServerConn, ServerCtx};
 
 pub use error::{Error, Result};
 

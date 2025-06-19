@@ -11,16 +11,16 @@ use crate::{
 };
 
 /// Factory function type for creating Connection instances
-pub type ServerConnectionFactory = Box<dyn Fn() -> Box<dyn ServerConnection> + Send + Sync>;
+pub type ServerConnectionFactory = Box<dyn Fn() -> Box<dyn ServerConn> + Send + Sync>;
 
 /// Context provided to Connection implementations for interacting with the client
 #[derive(Debug, Clone)]
-pub struct ServerConnectionContext {
+pub struct ServerCtx {
     /// Sender for server notifications
     pub(crate) notification_tx: broadcast::Sender<schema::ClientNotification>,
 }
 
-impl ServerConnectionContext {
+impl ServerCtx {
     /// Create a new ServerConnectionContext with a notification channel
     /// This is primarily intended for testing purposes
     pub fn new(notification_tx: broadcast::Sender<schema::ClientNotification>) -> Self {
@@ -39,9 +39,9 @@ impl ServerConnectionContext {
 /// Connection trait that server implementers must implement
 /// Each client connection will have its own instance of the implementation
 #[async_trait]
-pub trait ServerConnection: Send + Sync {
+pub trait ServerConn: Send + Sync {
     /// Called when a new connection is established
-    async fn on_connect(&mut self, _context: ServerConnectionContext) -> Result<()> {
+    async fn on_connect(&mut self, _context: ServerCtx) -> Result<()> {
         Ok(())
     }
 
@@ -53,26 +53,26 @@ pub trait ServerConnection: Send + Sync {
     /// Handle initialize request
     async fn initialize(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         _protocol_version: String,
         _capabilities: schema::ClientCapabilities,
         _client_info: schema::Implementation,
     ) -> Result<InitializeResult>;
 
     /// Respond to a ping request from the client
-    async fn pong(&mut self, _context: ServerConnectionContext) -> Result<()> {
+    async fn pong(&mut self, _context: ServerCtx) -> Result<()> {
         Ok(())
     }
 
     /// List available tools
-    async fn tools_list(&mut self, _context: ServerConnectionContext) -> Result<ListToolsResult> {
+    async fn tools_list(&mut self, _context: ServerCtx) -> Result<ListToolsResult> {
         Ok(ListToolsResult::default())
     }
 
     /// Call a tool
     async fn tools_call(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         name: String,
         _arguments: Option<Value>,
     ) -> Result<schema::CallToolResult> {
@@ -83,10 +83,7 @@ pub trait ServerConnection: Send + Sync {
     }
 
     /// List available resources
-    async fn resources_list(
-        &mut self,
-        _context: ServerConnectionContext,
-    ) -> Result<ListResourcesResult> {
+    async fn resources_list(&mut self, _context: ServerCtx) -> Result<ListResourcesResult> {
         Ok(ListResourcesResult {
             resources: vec![],
             next_cursor: None,
@@ -96,7 +93,7 @@ pub trait ServerConnection: Send + Sync {
     /// List resource templates
     async fn resources_templates_list(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
     ) -> Result<ListResourceTemplatesResult> {
         Ok(ListResourceTemplatesResult {
             resource_templates: vec![],
@@ -107,35 +104,24 @@ pub trait ServerConnection: Send + Sync {
     /// Read a resource
     async fn resources_read(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         uri: String,
     ) -> Result<ReadResourceResult> {
         Err(Error::ResourceNotFound { uri })
     }
 
     /// Subscribe to resource updates
-    async fn resources_subscribe(
-        &mut self,
-        _context: ServerConnectionContext,
-        _uri: String,
-    ) -> Result<()> {
+    async fn resources_subscribe(&mut self, _context: ServerCtx, _uri: String) -> Result<()> {
         Ok(())
     }
 
     /// Unsubscribe from resource updates
-    async fn resources_unsubscribe(
-        &mut self,
-        _context: ServerConnectionContext,
-        _uri: String,
-    ) -> Result<()> {
+    async fn resources_unsubscribe(&mut self, _context: ServerCtx, _uri: String) -> Result<()> {
         Ok(())
     }
 
     /// List available prompts
-    async fn prompts_list(
-        &mut self,
-        _context: ServerConnectionContext,
-    ) -> Result<ListPromptsResult> {
+    async fn prompts_list(&mut self, _context: ServerCtx) -> Result<ListPromptsResult> {
         Ok(ListPromptsResult {
             prompts: vec![],
             next_cursor: None,
@@ -145,7 +131,7 @@ pub trait ServerConnection: Send + Sync {
     /// Get a prompt
     async fn prompts_get(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         name: String,
         _arguments: Option<std::collections::HashMap<String, serde_json::Value>>,
     ) -> Result<GetPromptResult> {
@@ -158,7 +144,7 @@ pub trait ServerConnection: Send + Sync {
     /// Handle completion request
     async fn completion_complete(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         _reference: schema::Reference,
         _argument: schema::ArgumentInfo,
     ) -> Result<schema::CompleteResult> {
@@ -173,16 +159,12 @@ pub trait ServerConnection: Send + Sync {
     }
 
     /// Set logging level
-    async fn logging_set_level(
-        &mut self,
-        _context: ServerConnectionContext,
-        _level: LoggingLevel,
-    ) -> Result<()> {
+    async fn logging_set_level(&mut self, _context: ServerCtx, _level: LoggingLevel) -> Result<()> {
         Ok(())
     }
 
     /// List roots (for server-initiated roots/list request)
-    async fn roots_list(&mut self, _context: ServerConnectionContext) -> Result<ListRootsResult> {
+    async fn roots_list(&mut self, _context: ServerCtx) -> Result<ListRootsResult> {
         Ok(ListRootsResult {
             roots: vec![],
             meta: None,
@@ -192,7 +174,7 @@ pub trait ServerConnection: Send + Sync {
     /// Handle sampling/createMessage request from server
     async fn sampling_create_message(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         _params: schema::CreateMessageParams,
     ) -> Result<schema::CreateMessageResult> {
         Err(Error::MethodNotFound("sampling/createMessage".to_string()))
@@ -205,7 +187,7 @@ pub trait ServerConnection: Send + Sync {
     /// progress updates or cancellations.
     async fn notification(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         _notification: schema::ServerNotification,
     ) -> Result<()> {
         Ok(())

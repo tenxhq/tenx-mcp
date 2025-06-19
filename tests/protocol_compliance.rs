@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use serde_json::json;
-use tenx_mcp::{schema::*, Error, Result, ServerConnection, ServerConnectionContext};
+use tenx_mcp::{schema::*, Error, Result, ServerConn, ServerCtx};
 
 /// Test connection implementation with echo and add tools
 struct TestConnection {
@@ -77,10 +77,10 @@ impl TestConnection {
 }
 
 #[async_trait]
-impl ServerConnection for TestConnection {
+impl ServerConn for TestConnection {
     async fn initialize(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -102,7 +102,7 @@ impl ServerConnection for TestConnection {
         })
     }
 
-    async fn tools_list(&mut self, _context: ServerConnectionContext) -> Result<ListToolsResult> {
+    async fn tools_list(&mut self, _context: ServerCtx) -> Result<ListToolsResult> {
         let mut result = ListToolsResult::new();
         for tool in self.tools.values() {
             result = result.with_tool(tool.clone());
@@ -112,7 +112,7 @@ impl ServerConnection for TestConnection {
 
     async fn tools_call(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         name: String,
         arguments: Option<serde_json::Value>,
     ) -> Result<CallToolResult> {
@@ -160,9 +160,9 @@ mod tests {
     use super::*;
     use tokio::sync::broadcast;
 
-    fn create_test_context() -> ServerConnectionContext {
+    fn create_test_context() -> ServerCtx {
         let (notification_tx, _) = broadcast::channel(100);
-        ServerConnectionContext::new(notification_tx)
+        ServerCtx::new(notification_tx)
     }
 
     #[tokio::test]

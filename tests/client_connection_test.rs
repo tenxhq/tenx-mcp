@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
-use tenx_mcp::{schema::*, ClientConnection, ClientConnectionContext, Result};
+use tenx_mcp::{schema::*, ClientConn, ClientCtx, Result};
 
 /// Test client connection that tracks method calls
 #[derive(Default)]
@@ -9,25 +9,25 @@ struct TestClientConnection {
 }
 
 #[async_trait]
-impl ClientConnection for TestClientConnection {
-    async fn on_connect(&mut self, _context: ClientConnectionContext) -> Result<()> {
+impl ClientConn for TestClientConnection {
+    async fn on_connect(&mut self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_connect".to_string());
         Ok(())
     }
 
-    async fn on_disconnect(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    async fn on_disconnect(&mut self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_disconnect".to_string());
         Ok(())
     }
 
-    async fn pong(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    async fn pong(&mut self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("ping".to_string());
         Ok(())
     }
 
     async fn create_message(
         &mut self,
-        _context: ClientConnectionContext,
+        _context: ClientCtx,
         _method: &str,
         _params: CreateMessageParams,
     ) -> Result<CreateMessageResult> {
@@ -47,7 +47,7 @@ impl ClientConnection for TestClientConnection {
         })
     }
 
-    async fn list_roots(&mut self, _context: ClientConnectionContext) -> Result<ListRootsResult> {
+    async fn list_roots(&mut self, _context: ClientCtx) -> Result<ListRootsResult> {
         self.calls.lock().unwrap().push("list_roots".to_string());
         Ok(ListRootsResult {
             roots: vec![Root {
@@ -66,7 +66,7 @@ async fn test_client_connection_trait_methods() {
 
     // Create a dummy context for testing
     let (notification_tx, _) = tokio::sync::broadcast::channel(10);
-    let context = ClientConnectionContext::new(notification_tx);
+    let context = ClientCtx::new(notification_tx);
 
     // Test ping
     connection.pong(context.clone()).await.expect("Ping failed");

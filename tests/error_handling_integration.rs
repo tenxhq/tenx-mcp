@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use tenx_mcp::{
     schema,
     testutils::{make_duplex_pair, read_message, send_message},
-    Error, Result, Server, ServerConnection, ServerConnectionContext, ServerHandle,
+    Error, Result, Server, ServerConn, ServerCtx, ServerHandle,
 };
 use tokio::io::BufReader;
 
@@ -19,10 +19,10 @@ use tokio::io::BufReader;
 struct TestConnection;
 
 #[async_trait]
-impl ServerConnection for TestConnection {
+impl ServerConn for TestConnection {
     async fn initialize(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         _protocol_version: String,
         _capabilities: schema::ClientCapabilities,
         _client_info: schema::Implementation,
@@ -44,10 +44,7 @@ impl ServerConnection for TestConnection {
         })
     }
 
-    async fn tools_list(
-        &mut self,
-        _context: ServerConnectionContext,
-    ) -> Result<schema::ListToolsResult> {
+    async fn tools_list(&mut self, _context: ServerCtx) -> Result<schema::ListToolsResult> {
         let schema = schema::ToolInputSchema {
             schema_type: "object".to_string(),
             properties: Some({
@@ -67,7 +64,7 @@ impl ServerConnection for TestConnection {
 
     async fn tools_call(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         name: String,
         arguments: Option<serde_json::Value>,
     ) -> Result<schema::CallToolResult> {

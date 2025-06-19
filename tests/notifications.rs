@@ -1,8 +1,5 @@
 use async_trait::async_trait;
-use tenx_mcp::{
-    schema, ClientConnection, ClientConnectionContext, Result, ServerConnection,
-    ServerConnectionContext,
-};
+use tenx_mcp::{schema, ClientConn, ClientCtx, Result, ServerConn, ServerCtx};
 
 #[tokio::test]
 async fn test_server_to_client_notifications() {
@@ -18,10 +15,10 @@ async fn test_server_to_client_notifications() {
     }
 
     #[async_trait]
-    impl ClientConnection for NotificationRecorder {
+    impl ClientConn for NotificationRecorder {
         async fn notification(
             &mut self,
-            _context: ClientConnectionContext,
+            _context: ClientCtx,
             notification: tenx_mcp::schema::ClientNotification,
         ) -> Result<()> {
             tracing::info!("Client received notification: {:?}", notification);
@@ -43,8 +40,8 @@ async fn test_server_to_client_notifications() {
     }
 
     #[async_trait]
-    impl ServerConnection for NotifyingServer {
-        async fn on_connect(&mut self, context: ServerConnectionContext) -> Result<()> {
+    impl ServerConn for NotifyingServer {
+        async fn on_connect(&mut self, context: ServerCtx) -> Result<()> {
             // Send a notification after connection
             let sent_notification = self.sent_notification.clone();
             tokio::spawn(async move {
@@ -65,7 +62,7 @@ async fn test_server_to_client_notifications() {
 
         async fn initialize(
             &mut self,
-            _context: ServerConnectionContext,
+            _context: ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,

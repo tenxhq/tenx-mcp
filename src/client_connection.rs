@@ -8,12 +8,12 @@ use crate::{
 
 /// Context provided to ClientConnection implementations for interacting with the client
 #[derive(Debug, Clone)]
-pub struct ClientConnectionContext {
+pub struct ClientCtx {
     /// Sender for client notifications
     pub(crate) notification_tx: broadcast::Sender<schema::ServerNotification>,
 }
 
-impl ClientConnectionContext {
+impl ClientCtx {
     /// Create a new ClientConnectionContext with the given notification sender
     pub fn new(notification_tx: broadcast::Sender<schema::ServerNotification>) -> Self {
         Self { notification_tx }
@@ -31,25 +31,25 @@ impl ClientConnectionContext {
 /// Connection trait that server implementers must implement
 /// Each client connection will have its own instance of the implementation
 #[async_trait]
-pub trait ClientConnection: Send + Sync {
+pub trait ClientConn: Send + Sync {
     /// Called when a new connection is established
-    async fn on_connect(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    async fn on_connect(&mut self, _context: ClientCtx) -> Result<()> {
         Ok(())
     }
 
     /// Called when the connection is being closed
-    async fn on_disconnect(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    async fn on_disconnect(&mut self, _context: ClientCtx) -> Result<()> {
         Ok(())
     }
 
     /// Responde to a ping request from the server
-    async fn pong(&mut self, _context: ClientConnectionContext) -> Result<()> {
+    async fn pong(&mut self, _context: ClientCtx) -> Result<()> {
         Ok(())
     }
 
     async fn create_message(
         &mut self,
-        _context: ClientConnectionContext,
+        _context: ClientCtx,
         _method: &str,
         _params: schema::CreateMessageParams,
     ) -> Result<schema::CreateMessageResult> {
@@ -58,10 +58,7 @@ pub trait ClientConnection: Send + Sync {
         ))
     }
 
-    async fn list_roots(
-        &mut self,
-        _context: ClientConnectionContext,
-    ) -> Result<schema::ListRootsResult> {
+    async fn list_roots(&mut self, _context: ClientCtx) -> Result<schema::ListRootsResult> {
         Err(Error::InvalidRequest("list_roots not implemented".into()))
     }
 
@@ -71,7 +68,7 @@ pub trait ClientConnection: Send + Sync {
     /// can override this method to react to server-initiated notifications.
     async fn notification(
         &mut self,
-        _context: ClientConnectionContext,
+        _context: ClientCtx,
         _notification: schema::ClientNotification,
     ) -> Result<()> {
         Ok(())

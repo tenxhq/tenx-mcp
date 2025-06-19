@@ -10,7 +10,7 @@ use std::env;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tenx_mcp::{schema, Error, Result, Server, ServerConnection, ServerConnectionContext};
+use tenx_mcp::{schema, Error, Result, Server, ServerConn, ServerCtx};
 use tokio::time::sleep;
 use tracing::{info, warn};
 
@@ -41,10 +41,10 @@ impl TimeoutTestConnection {
 }
 
 #[async_trait]
-impl ServerConnection for TimeoutTestConnection {
+impl ServerConn for TimeoutTestConnection {
     async fn initialize(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         _protocol_version: String,
         _capabilities: schema::ClientCapabilities,
         _client_info: schema::Implementation,
@@ -55,10 +55,7 @@ impl ServerConnection for TimeoutTestConnection {
         )
     }
 
-    async fn tools_list(
-        &mut self,
-        _context: ServerConnectionContext,
-    ) -> Result<schema::ListToolsResult> {
+    async fn tools_list(&mut self, _context: ServerCtx) -> Result<schema::ListToolsResult> {
         let object_schema = schema::ToolInputSchema {
             schema_type: "object".to_string(),
             properties: None,
@@ -86,7 +83,7 @@ impl ServerConnection for TimeoutTestConnection {
 
     async fn tools_call(
         &mut self,
-        _context: ServerConnectionContext,
+        _context: ServerCtx,
         name: String,
         _arguments: Option<serde_json::Value>,
     ) -> Result<schema::CallToolResult> {

@@ -72,14 +72,6 @@ impl Error {
         }
     }
 
-    /// Check if this error is retryable
-    pub fn is_retryable(&self) -> bool {
-        matches!(
-            self,
-            Self::Io { .. } | Self::TransportDisconnected | Self::ConnectionClosed
-        )
-    }
-
     /// Convert error to a specific JSONRPC response if applicable
     pub fn to_jsonrpc_response(&self, request_id: RequestId) -> Option<JSONRPCError> {
         let (code, message) = match self {

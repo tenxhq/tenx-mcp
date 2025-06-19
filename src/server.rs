@@ -9,7 +9,7 @@ use crate::{
     connection::create_jsonrpc_notification,
     error::{Error, Result},
     schema::{self, *},
-    server_connection::{ServerConnection, ServerConnectionContext, ServerConnectionFactory},
+    server_connection::{ServerConn, ServerConnectionFactory, ServerCtx},
     transport::{Transport, TransportStream},
 };
 
@@ -29,7 +29,7 @@ impl Server {
     /// Set the connection factory for creating Connection instances
     pub fn with_connection_factory<F>(mut self, factory: F) -> Self
     where
-        F: Fn() -> Box<dyn ServerConnection> + Send + Sync + 'static,
+        F: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
     {
         self.connection_factory = Some(Box::new(factory));
         self
@@ -139,7 +139,7 @@ impl ServerHandle {
         let notification_tx_handle = notification_tx.clone();
 
         // Create connection instance
-        let mut connection: Option<Box<dyn ServerConnection>> =
+        let mut connection: Option<Box<dyn ServerConn>> =
             if let Some(factory) = &server.connection_factory {
                 Some(factory())
             } else {
@@ -148,7 +148,7 @@ impl ServerHandle {
 
         // Initialize connection if present
         if let Some(conn) = &mut connection {
-            let context = ServerConnectionContext {
+            let context = ServerCtx {
                 notification_tx: notification_tx.clone(),
             };
             conn.on_connect(context).await?;
@@ -163,7 +163,7 @@ impl ServerHandle {
                         match result {
                             Some(Ok(message)) => {
                                 if let Some(conn) = &mut connection {
-                                    let context = ServerConnectionContext {
+                                    let context = ServerCtx {
                                         notification_tx: notification_tx.clone(),
                                     };
                                     if let Err(e) = handle_message_with_connection(conn, message, &mut sink_tx, context).await {
@@ -254,10 +254,10 @@ impl ServerHandle {
 
 /// Handle a message using the Connection trait
 async fn handle_message_with_connection(
-    connection: &mut Box<dyn ServerConnection>,
+    connection: &mut Box<dyn ServerConn>,
     message: JSONRPCMessage,
     sink: &mut SplitSink<Box<dyn TransportStream>, JSONRPCMessage>,
-    context: ServerConnectionContext,
+    context: ServerCtx,
 ) -> Result<()> {
     match message {
         JSONRPCMessage::Request(request) => {
@@ -288,9 +288,9 @@ async fn handle_message_with_connection(
 
 /// Handle a request using the Connection trait and convert result to JSONRPCMessage
 async fn handle_request(
-    connection: &mut Box<dyn ServerConnection>,
+    connection: &mut Box<dyn ServerConn>,
     request: JSONRPCRequest,
-    context: ServerConnectionContext,
+    context: ServerCtx,
 ) -> JSONRPCMessage {
     let result = handle_request_inner(connection, request.clone(), context).await;
 
@@ -334,9 +334,9 @@ async fn handle_request(
 
 /// Inner handler that returns Result<serde_json::Value>
 async fn handle_request_inner(
-    connection: &mut Box<dyn ServerConnection>,
+    connection: &mut Box<dyn ServerConn>,
     request: JSONRPCRequest,
-    context: ServerConnectionContext,
+    context: ServerCtx,
 ) -> Result<serde_json::Value> {
     // Convert RequestParams to serde_json::Value
     let params = request
@@ -486,9 +486,9 @@ async fn handle_request_inner(
 
 /// Handle a notification using the Connection trait
 async fn handle_notification(
-    connection: &mut Box<dyn ServerConnection>,
+    connection: &mut Box<dyn ServerConn>,
     notification: JSONRPCNotification,
-    context: ServerConnectionContext,
+    context: ServerCtx,
 ) -> Result<()> {
     debug!(
         "Received notification: {}",
