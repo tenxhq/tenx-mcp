@@ -279,11 +279,7 @@ async fn test_rmcp_server_with_tenx_client() {
                 name: "test-client".to_string(),
                 version: "0.1.0".to_string(),
             },
-            ClientCapabilities {
-                experimental: None,
-                roots: None,
-                sampling: None,
-            },
+            ClientCapabilities::default(),
         )
         .await
         .unwrap();

@@ -329,6 +329,38 @@ pub struct ClientCapabilities {
     pub sampling: Option<Value>,
 }
 
+impl ClientCapabilities {
+    /// Create a new empty ClientCapabilities
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add an experimental capability
+    pub fn with_experimental_capability(mut self, key: impl Into<String>, value: Value) -> Self {
+        self.experimental
+            .get_or_insert_with(HashMap::new)
+            .insert(key.into(), value);
+        self
+    }
+
+    /// Enable roots capability.
+    ///
+    /// list_changed indicates whether the client supports notifications for changes to the roots
+    /// list.
+    pub fn with_roots_capability(mut self, list_changed: bool) -> Self {
+        self.roots = Some(RootsCapability {
+            list_changed: Some(list_changed),
+        });
+        self
+    }
+
+    /// Enable sampling capability
+    pub fn with_sampling(mut self) -> Self {
+        self.sampling = Some(Value::Object(serde_json::Map::new()));
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RootsCapability {
     /// Whether the client supports notifications for changes to the roots list.
