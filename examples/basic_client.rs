@@ -31,7 +31,7 @@ async fn main() -> Result<()> {
     info!("Connected to server: {}", server_info.server_info.name);
 
     // List available tools
-    let tools = client.list_tools().await?;
+    let tools = client.list_tools(None).await?;
     info!("\nAvailable tools:");
     for tool in &tools.tools {
         info!(

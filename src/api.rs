@@ -26,7 +26,7 @@ pub trait ServerAPI: Send + Sync {
     async fn ping(&self) -> Result<()>;
 
     /// List available tools with optional pagination
-    async fn list_tools(&self, cursor: Option<Cursor>) -> Result<ListToolsResult>;
+    async fn list_tools(&self, cursor: impl Into<Option<Cursor>>) -> Result<ListToolsResult>;
 
     /// Call a tool with the given name and arguments
     async fn tools_call(
@@ -36,12 +36,15 @@ pub trait ServerAPI: Send + Sync {
     ) -> Result<CallToolResult>;
 
     /// List available resources with optional pagination
-    async fn list_resources(&self, cursor: Option<Cursor>) -> Result<ListResourcesResult>;
+    async fn list_resources(
+        &self,
+        cursor: impl Into<Option<Cursor>>,
+    ) -> Result<ListResourcesResult>;
 
     /// List resource templates with optional pagination
     async fn list_resource_templates(
         &self,
-        cursor: Option<Cursor>,
+        cursor: impl Into<Option<Cursor>>,
     ) -> Result<ListResourceTemplatesResult>;
 
     /// Read a resource by URI
@@ -54,7 +57,7 @@ pub trait ServerAPI: Send + Sync {
     async fn resources_unsubscribe(&self, uri: impl Into<String>) -> Result<()>;
 
     /// List available prompts with optional pagination
-    async fn list_prompts(&self, cursor: Option<Cursor>) -> Result<ListPromptsResult>;
+    async fn list_prompts(&self, cursor: impl Into<Option<Cursor>>) -> Result<ListPromptsResult>;
 
     /// Get a prompt by name with optional arguments
     async fn get_prompt(
@@ -87,4 +90,3 @@ pub trait ClientAPI: Send + Sync {
     /// List available filesystem roots
     async fn list_roots(&self) -> Result<ListRootsResult>;
 }
-

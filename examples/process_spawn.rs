@@ -58,7 +58,7 @@ async fn main() -> Result<()> {
     }
 
     // List available tools
-    match client.list_tools().await {
+    match client.list_tools(None).await {
         Ok(tools) => {
             info!("Available tools:");
             for tool in tools.tools {

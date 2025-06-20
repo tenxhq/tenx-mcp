@@ -283,7 +283,7 @@ async fn test_rmcp_server_with_tenx_client() {
     assert!(!init_result.server_info.name.is_empty());
 
     // List tools from rmcp server
-    let tools = client.list_tools().await.unwrap();
+    let tools = client.list_tools(None).await.unwrap();
     assert_eq!(tools.tools.len(), 1);
     assert_eq!(tools.tools[0].name, "reverse");
 

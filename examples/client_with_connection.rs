@@ -102,7 +102,7 @@ async fn main() -> Result<()> {
     // 2. Server-initiated requests (via ClientConnection trait)
 
     // Example: Call a tool
-    match client.list_tools().await {
+    match client.list_tools(None).await {
         Ok(tools) => {
             println!("Available tools: {:?}", tools.tools);
         }

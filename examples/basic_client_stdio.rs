@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
 
     // List available tools
     info!("Listing available tools...");
-    let tools = client.list_tools().await?;
+    let tools = client.list_tools(None).await?;
     for tool in &tools.tools {
         info!(
             "Found tool: {} - {}",

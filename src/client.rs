@@ -125,71 +125,40 @@ where
     }
 
     /// List available tools from the server
-    pub async fn list_tools(&mut self) -> Result<ListToolsResult> {
-        self.request(ClientRequest::ListTools { cursor: None })
-            .await
-    }
-
-    /// List available tools from the server with pagination cursor
-    pub async fn list_tools_with_cursor(
+    pub async fn list_tools(
         &mut self,
-        cursor: impl Into<Cursor>,
+        cursor: impl Into<Option<Cursor>>,
     ) -> Result<ListToolsResult> {
-        self.request(ClientRequest::ListTools {
-            cursor: Some(cursor.into()),
-        })
-        .await
+        let cursor: Option<Cursor> = cursor.into();
+        self.request(ClientRequest::ListTools { cursor }).await
     }
 
     /// List available resources from the server
-    pub async fn list_resources(&mut self) -> Result<ListResourcesResult> {
-        self.request(ClientRequest::ListResources { cursor: None })
-            .await
-    }
-
-    /// List available resources from the server with pagination cursor
-    pub async fn list_resources_with_cursor(
+    pub async fn list_resources(
         &mut self,
-        cursor: impl Into<Cursor>,
+        cursor: impl Into<Option<Cursor>>,
     ) -> Result<ListResourcesResult> {
-        self.request(ClientRequest::ListResources {
-            cursor: Some(cursor.into()),
-        })
-        .await
+        let cursor: Option<Cursor> = cursor.into();
+        self.request(ClientRequest::ListResources { cursor }).await
     }
 
     /// List available resource templates from the server
-    pub async fn list_resource_templates(&mut self) -> Result<ListResourceTemplatesResult> {
-        self.request(ClientRequest::ListResourceTemplates { cursor: None })
-            .await
-    }
-
-    /// List available resource templates from the server with pagination cursor
-    pub async fn list_resource_templates_with_cursor(
+    pub async fn list_resource_templates(
         &mut self,
-        cursor: impl Into<Cursor>,
+        cursor: impl Into<Option<Cursor>>,
     ) -> Result<ListResourceTemplatesResult> {
-        self.request(ClientRequest::ListResourceTemplates {
-            cursor: Some(cursor.into()),
-        })
-        .await
+        let cursor: Option<Cursor> = cursor.into();
+        self.request(ClientRequest::ListResourceTemplates { cursor })
+            .await
     }
 
     /// List available prompts from the server
-    pub async fn list_prompts(&mut self) -> Result<ListPromptsResult> {
-        self.request(ClientRequest::ListPrompts { cursor: None })
-            .await
-    }
-
-    /// List available prompts from the server with pagination cursor
-    pub async fn list_prompts_with_cursor(
+    pub async fn list_prompts(
         &mut self,
-        cursor: impl Into<Cursor>,
+        cursor: impl Into<Option<Cursor>>,
     ) -> Result<ListPromptsResult> {
-        self.request(ClientRequest::ListPrompts {
-            cursor: Some(cursor.into()),
-        })
-        .await
+        let cursor: Option<Cursor> = cursor.into();
+        self.request(ClientRequest::ListPrompts { cursor }).await
     }
 
     /// Call a tool on the server without arguments
@@ -686,36 +655,24 @@ mod tests {
 
         // These should all compile cleanly
         std::mem::drop(async {
-            // Simple calls without cursors
-            client.list_tools().await.unwrap();
-            client.list_resources().await.unwrap();
-            client.list_prompts().await.unwrap();
-            client.list_resource_templates().await.unwrap();
+            // Simple calls without cursors - passing None
+            client.list_tools(None).await.unwrap();
+            client.list_resources(None).await.unwrap();
+            client.list_prompts(None).await.unwrap();
+            client.list_resource_templates(None).await.unwrap();
 
-            // Calls with cursor as &str
-            client.list_tools_with_cursor("cursor").await.unwrap();
-            client.list_resources_with_cursor("cursor").await.unwrap();
-            client.list_prompts_with_cursor("cursor").await.unwrap();
-            client
-                .list_resource_templates_with_cursor("cursor")
-                .await
-                .unwrap();
+            // Calls with cursor as Cursor type
+            let cursor = Cursor::from("cursor");
+            client.list_tools(cursor.clone()).await.unwrap();
+            client.list_resources(cursor.clone()).await.unwrap();
+            client.list_prompts(cursor.clone()).await.unwrap();
+            client.list_resource_templates(cursor).await.unwrap();
 
-            // Calls with cursor as String
-            let cursor = "next_page".to_string();
-            client.list_tools_with_cursor(cursor.clone()).await.unwrap();
-            client
-                .list_resources_with_cursor(cursor.clone())
-                .await
-                .unwrap();
-            client
-                .list_prompts_with_cursor(cursor.clone())
-                .await
-                .unwrap();
-            client
-                .list_resource_templates_with_cursor(cursor)
-                .await
-                .unwrap();
+            // Calls with explicit Some(Cursor)
+            client.list_tools(Some(Cursor::from("some_cursor"))).await.unwrap();
+            client.list_resources(Some(Cursor::from("some_cursor"))).await.unwrap();
+            client.list_prompts(Some(Cursor::from("some_cursor"))).await.unwrap();
+            client.list_resource_templates(Some(Cursor::from("some_cursor"))).await.unwrap();
         });
     }
 
