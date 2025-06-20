@@ -75,15 +75,13 @@ async fn main() -> Result<()> {
     }
 
     // Call a tool if available
-    match client
-        .call_tool(
-            "echo",
-            &serde_json::json!({
-                "message": "Hello from spawned process!"
-            }),
-        )
-        .await
-    {
+    let mut args = std::collections::HashMap::new();
+    args.insert(
+        "message".to_string(),
+        serde_json::json!("Hello from spawned process!"),
+    );
+
+    match client.call_tool("echo", args).await {
         Ok(result) => {
             info!("Tool response: {:?}", result.content);
         }

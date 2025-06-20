@@ -123,35 +123,6 @@ where
         .await
     }
 
-    /// Call a tool on the server without arguments
-    ///
-    /// This is a convenience method for calling tools that don't require arguments.
-    pub async fn call_tool_without_args(
-        &mut self,
-        name: impl Into<String> + Send,
-    ) -> Result<CallToolResult> {
-        <Self as ServerAPI>::call_tool(self, name, None).await
-    }
-
-    /// Call a tool on the server with arguments
-    pub async fn call_tool<T>(
-        &mut self,
-        name: impl Into<String> + Send,
-        arguments: &T,
-    ) -> Result<CallToolResult>
-    where
-        T: serde::Serialize,
-    {
-        let value = serde_json::to_value(arguments)?;
-        let arguments = if let serde_json::Value::Object(map) = value {
-            Some(map.into_iter().collect())
-        } else {
-            Some(std::collections::HashMap::new())
-        };
-
-        <Self as ServerAPI>::call_tool(self, name, arguments).await
-    }
-
     /// Connect to a TCP server and initialize the connection
     ///
     /// This is a convenience method that creates a TCP transport,
@@ -545,11 +516,11 @@ where
     async fn call_tool(
         &mut self,
         name: impl Into<String> + Send,
-        arguments: Option<HashMap<String, Value>>,
+        arguments: impl Into<Option<HashMap<String, Value>>> + Send,
     ) -> Result<CallToolResult> {
         let request = ClientRequest::CallTool {
             name: name.into(),
-            arguments,
+            arguments: arguments.into(),
         };
         self.request(request).await
     }
@@ -785,40 +756,26 @@ mod tests {
 
         // These should all compile cleanly
         std::mem::drop(async {
-            // Call without arguments
-            client.call_tool_without_args("my_tool").await.unwrap();
+            // Call without arguments - passing None
+            client.call_tool("my_tool", None).await.unwrap();
 
             // Call with String for tool name
             let tool_name = "another_tool".to_string();
-            client.call_tool_without_args(tool_name).await.unwrap();
+            client.call_tool(tool_name, None).await.unwrap();
 
             // Call with &String
             let tool_name = "third_tool".to_string();
-            client.call_tool_without_args(&tool_name).await.unwrap();
+            client.call_tool(&tool_name, None).await.unwrap();
 
-            // Call with serde_json::Value arguments
-            let args = serde_json::json!({"param": "value"});
-            client.call_tool("tool_with_args", &args).await.unwrap();
+            // Call with HashMap arguments directly
+            let mut args = std::collections::HashMap::new();
+            args.insert("param".to_string(), serde_json::json!("value"));
+            client.call_tool("tool_with_args", args).await.unwrap();
 
-            // Call with struct that implements Serialize
-            #[derive(serde::Serialize)]
-            struct MyArgs {
-                param: String,
-                count: i32,
-            }
-            let my_args = MyArgs {
-                param: "value".to_string(),
-                count: 42,
-            };
-            client
-                .call_tool("tool_with_struct", &my_args)
-                .await
-                .unwrap();
-
-            // Call with HashMap
-            let mut map = std::collections::HashMap::new();
-            map.insert("key", "value");
-            client.call_tool("tool_with_map", &map).await.unwrap();
+            // Call with Some(HashMap)
+            let mut args = std::collections::HashMap::new();
+            args.insert("key".to_string(), serde_json::json!("value"));
+            client.call_tool("tool_with_map", Some(args)).await.unwrap();
         });
     }
 

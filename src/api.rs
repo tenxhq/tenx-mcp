@@ -35,7 +35,7 @@ pub trait ServerAPI: Send + Sync {
     async fn call_tool(
         &mut self,
         name: impl Into<String> + Send,
-        arguments: Option<HashMap<String, Value>>,
+        arguments: impl Into<Option<HashMap<String, Value>>> + Send,
     ) -> Result<CallToolResult>;
 
     /// List available resources with optional pagination

@@ -43,14 +43,19 @@ async fn main() -> Result<()> {
 
     // Call the echo tool
     info!("\nCalling echo tool...");
-    let result = client
-        .call_tool(
-            "echo",
-            &EchoParams {
-                message: "Hello from tenx-mcp client!".to_string(),
-            },
-        )
-        .await?;
+    let params = EchoParams {
+        message: "Hello from tenx-mcp client!".to_string(),
+    };
+
+    // Convert struct to HashMap<String, Value>
+    let args_value = serde_json::to_value(&params)?;
+    let args = if let serde_json::Value::Object(map) = args_value {
+        Some(map.into_iter().collect())
+    } else {
+        None
+    };
+
+    let result = client.call_tool("echo", args).await?;
 
     // Assume text response
     if let Some(schema::Content::Text(text_content)) = result.content.first() {

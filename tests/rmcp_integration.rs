@@ -289,10 +289,9 @@ async fn test_rmcp_server_with_tenx_client() {
     assert_eq!(tools.tools[0].name, "reverse");
 
     // Call reverse tool
-    let result = client
-        .call_tool("reverse", &json!({ "text": "hello" }))
-        .await
-        .unwrap();
+    let mut args = HashMap::new();
+    args.insert("text".to_string(), json!("hello"));
+    let result = client.call_tool("reverse", args).await.unwrap();
 
     // Verify reversed result
     assert_eq!(result.content.len(), 1);

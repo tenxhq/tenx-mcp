@@ -77,7 +77,6 @@ impl std::fmt::Display for Cursor {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct Request {
     pub method: String,
