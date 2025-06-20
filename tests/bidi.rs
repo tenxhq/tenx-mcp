@@ -1,3 +1,4 @@
+/// Test bi-dirctional client-server and server-client messages
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
 use tenx_mcp::{
