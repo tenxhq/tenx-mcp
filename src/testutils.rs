@@ -18,7 +18,7 @@ use tokio::io::{self, AsyncRead, AsyncWrite};
 use tokio::sync::broadcast;
 
 use crate::{
-    error::Result, schema::ClientNotification, server::ServerCtx, Client, ClientConn, Server,
+    error::Result, schema::ServerNotification, server::ServerCtx, Client, ClientConn, Server,
     ServerConn, ServerHandle,
 };
 
@@ -120,6 +120,6 @@ where
 
 /// Create a ServerCtx for testing purposes.
 /// This creates a ServerCtx with only notification capability (no request/response).
-pub fn test_server_ctx(notification_tx: broadcast::Sender<ClientNotification>) -> ServerCtx {
+pub fn test_server_ctx(notification_tx: broadcast::Sender<ServerNotification>) -> ServerCtx {
     ServerCtx::new(notification_tx, None)
 }

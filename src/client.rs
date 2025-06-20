@@ -550,7 +550,7 @@ async fn handle_server_notification<C: ClientConn>(
 
     let value = Value::Object(obj);
 
-    match serde_json::from_value::<ClientNotification>(value) {
+    match serde_json::from_value::<ServerNotification>(value) {
         Ok(typed) => connection.notification(context, typed).await,
         Err(e) => Err(Error::InvalidParams(format!(
             "Failed to parse server notification: {e}",
@@ -700,11 +700,11 @@ mod tests {
             async fn notification(
                 &self,
                 _context: crate::client_connection::ClientCtx,
-                notification: crate::schema::ClientNotification,
+                notification: crate::schema::ServerNotification,
             ) -> Result<()> {
                 if matches!(
                     notification,
-                    crate::schema::ClientNotification::RootsListChanged
+                    crate::schema::ServerNotification::ToolListChanged
                 ) {
                     let mut tx_guard = self.tx.lock().await;
                     if let Some(tx) = tx_guard.take() {
@@ -759,7 +759,7 @@ mod tests {
         client.init().await.expect("Failed to initialize");
 
         // Send server notification
-        server_handle.send_server_notification(crate::schema::ClientNotification::RootsListChanged);
+        server_handle.send_server_notification(crate::schema::ServerNotification::ToolListChanged);
 
         // Wait for notification to be received
         tokio::time::timeout(std::time::Duration::from_secs(1), rx_notif)
@@ -800,12 +800,9 @@ mod tests {
             async fn notification(
                 &self,
                 _context: crate::server::ServerCtx,
-                notification: crate::schema::ServerNotification,
+                notification: crate::schema::ClientNotification,
             ) -> Result<()> {
-                if matches!(
-                    notification,
-                    crate::schema::ServerNotification::ToolListChanged
-                ) {
+                if matches!(notification, crate::schema::ClientNotification::Initialized) {
                     let maybe_tx = self.tx.lock().unwrap().take();
                     if let Some(tx) = maybe_tx {
                         let _ = tx.send(());
@@ -822,7 +819,7 @@ mod tests {
         #[async_trait::async_trait]
         impl crate::client_connection::ClientConn for NotifierClientConnection {
             async fn on_connect(&self, context: crate::client_connection::ClientCtx) -> Result<()> {
-                context.send_notification(crate::schema::ServerNotification::ToolListChanged)?;
+                context.send_notification(crate::schema::ClientNotification::Initialized)?;
                 Ok(())
             }
         }

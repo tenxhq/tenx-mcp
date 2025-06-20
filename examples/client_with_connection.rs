@@ -13,7 +13,7 @@ impl ClientConn for MyClientConnection {
         println!("Client connection established for: {}", self.name);
 
         // Example: Send a notification when connected
-        context.send_notification(schema::ServerNotification::ToolListChanged)?;
+        context.send_notification(schema::ClientNotification::Initialized)?;
 
         Ok(())
     }

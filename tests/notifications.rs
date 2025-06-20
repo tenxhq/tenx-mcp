@@ -20,12 +20,12 @@ async fn test_server_to_client_notifications() {
         async fn notification(
             &self,
             _context: ClientCtx,
-            notification: tenx_mcp::schema::ClientNotification,
+            notification: tenx_mcp::schema::ServerNotification,
         ) -> Result<()> {
             tracing::info!("Client received notification: {:?}", notification);
             if matches!(
                 notification,
-                tenx_mcp::schema::ClientNotification::RootsListChanged
+                tenx_mcp::schema::ServerNotification::ToolListChanged
             ) {
                 if let Some(tx) = self.tx.lock().unwrap().take() {
                     let _ = tx.send(());
@@ -48,7 +48,7 @@ async fn test_server_to_client_notifications() {
             tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                 // Send roots list changed notification
-                match context.notify(schema::ClientNotification::RootsListChanged) {
+                match context.notify(schema::ServerNotification::ToolListChanged) {
                     Ok(_) => {
                         tracing::info!("Server sent roots_list_changed notification");
                         *sent_notification.lock().unwrap() = true;

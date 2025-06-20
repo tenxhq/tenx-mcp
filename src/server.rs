@@ -20,7 +20,7 @@ use crate::{
 #[derive(Clone)]
 pub struct ServerCtx {
     /// Sender for server notifications
-    pub(crate) notification_tx: broadcast::Sender<schema::ClientNotification>,
+    pub(crate) notification_tx: broadcast::Sender<schema::ServerNotification>,
     /// Request handler for making requests to clients
     request_handler: crate::request_handler::RequestHandler,
 }
@@ -28,7 +28,7 @@ pub struct ServerCtx {
 impl ServerCtx {
     /// Create a new ServerCtx with notification channel and transport
     pub(crate) fn new(
-        notification_tx: broadcast::Sender<schema::ClientNotification>,
+        notification_tx: broadcast::Sender<schema::ServerNotification>,
         transport_tx: Option<TransportSink>,
     ) -> Self {
         Self {
@@ -41,7 +41,7 @@ impl ServerCtx {
     }
 
     /// Send a notification to the client
-    pub fn notify(&self, notification: schema::ClientNotification) -> Result<()> {
+    pub fn notify(&self, notification: schema::ServerNotification) -> Result<()> {
         self.notification_tx
             .send(notification)
             .map_err(|_| Error::InternalError("Failed to send notification".into()))?;
@@ -91,7 +91,7 @@ impl ClientAPI for ServerCtx {
 
 pub struct ServerHandle {
     pub handle: JoinHandle<()>,
-    notification_tx: broadcast::Sender<ClientNotification>,
+    notification_tx: broadcast::Sender<ServerNotification>,
 }
 
 /// MCP Server implementation
@@ -376,7 +376,7 @@ impl ServerHandle {
     }
 
     /// Send a server notification
-    pub fn send_server_notification(&self, notification: ClientNotification) {
+    pub fn send_server_notification(&self, notification: ServerNotification) {
         // TODO Skip sending notifications if specific server capabilities are not enabled
         if let Err(e) = self.notification_tx.send(notification.clone()) {
             error!(
@@ -608,7 +608,7 @@ async fn handle_notification(
 
     let value = serde_json::Value::Object(object);
 
-    match serde_json::from_value::<ServerNotification>(value) {
+    match serde_json::from_value::<ClientNotification>(value) {
         Ok(typed) => connection.notification(context, typed).await,
         Err(e) => {
             warn!("Failed to deserialize client notification: {}", e);

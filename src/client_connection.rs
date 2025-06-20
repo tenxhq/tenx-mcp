@@ -10,17 +10,17 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct ClientCtx {
     /// Sender for client notifications
-    pub(crate) notification_tx: broadcast::Sender<schema::ServerNotification>,
+    pub(crate) notification_tx: broadcast::Sender<schema::ClientNotification>,
 }
 
 impl ClientCtx {
     /// Create a new ClientConnectionContext with the given notification sender
-    pub fn new(notification_tx: broadcast::Sender<schema::ServerNotification>) -> Self {
+    pub fn new(notification_tx: broadcast::Sender<schema::ClientNotification>) -> Self {
         Self { notification_tx }
     }
 
     /// Send a notification to the client
-    pub fn send_notification(&self, notification: schema::ServerNotification) -> Result<()> {
+    pub fn send_notification(&self, notification: schema::ClientNotification) -> Result<()> {
         self.notification_tx.send(notification).map_err(|_| {
             crate::error::Error::InternalError("Failed to send notification".into())
         })?;
@@ -73,7 +73,7 @@ pub trait ClientConn: Send + Sync + Clone {
     async fn notification(
         &self,
         _context: ClientCtx,
-        _notification: schema::ClientNotification,
+        _notification: schema::ServerNotification,
     ) -> Result<()> {
         Ok(())
     }

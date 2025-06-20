@@ -172,7 +172,7 @@ pub trait ServerConn: Send + Sync {
     async fn notification(
         &self,
         _context: ServerCtx,
-        _notification: schema::ServerNotification,
+        _notification: schema::ClientNotification,
     ) -> Result<()> {
         Ok(())
     }
