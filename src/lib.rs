@@ -1,26 +1,22 @@
+mod api;
 mod client;
 mod client_connection;
-mod error;
-pub mod schema;
-mod server;
-mod server_connection;
-
 mod codec;
 mod connection;
+mod error;
+mod server;
+mod server_connection;
 mod transport;
 
-// Test utilities (available unconditionally; they are handy for downstream
-// users that want to integration-test their own `ServerConnection` /
-// `ClientConnection` implementations).
+pub mod schema;
 pub mod testutils;
 
-// Re-export commonly used types
+pub use api::*;
 pub use client::Client;
 pub use client_connection::{ClientConn, ClientCtx};
+pub use error::{Error, Result};
 pub use server::{Server, ServerHandle};
 pub use server_connection::{ServerConn, ServerCtx};
-
-pub use error::{Error, Result};
 
 // Re-export schemars for users
 pub use schemars;
