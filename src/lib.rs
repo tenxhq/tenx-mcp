@@ -16,8 +16,8 @@ pub use client::Client;
 pub use client_connection::{ClientConn, ClientCtx};
 pub use error::{Error, Result};
 pub use schema::Cursor;
-pub use server::{Server, ServerHandle};
-pub use server_connection::{ServerConn, ServerCtx};
+pub use server::{Server, ServerCtx, ServerHandle};
+pub use server_connection::ServerConn;
 
 // Re-export schemars for users
 pub use schemars;

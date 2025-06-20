@@ -1787,6 +1787,17 @@ pub enum ServerRequest {
     ListRoots,
 }
 
+impl ServerRequest {
+    /// Get the method name for this request
+    pub fn method(&self) -> &'static str {
+        match self {
+            ServerRequest::Ping => "ping",
+            ServerRequest::CreateMessage { .. } => "sampling/createMessage",
+            ServerRequest::ListRoots => "roots/list",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
 pub enum ServerNotification {

@@ -1,16 +1,209 @@
+use async_trait::async_trait;
 use futures::{stream::SplitSink, SinkExt, StreamExt};
 use std::collections::HashMap;
-use tokio::sync::broadcast;
+use std::sync::Arc;
+use tokio::sync::{broadcast, oneshot, Mutex};
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 use crate::{
+    api::ClientAPI,
     connection::create_jsonrpc_notification,
     error::{Error, Result},
     schema::{self, *},
-    server_connection::{ServerConn, ServerCtx},
+    server_connection::ServerConn,
     transport::{Transport, TransportStream},
 };
+
+/// Type for handling either a response or error from JSON-RPC
+#[derive(Debug)]
+enum ResponseOrError {
+    Response(JSONRPCResponse),
+    Error(JSONRPCError),
+}
+
+type TransportSink = Arc<Mutex<SplitSink<Box<dyn TransportStream>, JSONRPCMessage>>>;
+
+/// Context provided to ServerConn implementations for interacting with clients
+#[derive(Clone)]
+pub struct ServerCtx {
+    /// Sender for server notifications
+    pub(crate) notification_tx: broadcast::Sender<schema::ClientNotification>,
+    /// Transport sink for sending requests to client
+    transport_tx: Option<TransportSink>,
+    /// Pending requests waiting for responses from client
+    pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<ResponseOrError>>>>,
+    /// Next request ID counter
+    next_request_id: Arc<Mutex<u64>>,
+}
+
+impl ServerCtx {
+    /// Create a new ServerCtx with notification channel and transport
+    pub fn new(
+        notification_tx: broadcast::Sender<schema::ClientNotification>,
+        transport_tx: Option<TransportSink>,
+    ) -> Self {
+        Self {
+            notification_tx,
+            transport_tx,
+            pending_requests: Arc::new(Mutex::new(HashMap::new())),
+            next_request_id: Arc::new(Mutex::new(1)),
+        }
+    }
+
+    /// Send a notification to the client
+    pub fn notify(&self, notification: schema::ClientNotification) -> Result<()> {
+        self.notification_tx
+            .send(notification)
+            .map_err(|_| Error::InternalError("Failed to send notification".into()))?;
+        Ok(())
+    }
+
+    /// Send a request to the client and wait for response
+    async fn request<T>(&mut self, request: ServerRequest) -> Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let id = self.next_request_id().await;
+        let (tx, rx) = oneshot::channel();
+
+        // Store the response channel
+        {
+            let mut pending = self.pending_requests.lock().await;
+            pending.insert(id.clone(), tx);
+        }
+
+        // Create the JSON-RPC request
+        let jsonrpc_request = JSONRPCRequest {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            id: RequestId::String(id.clone()),
+            request: Request {
+                method: request.method().to_string(),
+                params: Some(RequestParams {
+                    meta: None,
+                    other: serde_json::to_value(&request)?
+                        .as_object()
+                        .unwrap_or(&serde_json::Map::new())
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect(),
+                }),
+            },
+        };
+
+        self.send_message(JSONRPCMessage::Request(jsonrpc_request))
+            .await?;
+
+        // Wait for response
+        match rx.await {
+            Ok(response_or_error) => {
+                match response_or_error {
+                    ResponseOrError::Response(response) => {
+                        // Create a combined Value from the result's fields
+                        let mut result_value = serde_json::Map::new();
+
+                        // Add metadata if present
+                        if let Some(meta) = response.result.meta {
+                            result_value.insert("_meta".to_string(), serde_json::to_value(meta)?);
+                        }
+
+                        // Add all other fields
+                        for (key, value) in response.result.other {
+                            result_value.insert(key, value);
+                        }
+
+                        // Deserialize directly from the combined map
+                        serde_json::from_value(serde_json::Value::Object(result_value)).map_err(
+                            |e| Error::Protocol(format!("Failed to deserialize response: {e}")),
+                        )
+                    }
+                    ResponseOrError::Error(error) => {
+                        // Map JSON-RPC errors to appropriate Error variants
+                        match error.error.code {
+                            METHOD_NOT_FOUND => Err(Error::MethodNotFound(error.error.message)),
+                            INVALID_PARAMS => Err(Error::InvalidParams(format!(
+                                "{}: {}",
+                                request.method(),
+                                error.error.message
+                            ))),
+                            _ => Err(Error::Protocol(format!(
+                                "JSON-RPC error {}: {}",
+                                error.error.code, error.error.message
+                            ))),
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Response channel closed for request {}: {}", id, e);
+                // Remove the pending request
+                self.pending_requests.lock().await.remove(&id);
+                Err(Error::Protocol("Response channel closed".to_string()))
+            }
+        }
+    }
+
+    /// Send a message through the transport
+    async fn send_message(&mut self, message: JSONRPCMessage) -> Result<()> {
+        if let Some(transport_tx) = &self.transport_tx {
+            let mut tx = transport_tx.lock().await;
+            tx.send(message).await?;
+            Ok(())
+        } else {
+            Err(Error::Transport("Not connected".to_string()))
+        }
+    }
+
+    /// Generate the next request ID
+    async fn next_request_id(&self) -> String {
+        let mut id = self.next_request_id.lock().await;
+        let current = *id;
+        *id += 1;
+        format!("srv-req-{current}")
+    }
+
+    /// Handle a response from the client
+    pub(crate) async fn handle_client_response(&self, response: JSONRPCResponse) {
+        if let RequestId::String(id) = &response.id {
+            let mut pending = self.pending_requests.lock().await;
+            if let Some(tx) = pending.remove(id) {
+                let _ = tx.send(ResponseOrError::Response(response));
+            } else {
+                warn!("Received response for unknown request ID: {}", id);
+            }
+        }
+    }
+
+    /// Handle an error response from the client
+    pub(crate) async fn handle_client_error(&self, error: JSONRPCError) {
+        if let RequestId::String(id) = &error.id {
+            let mut pending = self.pending_requests.lock().await;
+            if let Some(tx) = pending.remove(id) {
+                let _ = tx.send(ResponseOrError::Error(error));
+            } else {
+                warn!("Received error for unknown request ID: {}", id);
+            }
+        }
+    }
+}
+
+/// Implementation of ClientAPI trait for ServerCtx
+#[async_trait]
+impl ClientAPI for ServerCtx {
+    async fn ping(&mut self) -> Result<()> {
+        let _: EmptyResult = self.request(ServerRequest::Ping).await?;
+        Ok(())
+    }
+
+    async fn create_message(&mut self, params: CreateMessageParams) -> Result<CreateMessageResult> {
+        self.request(ServerRequest::CreateMessage(Box::new(params)))
+            .await
+    }
+
+    async fn list_roots(&mut self) -> Result<ListRootsResult> {
+        self.request(ServerRequest::ListRoots).await
+    }
+}
 
 pub struct ServerHandle {
     pub handle: JoinHandle<()>,
@@ -158,10 +351,13 @@ impl ServerHandle {
     {
         transport.connect().await?;
         let stream = transport.framed()?;
-        let (mut sink_tx, mut stream_rx) = stream.split();
+        let (sink_tx, mut stream_rx) = stream.split();
 
         info!("MCP server started");
         let (notification_tx, mut notification_rx) = broadcast::channel(100);
+
+        // Wrap the sink in an Arc<Mutex> for sharing
+        let sink_tx = Arc::new(Mutex::new(sink_tx));
 
         // Clone notification_tx for the handle
         let notification_tx_handle = notification_tx.clone();
@@ -176,9 +372,7 @@ impl ServerHandle {
 
         // Initialize connection if present
         if let Some(conn) = &mut connection {
-            let context = ServerCtx {
-                notification_tx: notification_tx.clone(),
-            };
+            let context = ServerCtx::new(notification_tx.clone(), Some(sink_tx.clone()));
             conn.on_connect(context).await?;
         }
 
@@ -191,11 +385,24 @@ impl ServerHandle {
                         match result {
                             Some(Ok(message)) => {
                                 if let Some(conn) = &mut connection {
-                                    let context = ServerCtx {
-                                        notification_tx: notification_tx.clone(),
-                                    };
-                                    if let Err(e) = handle_message_with_connection(conn, message, &mut sink_tx, context).await {
-                                        error!("Error handling message: {}", e);
+                                    let context = ServerCtx::new(
+                                        notification_tx.clone(),
+                                        Some(sink_tx.clone()),
+                                    );
+
+                                    // Handle responses and errors from client specially
+                                    match &message {
+                                        JSONRPCMessage::Response(response) => {
+                                            context.handle_client_response(response.clone()).await;
+                                        }
+                                        JSONRPCMessage::Error(error) => {
+                                            context.handle_client_error(error.clone()).await;
+                                        }
+                                        _ => {
+                                            if let Err(e) = handle_message_with_connection(conn, message, &mut *sink_tx.lock().await, context).await {
+                                                error!("Error handling message: {}", e);
+                                            }
+                                        }
                                     }
                                 } else {
                                     error!("No connection factory provided - unable to handle messages");
@@ -218,9 +425,12 @@ impl ServerHandle {
                         match result {
                             Ok(notification) => {
                                 let jsonrpc_notification = create_jsonrpc_notification(notification);
-                                if let Err(e) = sink_tx.send(JSONRPCMessage::Notification(jsonrpc_notification)).await {
-                                    error!("Error sending notification to client: {}", e);
-                                    break;
+                                {
+                                    let mut sink = sink_tx.lock().await;
+                                    if let Err(e) = sink.send(JSONRPCMessage::Notification(jsonrpc_notification)).await {
+                                        error!("Error sending notification to client: {}", e);
+                                        break;
+                                    }
                                 }
                             }
                             Err(e) => {

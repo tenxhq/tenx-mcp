@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use tokio::sync::broadcast;
 
 use crate::{
     schema::{
@@ -11,30 +10,8 @@ use crate::{
         LoggingLevel, ReadResourceResult,
     },
     Error, Result,
+    server::ServerCtx,
 };
-
-/// Context provided to Connection implementations for interacting with the client
-#[derive(Debug, Clone)]
-pub struct ServerCtx {
-    /// Sender for server notifications
-    pub(crate) notification_tx: broadcast::Sender<schema::ClientNotification>,
-}
-
-impl ServerCtx {
-    /// Create a new ServerConnectionContext with a notification channel
-    /// This is primarily intended for testing purposes
-    pub fn new(notification_tx: broadcast::Sender<schema::ClientNotification>) -> Self {
-        Self { notification_tx }
-    }
-
-    /// Send a notification to the client
-    pub fn notify(&self, notification: schema::ClientNotification) -> Result<()> {
-        self.notification_tx
-            .send(notification)
-            .map_err(|_| Error::InternalError("Failed to send notification".into()))?;
-        Ok(())
-    }
-}
 
 /// Connection trait that server implementers must implement
 /// Each client connection will have its own instance of the implementation
