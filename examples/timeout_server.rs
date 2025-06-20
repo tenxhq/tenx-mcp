@@ -43,7 +43,7 @@ impl TimeoutTestConnection {
 #[async_trait]
 impl ServerConn for TimeoutTestConnection {
     async fn initialize(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _protocol_version: String,
         _capabilities: schema::ClientCapabilities,
@@ -56,7 +56,7 @@ impl ServerConn for TimeoutTestConnection {
     }
 
     async fn tools_list(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _cursor: Option<schema::Cursor>,
     ) -> Result<schema::ListToolsResult> {
@@ -86,7 +86,7 @@ impl ServerConn for TimeoutTestConnection {
     }
 
     async fn tools_call(
-        &mut self,
+        &self,
         _context: ServerCtx,
         name: String,
         _arguments: Option<std::collections::HashMap<String, serde_json::Value>>,

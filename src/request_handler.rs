@@ -64,6 +64,11 @@ impl RequestHandler {
         {
             let mut pending = self.pending_requests.lock().await;
             pending.insert(id.clone(), tx);
+            tracing::debug!(
+                "Stored pending request with ID: {}, total pending: {}",
+                id,
+                pending.len()
+            );
         }
 
         // Create the JSON-RPC request
@@ -84,6 +89,11 @@ impl RequestHandler {
             },
         };
 
+        tracing::info!(
+            "Sending request with ID: {} method: {}",
+            id,
+            request.method()
+        );
         self.send_message(JSONRPCMessage::Request(jsonrpc_request))
             .await?;
 
@@ -186,6 +196,11 @@ impl RequestHandler {
     pub async fn handle_response(&self, response: JSONRPCResponse) {
         if let RequestId::String(id) = &response.id {
             let mut pending = self.pending_requests.lock().await;
+            tracing::debug!(
+                "Handling response for ID: {}, pending requests: {:?}",
+                id,
+                pending.keys().collect::<Vec<_>>()
+            );
             if let Some(tx) = pending.remove(id) {
                 let _ = tx.send(ResponseOrError::Response(response));
             } else {

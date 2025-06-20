@@ -212,7 +212,7 @@ where
         self.request_handler.set_transport(tx.clone());
 
         // Clone the connection for use in the handler
-        let mut connection = self.connection.clone();
+        let connection = self.connection.clone();
 
         // Create broadcast channel for client notifications
         let (client_notification_tx, mut client_notification_rx) =
@@ -246,7 +246,7 @@ where
                                     JSONRPCMessage::Notification(notification) => {
                                         // Convert the JSON-RPC notification into a typed
                                         // ServerNotification and pass it to the connection handler.
-                                        if let Err(err) = handle_server_notification(&mut connection, context.clone(), notification).await {
+                                        if let Err(err) = handle_server_notification(&connection, context.clone(), notification).await {
                                             error!("Failed to handle server notification: {}", err);
                                         }
                                     }
@@ -254,7 +254,13 @@ where
                                         request_handler.handle_error(error).await;
                                     }
                                     JSONRPCMessage::Request(request) => {
-                                        let response = handle_server_request(&mut connection, context.clone(), request).await;
+                                        tracing::info!("Client received request from server: {:?}", request.id);
+                                        let response = handle_server_request(&connection, context.clone(), request).await;
+                                        tracing::info!("Client sending response to server: {:?}", match &response {
+                                            JSONRPCMessage::Response(r) => format!("{:?}", r.id),
+                                            JSONRPCMessage::Error(e) => format!("{:?}", e.id),
+                                            _ => "Unknown".to_string()
+                                        });
                                         let mut sink = tx.lock().await;
                                         if let Err(e) = sink.send(response).await {
                                             error!("Failed to send response to server: {}", e);
@@ -460,7 +466,7 @@ where
 
 /// Handle a request from the server using the ClientConnection trait
 async fn handle_server_request<C: ClientConn>(
-    connection: &mut C,
+    connection: &C,
     context: ClientCtx,
     request: JSONRPCRequest,
 ) -> JSONRPCMessage {
@@ -470,7 +476,7 @@ async fn handle_server_request<C: ClientConn>(
 
 /// Inner handler that returns Result<serde_json::Value>
 async fn handle_server_request_inner<C: ClientConn>(
-    connection: &mut C,
+    connection: &C,
     ctx: ClientCtx,
     request: JSONRPCRequest,
 ) -> Result<serde_json::Value> {
@@ -522,7 +528,7 @@ async fn handle_server_request_inner<C: ClientConn>(
 /// Convert a JSON-RPC notification into a typed ServerNotification and pass it
 /// to the connection implementation for further handling.
 async fn handle_server_notification<C: ClientConn>(
-    connection: &mut C,
+    connection: &C,
     context: ClientCtx,
     notification: JSONRPCNotification,
 ) -> Result<()> {
@@ -641,7 +647,7 @@ mod tests {
         #[async_trait::async_trait]
         impl crate::server_connection::ServerConn for TestConnection {
             async fn initialize(
-                &mut self,
+                &self,
                 _context: crate::server::ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
@@ -692,7 +698,7 @@ mod tests {
         #[async_trait::async_trait]
         impl crate::client_connection::ClientConn for NotifClientConnection {
             async fn notification(
-                &mut self,
+                &self,
                 _context: crate::client_connection::ClientCtx,
                 notification: crate::schema::ClientNotification,
             ) -> Result<()> {
@@ -716,7 +722,7 @@ mod tests {
         #[async_trait::async_trait]
         impl crate::server_connection::ServerConn for DummyServerConnection {
             async fn initialize(
-                &mut self,
+                &self,
                 _context: crate::server::ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
@@ -782,7 +788,7 @@ mod tests {
         #[async_trait::async_trait]
         impl crate::server_connection::ServerConn for NotifServerConnection {
             async fn initialize(
-                &mut self,
+                &self,
                 _context: crate::server::ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
@@ -792,7 +798,7 @@ mod tests {
             }
 
             async fn notification(
-                &mut self,
+                &self,
                 _context: crate::server::ServerCtx,
                 notification: crate::schema::ServerNotification,
             ) -> Result<()> {
@@ -815,10 +821,7 @@ mod tests {
 
         #[async_trait::async_trait]
         impl crate::client_connection::ClientConn for NotifierClientConnection {
-            async fn on_connect(
-                &mut self,
-                context: crate::client_connection::ClientCtx,
-            ) -> Result<()> {
+            async fn on_connect(&self, context: crate::client_connection::ClientCtx) -> Result<()> {
                 context.send_notification(crate::schema::ServerNotification::ToolListChanged)?;
                 Ok(())
             }
@@ -919,7 +922,7 @@ mod tests {
         #[async_trait::async_trait]
         impl crate::server_connection::ServerConn for TestStreamConnection {
             async fn initialize(
-                &mut self,
+                &self,
                 _context: crate::server::ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
@@ -992,7 +995,7 @@ mod tests {
         #[async_trait::async_trait]
         impl crate::server_connection::ServerConn for TestConnection {
             async fn initialize(
-                &mut self,
+                &self,
                 _context: crate::server::ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,

@@ -28,27 +28,31 @@ impl ClientCtx {
     }
 }
 
-/// Connection trait that server implementers must implement
+/// Connection trait that client implementers must implement
 /// Each client connection will have its own instance of the implementation
+///
+/// All methods take &self to allow concurrent request handling.
+/// Implementations should use interior mutability (Arc<Mutex<_>>, RwLock, etc.)
+/// for any mutable state.
 #[async_trait]
 pub trait ClientConn: Send + Sync + Clone {
     /// Called when a new connection is established
-    async fn on_connect(&mut self, _context: ClientCtx) -> Result<()> {
+    async fn on_connect(&self, _context: ClientCtx) -> Result<()> {
         Ok(())
     }
 
     /// Called when the connection is being closed
-    async fn on_disconnect(&mut self, _context: ClientCtx) -> Result<()> {
+    async fn on_disconnect(&self, _context: ClientCtx) -> Result<()> {
         Ok(())
     }
 
     /// Responde to a ping request from the server
-    async fn pong(&mut self, _context: ClientCtx) -> Result<()> {
+    async fn pong(&self, _context: ClientCtx) -> Result<()> {
         Ok(())
     }
 
     async fn create_message(
-        &mut self,
+        &self,
         _context: ClientCtx,
         _method: &str,
         _params: schema::CreateMessageParams,
@@ -58,7 +62,7 @@ pub trait ClientConn: Send + Sync + Clone {
         ))
     }
 
-    async fn list_roots(&mut self, _context: ClientCtx) -> Result<schema::ListRootsResult> {
+    async fn list_roots(&self, _context: ClientCtx) -> Result<schema::ListRootsResult> {
         Err(Error::InvalidRequest("list_roots not implemented".into()))
     }
 
@@ -67,7 +71,7 @@ pub trait ClientConn: Send + Sync + Clone {
     /// The default implementation ignores the notification. Implementations
     /// can override this method to react to server-initiated notifications.
     async fn notification(
-        &mut self,
+        &self,
         _context: ClientCtx,
         _notification: schema::ClientNotification,
     ) -> Result<()> {

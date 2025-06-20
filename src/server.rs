@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::{stream::SplitSink, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex};
@@ -13,7 +13,7 @@ use crate::{
     request_handler::TransportSink,
     schema::{self, *},
     server_connection::ServerConn,
-    transport::{Transport, TransportStream},
+    transport::Transport,
 };
 
 /// Context provided to ServerConn implementations for interacting with clients
@@ -58,12 +58,16 @@ impl ServerCtx {
 
     /// Handle a response from the client
     pub(crate) async fn handle_client_response(&self, response: JSONRPCResponse) {
-        self.request_handler.handle_response(response).await
+        // Clone the handler to avoid holding locks across await points
+        let handler = self.request_handler.clone();
+        handler.handle_response(response).await
     }
 
     /// Handle an error response from the client
     pub(crate) async fn handle_client_error(&self, error: JSONRPCError) {
-        self.request_handler.handle_error(error).await
+        // Clone the handler to avoid holding locks across await points
+        let handler = self.request_handler.clone();
+        handler.handle_error(error).await
     }
 }
 
@@ -236,24 +240,30 @@ impl ServerHandle {
         info!("MCP server started");
         let (notification_tx, mut notification_rx) = broadcast::channel(100);
 
+        // Channel for queueing responses to be sent
+        let (response_tx, mut response_rx) =
+            tokio::sync::mpsc::unbounded_channel::<JSONRPCMessage>();
+
         // Wrap the sink in an Arc<Mutex> for sharing
         let sink_tx = Arc::new(Mutex::new(sink_tx));
 
         // Clone notification_tx for the handle
         let notification_tx_handle = notification_tx.clone();
 
-        // Create connection instance
-        let mut connection: Option<Box<dyn ServerConn>> =
+        // Create connection instance wrapped in Arc for shared access
+        let connection: Option<Arc<Box<dyn ServerConn>>> =
             if let Some(factory) = &server.connection_factory {
-                Some(factory())
+                Some(Arc::new(factory()))
             } else {
                 None
             };
 
+        // Create a single ServerCtx instance that will be used throughout the connection
+        let server_ctx = ServerCtx::new(notification_tx.clone(), Some(sink_tx.clone()));
+
         // Initialize connection if present
-        if let Some(conn) = &mut connection {
-            let context = ServerCtx::new(notification_tx.clone(), Some(sink_tx.clone()));
-            conn.on_connect(context).await?;
+        if let Some(conn) = &connection {
+            conn.on_connect(server_ctx.clone()).await?;
         }
 
         // Start the main server loop in a background task
@@ -264,22 +274,19 @@ impl ServerHandle {
                     result = stream_rx.next() => {
                         match result {
                             Some(Ok(message)) => {
-                                if let Some(conn) = &mut connection {
-                                    let context = ServerCtx::new(
-                                        notification_tx.clone(),
-                                        Some(sink_tx.clone()),
-                                    );
-
+                                if let Some(conn) = &connection {
                                     // Handle responses and errors from client specially
                                     match &message {
                                         JSONRPCMessage::Response(response) => {
-                                            context.handle_client_response(response.clone()).await;
+                                            tracing::info!("Server received response from client: {:?}", response.id);
+                                            server_ctx.handle_client_response(response.clone()).await;
                                         }
                                         JSONRPCMessage::Error(error) => {
-                                            context.handle_client_error(error.clone()).await;
+                                            tracing::info!("Server received error from client: {:?}", error.id);
+                                            server_ctx.handle_client_error(error.clone()).await;
                                         }
                                         _ => {
-                                            if let Err(e) = handle_message_with_connection(conn, message, &mut *sink_tx.lock().await, context).await {
+                                            if let Err(e) = handle_message_with_connection(conn.clone(), message, response_tx.clone(), server_ctx.clone()).await {
                                                 error!("Error handling message: {}", e);
                                             }
                                         }
@@ -319,11 +326,20 @@ impl ServerHandle {
                             }
                         }
                     }
+
+                    // Send queued responses to client
+                    Some(response) = response_rx.recv() => {
+                        let mut sink = sink_tx.lock().await;
+                        if let Err(e) = sink.send(response).await {
+                            error!("Error sending response to client: {}", e);
+                            break;
+                        }
+                    }
                 }
             }
 
             // Clean up connection
-            if let Some(mut conn) = connection {
+            if let Some(conn) = connection {
                 if let Err(e) = conn.on_disconnect().await {
                     error!("Error during connection disconnect: {}", e);
                 }
@@ -373,26 +389,38 @@ impl ServerHandle {
 
 /// Handle a message using the Connection trait
 async fn handle_message_with_connection(
-    connection: &mut Box<dyn ServerConn>,
+    connection: Arc<Box<dyn ServerConn>>,
     message: JSONRPCMessage,
-    sink: &mut SplitSink<Box<dyn TransportStream>, JSONRPCMessage>,
+    response_tx: tokio::sync::mpsc::UnboundedSender<JSONRPCMessage>,
     context: ServerCtx,
 ) -> Result<()> {
     match message {
         JSONRPCMessage::Request(request) => {
-            let response_message =
-                handle_request(connection, request.clone(), context.clone()).await;
-            tracing::info!("Server sending response: {:?}", response_message);
-            sink.send(response_message).await?;
+            // Process request concurrently
+            let conn = connection.clone();
+            let ctx = context.clone();
+            let tx = response_tx.clone();
+
+            tokio::spawn(async move {
+                let response_message = handle_request(&**conn, request.clone(), ctx).await;
+                tracing::info!("Server sending response: {:?}", response_message);
+
+                // Queue the response to be sent
+                if let Err(e) = tx.send(response_message) {
+                    error!("Failed to queue response: {}", e);
+                }
+            });
         }
         JSONRPCMessage::Notification(notification) => {
-            handle_notification(connection, notification, context).await?;
+            handle_notification(&**connection, notification, context).await?;
         }
         JSONRPCMessage::Response(_) => {
-            warn!("Server received unexpected response message");
+            // Response handling is done in the main message loop
+            debug!("Response handling delegated to main loop");
         }
-        JSONRPCMessage::Error(error) => {
-            warn!("Server received error message: {:?}", error);
+        JSONRPCMessage::Error(_) => {
+            // Error handling is done in the main message loop
+            debug!("Error handling delegated to main loop");
         }
         JSONRPCMessage::BatchRequest(_) => {
             // TODO: Implement batch request handling
@@ -407,10 +435,15 @@ async fn handle_message_with_connection(
 
 /// Handle a request using the Connection trait and convert result to JSONRPCMessage
 async fn handle_request(
-    connection: &mut Box<dyn ServerConn>,
+    connection: &dyn ServerConn,
     request: JSONRPCRequest,
     context: ServerCtx,
 ) -> JSONRPCMessage {
+    tracing::info!(
+        "Server handling request: {:?} method: {}",
+        request.id,
+        request.request.method
+    );
     let result = handle_request_inner(connection, request.clone(), context).await;
 
     match result {
@@ -453,7 +486,7 @@ async fn handle_request(
 
 /// Inner handler that returns Result<serde_json::Value>
 async fn handle_request_inner(
-    conn: &mut Box<dyn ServerConn>,
+    conn: &dyn ServerConn,
     request: JSONRPCRequest,
     ctx: ServerCtx,
 ) -> Result<serde_json::Value> {
@@ -551,7 +584,7 @@ async fn handle_request_inner(
 
 /// Handle a notification using the Connection trait
 async fn handle_notification(
-    connection: &mut Box<dyn ServerConn>,
+    connection: &dyn ServerConn,
     notification: JSONRPCNotification,
     context: ServerCtx,
 ) -> Result<()> {

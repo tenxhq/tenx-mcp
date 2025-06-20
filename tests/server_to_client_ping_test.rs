@@ -14,24 +14,24 @@ struct TestClientConnection {
 
 #[async_trait]
 impl ClientConn for TestClientConnection {
-    async fn on_connect(&mut self, _context: ClientCtx) -> Result<()> {
+    async fn on_connect(&self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_connect".to_string());
         Ok(())
     }
 
-    async fn on_disconnect(&mut self, _context: ClientCtx) -> Result<()> {
+    async fn on_disconnect(&self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_disconnect".to_string());
         Ok(())
     }
 
-    async fn pong(&mut self, _context: ClientCtx) -> Result<()> {
+    async fn pong(&self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("ping".to_string());
         println!("Client received ping from server!");
         Ok(())
     }
 
     async fn create_message(
-        &mut self,
+        &self,
         _context: ClientCtx,
         _method: &str,
         _params: CreateMessageParams,
@@ -52,7 +52,7 @@ impl ClientConn for TestClientConnection {
         })
     }
 
-    async fn list_roots(&mut self, _context: ClientCtx) -> Result<ListRootsResult> {
+    async fn list_roots(&self, _context: ClientCtx) -> Result<ListRootsResult> {
         self.calls.lock().unwrap().push("list_roots".to_string());
         Ok(ListRootsResult {
             roots: vec![Root {
@@ -66,18 +66,18 @@ impl ClientConn for TestClientConnection {
 
 /// Test server connection
 struct TestServerConnection {
-    context: Option<ServerCtx>,
+    context: Arc<Mutex<Option<ServerCtx>>>,
 }
 
 #[async_trait]
 impl ServerConn for TestServerConnection {
-    async fn on_connect(&mut self, context: ServerCtx) -> Result<()> {
-        self.context = Some(context);
+    async fn on_connect(&self, context: ServerCtx) -> Result<()> {
+        *self.context.lock().unwrap() = Some(context);
         Ok(())
     }
 
     async fn initialize(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
@@ -86,7 +86,7 @@ impl ServerConn for TestServerConnection {
         Ok(InitializeResult::new("test-server", "1.0.0"))
     }
 
-    async fn pong(&mut self, _context: ServerCtx) -> Result<()> {
+    async fn pong(&self, _context: ServerCtx) -> Result<()> {
         Ok(())
     }
 }
@@ -103,7 +103,11 @@ async fn test_server_to_client_ping_integration() {
 
     // Create client and server connected via in-memory duplex streams.
     let (mut client, server_handle) = connected_client_and_server_with_conn(
-        || Box::new(TestServerConnection { context: None }),
+        || {
+            Box::new(TestServerConnection {
+                context: Arc::new(Mutex::new(None)),
+            })
+        },
         TestClientConnection {
             calls: calls.clone(),
         },
@@ -139,7 +143,7 @@ async fn test_client_handles_server_requests_unit() {
     // Unit test for ClientConnection methods
 
     let calls = Arc::new(Mutex::new(Vec::<String>::new()));
-    let mut connection = TestClientConnection {
+    let connection = TestClientConnection {
         calls: calls.clone(),
     };
 

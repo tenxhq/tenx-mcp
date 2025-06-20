@@ -15,21 +15,25 @@ use crate::{
 
 /// Connection trait that server implementers must implement
 /// Each client connection will have its own instance of the implementation
+///
+/// All methods take &self to allow concurrent request handling.
+/// Implementations should use interior mutability (Arc<Mutex<_>>, RwLock, etc.)
+/// for any mutable state.
 #[async_trait]
 pub trait ServerConn: Send + Sync {
     /// Called when a new connection is established
-    async fn on_connect(&mut self, _context: ServerCtx) -> Result<()> {
+    async fn on_connect(&self, _context: ServerCtx) -> Result<()> {
         Ok(())
     }
 
     /// Called when the connection is being closed
-    async fn on_disconnect(&mut self) -> Result<()> {
+    async fn on_disconnect(&self) -> Result<()> {
         Ok(())
     }
 
     /// Handle initialize request
     async fn initialize(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _protocol_version: String,
         _capabilities: schema::ClientCapabilities,
@@ -37,13 +41,13 @@ pub trait ServerConn: Send + Sync {
     ) -> Result<InitializeResult>;
 
     /// Respond to a ping request from the client
-    async fn pong(&mut self, _context: ServerCtx) -> Result<()> {
+    async fn pong(&self, _context: ServerCtx) -> Result<()> {
         Ok(())
     }
 
     /// List available tools
     async fn tools_list(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListToolsResult> {
@@ -52,7 +56,7 @@ pub trait ServerConn: Send + Sync {
 
     /// Call a tool
     async fn tools_call(
-        &mut self,
+        &self,
         _context: ServerCtx,
         name: String,
         _arguments: Option<HashMap<String, Value>>,
@@ -65,7 +69,7 @@ pub trait ServerConn: Send + Sync {
 
     /// List available resources
     async fn list_resources(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListResourcesResult> {
@@ -74,7 +78,7 @@ pub trait ServerConn: Send + Sync {
 
     /// List resource templates
     async fn list_resource_templates(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListResourceTemplatesResult> {
@@ -85,27 +89,23 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// Read a resource
-    async fn resources_read(
-        &mut self,
-        _context: ServerCtx,
-        uri: String,
-    ) -> Result<ReadResourceResult> {
+    async fn resources_read(&self, _context: ServerCtx, uri: String) -> Result<ReadResourceResult> {
         Err(Error::ResourceNotFound { uri })
     }
 
     /// Subscribe to resource updates
-    async fn resources_subscribe(&mut self, _context: ServerCtx, _uri: String) -> Result<()> {
+    async fn resources_subscribe(&self, _context: ServerCtx, _uri: String) -> Result<()> {
         Ok(())
     }
 
     /// Unsubscribe from resource updates
-    async fn resources_unsubscribe(&mut self, _context: ServerCtx, _uri: String) -> Result<()> {
+    async fn resources_unsubscribe(&self, _context: ServerCtx, _uri: String) -> Result<()> {
         Ok(())
     }
 
     /// List available prompts
     async fn list_prompts(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListPromptsResult> {
@@ -114,7 +114,7 @@ pub trait ServerConn: Send + Sync {
 
     /// Get a prompt
     async fn prompts_get(
-        &mut self,
+        &self,
         _context: ServerCtx,
         name: String,
         _arguments: Option<std::collections::HashMap<String, String>>,
@@ -127,7 +127,7 @@ pub trait ServerConn: Send + Sync {
 
     /// Handle completion request
     async fn completion_complete(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _reference: schema::Reference,
         _argument: schema::ArgumentInfo,
@@ -143,12 +143,12 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// Set logging level
-    async fn logging_set_level(&mut self, _context: ServerCtx, _level: LoggingLevel) -> Result<()> {
+    async fn logging_set_level(&self, _context: ServerCtx, _level: LoggingLevel) -> Result<()> {
         Ok(())
     }
 
     /// List roots (for server-initiated roots/list request)
-    async fn list_roots(&mut self, _context: ServerCtx) -> Result<ListRootsResult> {
+    async fn list_roots(&self, _context: ServerCtx) -> Result<ListRootsResult> {
         Ok(ListRootsResult {
             roots: vec![],
             meta: None,
@@ -157,7 +157,7 @@ pub trait ServerConn: Send + Sync {
 
     /// Handle sampling/createMessage request from server
     async fn sampling_create_message(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _params: schema::CreateMessageParams,
     ) -> Result<schema::CreateMessageResult> {
@@ -170,7 +170,7 @@ pub trait ServerConn: Send + Sync {
     /// override this to react to client-initiated notifications such as
     /// progress updates or cancellations.
     async fn notification(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _notification: schema::ServerNotification,
     ) -> Result<()> {

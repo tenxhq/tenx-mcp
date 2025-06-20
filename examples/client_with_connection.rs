@@ -9,7 +9,7 @@ struct MyClientConnection {
 
 #[async_trait]
 impl ClientConn for MyClientConnection {
-    async fn on_connect(&mut self, context: ClientCtx) -> Result<()> {
+    async fn on_connect(&self, context: ClientCtx) -> Result<()> {
         println!("Client connection established for: {}", self.name);
 
         // Example: Send a notification when connected
@@ -18,18 +18,18 @@ impl ClientConn for MyClientConnection {
         Ok(())
     }
 
-    async fn on_disconnect(&mut self, _context: ClientCtx) -> Result<()> {
+    async fn on_disconnect(&self, _context: ClientCtx) -> Result<()> {
         println!("Client connection closed for: {}", self.name);
         Ok(())
     }
 
-    async fn pong(&mut self, _context: ClientCtx) -> Result<()> {
+    async fn pong(&self, _context: ClientCtx) -> Result<()> {
         println!("Server pinged us!");
         Ok(())
     }
 
     async fn create_message(
-        &mut self,
+        &self,
         _context: ClientCtx,
         method: &str,
         params: schema::CreateMessageParams,
@@ -62,7 +62,7 @@ impl ClientConn for MyClientConnection {
         })
     }
 
-    async fn list_roots(&mut self, _context: ClientCtx) -> Result<schema::ListRootsResult> {
+    async fn list_roots(&self, _context: ClientCtx) -> Result<schema::ListRootsResult> {
         println!("Server requested roots list");
 
         Ok(schema::ListRootsResult {

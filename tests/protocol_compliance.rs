@@ -79,7 +79,7 @@ impl TestConnection {
 #[async_trait]
 impl ServerConn for TestConnection {
     async fn initialize(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
@@ -103,7 +103,7 @@ impl ServerConn for TestConnection {
     }
 
     async fn tools_list(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListToolsResult> {
@@ -115,7 +115,7 @@ impl ServerConn for TestConnection {
     }
 
     async fn tools_call(
-        &mut self,
+        &self,
         _context: ServerCtx,
         name: String,
         arguments: Option<HashMap<String, serde_json::Value>>,
@@ -171,7 +171,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_echo_tool() {
-        let mut conn = TestConnection::new();
+        let conn = TestConnection::new();
 
         // Test tools list
         let context = create_test_context();
@@ -226,7 +226,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_tool() {
-        let mut conn = TestConnection::new();
+        let conn = TestConnection::new();
 
         // Test tools list contains add tool
         let context = create_test_context();
@@ -321,7 +321,7 @@ mod tests {
     #[tokio::test]
     async fn test_protocol_compliance() {
         // Test that our tools follow the MCP protocol specification
-        let mut conn = TestConnection::new();
+        let conn = TestConnection::new();
         let context = create_test_context();
         let tools_result = conn.tools_list(context, None).await.unwrap();
 

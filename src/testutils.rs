@@ -115,7 +115,7 @@ where
     // server shutdown.
     drop(client);
 
-    let _ = timeout(Duration::from_millis(100), server.stop()).await;
+    let _ = timeout(Duration::from_millis(10), server.stop()).await;
 }
 
 /// Create a ServerCtx for testing purposes.

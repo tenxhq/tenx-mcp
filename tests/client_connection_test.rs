@@ -10,23 +10,23 @@ struct TestClientConnection {
 
 #[async_trait]
 impl ClientConn for TestClientConnection {
-    async fn on_connect(&mut self, _context: ClientCtx) -> Result<()> {
+    async fn on_connect(&self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_connect".to_string());
         Ok(())
     }
 
-    async fn on_disconnect(&mut self, _context: ClientCtx) -> Result<()> {
+    async fn on_disconnect(&self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_disconnect".to_string());
         Ok(())
     }
 
-    async fn pong(&mut self, _context: ClientCtx) -> Result<()> {
+    async fn pong(&self, _context: ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("ping".to_string());
         Ok(())
     }
 
     async fn create_message(
-        &mut self,
+        &self,
         _context: ClientCtx,
         _method: &str,
         _params: CreateMessageParams,
@@ -47,7 +47,7 @@ impl ClientConn for TestClientConnection {
         })
     }
 
-    async fn list_roots(&mut self, _context: ClientCtx) -> Result<ListRootsResult> {
+    async fn list_roots(&self, _context: ClientCtx) -> Result<ListRootsResult> {
         self.calls.lock().unwrap().push("list_roots".to_string());
         Ok(ListRootsResult {
             roots: vec![Root {
@@ -62,7 +62,7 @@ impl ClientConn for TestClientConnection {
 #[tokio::test]
 async fn test_client_connection_trait_methods() {
     // Test that the trait methods can be called
-    let mut connection = TestClientConnection::default();
+    let connection = TestClientConnection::default();
 
     // Create a dummy context for testing
     let (notification_tx, _) = tokio::sync::broadcast::channel(10);

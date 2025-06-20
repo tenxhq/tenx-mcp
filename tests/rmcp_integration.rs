@@ -19,7 +19,7 @@ struct EchoConnection;
 #[async_trait]
 impl ServerConn for EchoConnection {
     async fn initialize(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
@@ -29,7 +29,7 @@ impl ServerConn for EchoConnection {
     }
 
     async fn tools_list(
-        &mut self,
+        &self,
         _context: ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListToolsResult> {
@@ -55,7 +55,7 @@ impl ServerConn for EchoConnection {
     }
 
     async fn tools_call(
-        &mut self,
+        &self,
         _context: ServerCtx,
         name: String,
         arguments: Option<HashMap<String, serde_json::Value>>,

@@ -20,7 +20,7 @@ async fn test_method_not_found() {
     #[async_trait::async_trait]
     impl ServerConn for MinimalConnection {
         async fn initialize(
-            &mut self,
+            &self,
             _context: ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
@@ -39,7 +39,7 @@ async fn test_method_not_found() {
         }
     }
 
-    let mut conn = MinimalConnection;
+    let conn = MinimalConnection;
 
     // Call a tool on a connection that doesn't implement tools_call
     // This should use the default implementation which returns ToolNotFound
@@ -67,7 +67,7 @@ async fn test_invalid_params() {
     #[async_trait::async_trait]
     impl ServerConn for ConnectionWithValidation {
         async fn initialize(
-            &mut self,
+            &self,
             _context: ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
@@ -89,7 +89,7 @@ async fn test_invalid_params() {
         }
 
         async fn tools_list(
-            &mut self,
+            &self,
             _context: ServerCtx,
             _cursor: Option<schema::Cursor>,
         ) -> Result<schema::ListToolsResult> {
@@ -116,7 +116,7 @@ async fn test_invalid_params() {
         }
 
         async fn tools_call(
-            &mut self,
+            &self,
             _context: ServerCtx,
             name: String,
             arguments: Option<HashMap<String, serde_json::Value>>,
@@ -139,7 +139,7 @@ async fn test_invalid_params() {
         }
     }
 
-    let mut conn = ConnectionWithValidation;
+    let conn = ConnectionWithValidation;
 
     // Test 1: Call with missing arguments
     let context = create_test_context();
@@ -179,7 +179,7 @@ async fn test_successful_response() {
     #[async_trait::async_trait]
     impl ServerConn for ConnectionWithTools {
         async fn initialize(
-            &mut self,
+            &self,
             _context: ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
@@ -205,7 +205,7 @@ async fn test_successful_response() {
         }
 
         async fn tools_list(
-            &mut self,
+            &self,
             _context: ServerCtx,
             _cursor: Option<schema::Cursor>,
         ) -> Result<schema::ListToolsResult> {
@@ -221,7 +221,7 @@ async fn test_successful_response() {
         }
 
         async fn list_resources(
-            &mut self,
+            &self,
             _context: ServerCtx,
             _cursor: Option<schema::Cursor>,
         ) -> Result<schema::ListResourcesResult> {
@@ -238,7 +238,7 @@ async fn test_successful_response() {
         }
     }
 
-    let mut conn = ConnectionWithTools;
+    let conn = ConnectionWithTools;
 
     // Test successful initialization
     let context = create_test_context();
@@ -282,7 +282,7 @@ async fn test_error_propagation() {
     #[async_trait::async_trait]
     impl ServerConn for FaultyConnection {
         async fn initialize(
-            &mut self,
+            &self,
             _context: ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
@@ -293,7 +293,7 @@ async fn test_error_propagation() {
         }
 
         async fn resources_read(
-            &mut self,
+            &self,
             _context: ServerCtx,
             uri: String,
         ) -> Result<schema::ReadResourceResult> {
@@ -302,7 +302,7 @@ async fn test_error_propagation() {
         }
 
         async fn prompts_get(
-            &mut self,
+            &self,
             _context: ServerCtx,
             name: String,
             _arguments: Option<HashMap<String, String>>,
@@ -312,7 +312,7 @@ async fn test_error_propagation() {
         }
     }
 
-    let mut conn = FaultyConnection;
+    let conn = FaultyConnection;
 
     // Test initialization error
     let context = create_test_context();
