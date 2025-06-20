@@ -5,7 +5,7 @@
 //! - Connect to it using the process's stdin/stdout
 //! - Manage the process lifecycle
 
-use tenx_mcp::{Client, Result};
+use tenx_mcp::{Client, Result, ServerAPI};
 use tokio::process::Command;
 use tracing::{error, info, Level};
 
@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
     };
 
     // Initialize the connection
-    match client.initialize().await {
+    match client.init().await {
         Ok(result) => {
             info!(
                 "Connected to server: {} v{}",

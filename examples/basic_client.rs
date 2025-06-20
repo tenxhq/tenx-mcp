@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
-use tenx_mcp::{schema, schemars, Client, Result};
+use tenx_mcp::{schema, schemars, Client, Result, ServerAPI};
 use tracing::info;
 
 /// Echo tool input parameters - must match the server definition

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use tenx_mcp::{
     schema::*,
     testutils::{connected_client_and_server_with_conn, shutdown_client_and_server},
-    ClientConn, ClientCtx, Result, ServerConn, ServerCtx,
+    ClientConn, ClientCtx, Result, ServerAPI, ServerConn, ServerCtx,
 };
 
 /// Test client connection that tracks method calls

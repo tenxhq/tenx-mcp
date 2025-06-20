@@ -1,5 +1,6 @@
 use futures::stream::SplitSink;
 use futures::{SinkExt, StreamExt};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -7,6 +8,7 @@ use tokio::process::{Child, Command};
 use tokio::sync::{oneshot, Mutex};
 use tracing::{debug, error, info, warn};
 
+use crate::api::ServerAPI;
 use crate::{
     client_connection::{ClientConn, ClientCtx},
     connection::result_to_jsonrpc_response,
@@ -103,62 +105,22 @@ where
     }
 
     /// Initialize the connection with the server
-    pub async fn initialize(&mut self) -> Result<InitializeResult> {
+    ///
+    /// This is a convenience method that uses the client's configured name, version,
+    /// and capabilities with the latest protocol version.
+    pub async fn init(&mut self) -> Result<InitializeResult> {
         let client_info = Implementation {
             name: self.name.clone(),
             version: self.version.clone(),
         };
 
-        let request = ClientRequest::Initialize {
-            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-            capabilities: self.client_capabilities.clone(),
+        <Self as ServerAPI>::initialize(
+            self,
+            LATEST_PROTOCOL_VERSION.to_string(),
+            self.client_capabilities.clone(),
             client_info,
-        };
-
-        let result: InitializeResult = self.request(request).await?;
-
-        // Send the initialized notification to complete the handshake
-        self.send_notification("notifications/initialized", None)
-            .await?;
-
-        Ok(result)
-    }
-
-    /// List available tools from the server
-    pub async fn list_tools(
-        &mut self,
-        cursor: impl Into<Option<Cursor>>,
-    ) -> Result<ListToolsResult> {
-        let cursor: Option<Cursor> = cursor.into();
-        self.request(ClientRequest::ListTools { cursor }).await
-    }
-
-    /// List available resources from the server
-    pub async fn list_resources(
-        &mut self,
-        cursor: impl Into<Option<Cursor>>,
-    ) -> Result<ListResourcesResult> {
-        let cursor: Option<Cursor> = cursor.into();
-        self.request(ClientRequest::ListResources { cursor }).await
-    }
-
-    /// List available resource templates from the server
-    pub async fn list_resource_templates(
-        &mut self,
-        cursor: impl Into<Option<Cursor>>,
-    ) -> Result<ListResourceTemplatesResult> {
-        let cursor: Option<Cursor> = cursor.into();
-        self.request(ClientRequest::ListResourceTemplates { cursor })
-            .await
-    }
-
-    /// List available prompts from the server
-    pub async fn list_prompts(
-        &mut self,
-        cursor: impl Into<Option<Cursor>>,
-    ) -> Result<ListPromptsResult> {
-        let cursor: Option<Cursor> = cursor.into();
-        self.request(ClientRequest::ListPrompts { cursor }).await
+        )
+        .await
     }
 
     /// Call a tool on the server without arguments
@@ -166,19 +128,15 @@ where
     /// This is a convenience method for calling tools that don't require arguments.
     pub async fn call_tool_without_args(
         &mut self,
-        name: impl Into<String>,
+        name: impl Into<String> + Send,
     ) -> Result<CallToolResult> {
-        let request = ClientRequest::CallTool {
-            name: name.into(),
-            arguments: None,
-        };
-        self.request(request).await
+        <Self as ServerAPI>::call_tool(self, name, None).await
     }
 
     /// Call a tool on the server with arguments
     pub async fn call_tool<T>(
         &mut self,
-        name: impl Into<String>,
+        name: impl Into<String> + Send,
         arguments: &T,
     ) -> Result<CallToolResult>
     where
@@ -191,17 +149,7 @@ where
             Some(std::collections::HashMap::new())
         };
 
-        let request = ClientRequest::CallTool {
-            name: name.into(),
-            arguments,
-        };
-        self.request(request).await
-    }
-
-    /// Send a ping to the server
-    pub async fn ping(&mut self) -> Result<()> {
-        let _: EmptyResult = self.request(ClientRequest::Ping).await?;
-        Ok(())
+        <Self as ServerAPI>::call_tool(self, name, arguments).await
     }
 
     /// Connect to a TCP server and initialize the connection
@@ -211,7 +159,7 @@ where
     pub async fn connect_tcp(&mut self, addr: impl Into<String>) -> Result<InitializeResult> {
         let transport = Box::new(TcpClientTransport::new(addr));
         self.connect(transport).await?;
-        self.initialize().await
+        self.init().await
     }
 
     /// Connect via stdio and initialize the connection
@@ -221,7 +169,7 @@ where
     pub async fn connect_stdio(&mut self) -> Result<InitializeResult> {
         let transport = Box::new(StdioTransport::new());
         self.connect(transport).await?;
-        self.initialize().await
+        self.init().await
     }
 
     /// Connect using generic AsyncRead and AsyncWrite streams
@@ -550,6 +498,148 @@ where
     }
 }
 
+/// Implementation of ServerAPI trait for Client
+#[async_trait]
+impl<C> ServerAPI for Client<C>
+where
+    C: ClientConn + Send + Sync + 'static,
+{
+    /// Initialize the connection with protocol version and capabilities
+    async fn initialize(
+        &mut self,
+        protocol_version: String,
+        capabilities: ClientCapabilities,
+        client_info: Implementation,
+    ) -> Result<InitializeResult> {
+        let request = ClientRequest::Initialize {
+            protocol_version,
+            capabilities,
+            client_info,
+        };
+
+        let result: InitializeResult = self.request(request).await?;
+
+        // Send the initialized notification to complete the handshake
+        self.send_notification("notifications/initialized", None)
+            .await?;
+
+        Ok(result)
+    }
+
+    /// Respond to ping requests
+    async fn ping(&mut self) -> Result<()> {
+        let _: EmptyResult = self.request(ClientRequest::Ping).await?;
+        Ok(())
+    }
+
+    /// List available tools with optional pagination
+    async fn list_tools(
+        &mut self,
+        cursor: impl Into<Option<Cursor>> + Send,
+    ) -> Result<ListToolsResult> {
+        let cursor: Option<Cursor> = cursor.into();
+        self.request(ClientRequest::ListTools { cursor }).await
+    }
+
+    /// Call a tool with the given name and arguments
+    async fn call_tool(
+        &mut self,
+        name: impl Into<String> + Send,
+        arguments: Option<HashMap<String, Value>>,
+    ) -> Result<CallToolResult> {
+        let request = ClientRequest::CallTool {
+            name: name.into(),
+            arguments,
+        };
+        self.request(request).await
+    }
+
+    /// List available resources with optional pagination
+    async fn list_resources(
+        &mut self,
+        cursor: impl Into<Option<Cursor>> + Send,
+    ) -> Result<ListResourcesResult> {
+        let cursor: Option<Cursor> = cursor.into();
+        self.request(ClientRequest::ListResources { cursor }).await
+    }
+
+    /// List resource templates with optional pagination
+    async fn list_resource_templates(
+        &mut self,
+        cursor: impl Into<Option<Cursor>> + Send,
+    ) -> Result<ListResourceTemplatesResult> {
+        let cursor: Option<Cursor> = cursor.into();
+        self.request(ClientRequest::ListResourceTemplates { cursor })
+            .await
+    }
+
+    /// Read a resource by URI
+    async fn resources_read(
+        &mut self,
+        uri: impl Into<String> + Send,
+    ) -> Result<ReadResourceResult> {
+        self.request(ClientRequest::ReadResource { uri: uri.into() })
+            .await
+    }
+
+    /// Subscribe to resource updates
+    async fn resources_subscribe(&mut self, uri: impl Into<String> + Send) -> Result<()> {
+        let _: EmptyResult = self
+            .request(ClientRequest::Subscribe { uri: uri.into() })
+            .await?;
+        Ok(())
+    }
+
+    /// Unsubscribe from resource updates
+    async fn resources_unsubscribe(&mut self, uri: impl Into<String> + Send) -> Result<()> {
+        let _: EmptyResult = self
+            .request(ClientRequest::Unsubscribe { uri: uri.into() })
+            .await?;
+        Ok(())
+    }
+
+    /// List available prompts with optional pagination
+    async fn list_prompts(
+        &mut self,
+        cursor: impl Into<Option<Cursor>> + Send,
+    ) -> Result<ListPromptsResult> {
+        let cursor: Option<Cursor> = cursor.into();
+        self.request(ClientRequest::ListPrompts { cursor }).await
+    }
+
+    /// Get a prompt by name with optional arguments
+    async fn get_prompt(
+        &mut self,
+        name: impl Into<String> + Send,
+        arguments: Option<HashMap<String, String>>,
+    ) -> Result<GetPromptResult> {
+        self.request(ClientRequest::GetPrompt {
+            name: name.into(),
+            arguments,
+        })
+        .await
+    }
+
+    /// Handle completion requests
+    async fn complete(
+        &mut self,
+        reference: Reference,
+        argument: ArgumentInfo,
+    ) -> Result<CompleteResult> {
+        self.request(ClientRequest::Complete {
+            reference,
+            argument,
+        })
+        .await
+    }
+
+    /// Set the logging level
+    async fn set_level(&mut self, level: LoggingLevel) -> Result<()> {
+        let _: EmptyResult = self.request(ClientRequest::SetLevel { level }).await?;
+        Ok(())
+    }
+}
+
 /// Handle a request from the server using the ClientConnection trait
 async fn handle_server_request<C: ClientConn>(
     connection: &mut C,
@@ -669,10 +759,22 @@ mod tests {
             client.list_resource_templates(cursor).await.unwrap();
 
             // Calls with explicit Some(Cursor)
-            client.list_tools(Some(Cursor::from("some_cursor"))).await.unwrap();
-            client.list_resources(Some(Cursor::from("some_cursor"))).await.unwrap();
-            client.list_prompts(Some(Cursor::from("some_cursor"))).await.unwrap();
-            client.list_resource_templates(Some(Cursor::from("some_cursor"))).await.unwrap();
+            client
+                .list_tools(Some(Cursor::from("some_cursor")))
+                .await
+                .unwrap();
+            client
+                .list_resources(Some(Cursor::from("some_cursor")))
+                .await
+                .unwrap();
+            client
+                .list_prompts(Some(Cursor::from("some_cursor")))
+                .await
+                .unwrap();
+            client
+                .list_resource_templates(Some(Cursor::from("some_cursor")))
+                .await
+                .unwrap();
         });
     }
 
@@ -754,7 +856,7 @@ mod tests {
             .await
             .expect("Failed to connect");
 
-        client.initialize().await.expect("Failed to initialize");
+        client.init().await.expect("Failed to initialize");
 
         (client, server_handle)
     }
@@ -842,7 +944,7 @@ mod tests {
             .await
             .expect("Failed to connect");
 
-        client.initialize().await.expect("Failed to initialize");
+        client.init().await.expect("Failed to initialize");
 
         // Send server notification
         server_handle.send_server_notification(crate::schema::ClientNotification::RootsListChanged);
@@ -943,7 +1045,7 @@ mod tests {
             .await
             .expect("Failed to connect");
 
-        client.initialize().await.expect("Failed to initialize");
+        client.init().await.expect("Failed to initialize");
 
         // Wait for server to receive notification
         tokio::time::timeout(std::time::Duration::from_secs(1), rx_notif)
@@ -1053,7 +1155,7 @@ mod tests {
             .expect("Failed to connect client");
 
         // Test that we can initialize
-        let result = client.initialize().await.expect("Failed to initialize");
+        let result = client.init().await.expect("Failed to initialize");
 
         assert_eq!(result.server_info.name, "test-server");
 
@@ -1128,7 +1230,7 @@ mod tests {
             .expect("Reconnect failed");
 
         // Initialize and test the new connection
-        client.initialize().await.expect("Re-initialize failed");
+        client.init().await.expect("Re-initialize failed");
         client.ping().await.expect("Ping after reconnect failed");
     }
 }

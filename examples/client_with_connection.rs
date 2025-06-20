@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tenx_mcp::{schema, Client, ClientConn, ClientCtx, Result};
+use tenx_mcp::{schema, Client, ClientConn, ClientCtx, Result, ServerAPI};
 
 /// Example client connection that handles server requests
 #[derive(Clone)]

@@ -10,7 +10,8 @@ use rmcp::model::{CallToolRequestParam, PaginatedRequestParam};
 use rmcp::ServiceExt;
 use serde_json::json;
 use tenx_mcp::{
-    schema::*, testutils::make_duplex_pair, Client, Error, Result, Server, ServerConn, ServerCtx,
+    schema::*, testutils::make_duplex_pair, Client, Error, Result, Server, ServerAPI, ServerConn,
+    ServerCtx,
 };
 
 struct EchoConnection;
@@ -277,7 +278,7 @@ async fn test_rmcp_server_with_tenx_client() {
         .unwrap();
 
     // Initialize
-    let init_result = client.initialize().await.unwrap();
+    let init_result = client.init().await.unwrap();
 
     // Check server info is valid
     assert!(!init_result.server_info.name.is_empty());

@@ -16,65 +16,72 @@ use crate::schema::{
 pub trait ServerAPI: Send + Sync {
     /// Initialize the connection with protocol version and capabilities
     async fn initialize(
-        &self,
+        &mut self,
         protocol_version: String,
         capabilities: ClientCapabilities,
         client_info: Implementation,
     ) -> Result<InitializeResult>;
 
     /// Respond to ping requests
-    async fn ping(&self) -> Result<()>;
+    async fn ping(&mut self) -> Result<()>;
 
     /// List available tools with optional pagination
-    async fn list_tools(&self, cursor: impl Into<Option<Cursor>>) -> Result<ListToolsResult>;
+    async fn list_tools(
+        &mut self,
+        cursor: impl Into<Option<Cursor>> + Send,
+    ) -> Result<ListToolsResult>;
 
     /// Call a tool with the given name and arguments
-    async fn tools_call(
-        &self,
-        name: impl Into<String>,
+    async fn call_tool(
+        &mut self,
+        name: impl Into<String> + Send,
         arguments: Option<HashMap<String, Value>>,
     ) -> Result<CallToolResult>;
 
     /// List available resources with optional pagination
     async fn list_resources(
-        &self,
-        cursor: impl Into<Option<Cursor>>,
+        &mut self,
+        cursor: impl Into<Option<Cursor>> + Send,
     ) -> Result<ListResourcesResult>;
 
     /// List resource templates with optional pagination
     async fn list_resource_templates(
-        &self,
-        cursor: impl Into<Option<Cursor>>,
+        &mut self,
+        cursor: impl Into<Option<Cursor>> + Send,
     ) -> Result<ListResourceTemplatesResult>;
 
     /// Read a resource by URI
-    async fn resources_read(&self, uri: impl Into<String>) -> Result<ReadResourceResult>;
+    async fn resources_read(&mut self, uri: impl Into<String> + Send)
+        -> Result<ReadResourceResult>;
 
     /// Subscribe to resource updates
-    async fn resources_subscribe(&self, uri: impl Into<String>) -> Result<()>;
+    async fn resources_subscribe(&mut self, uri: impl Into<String> + Send) -> Result<()>;
 
     /// Unsubscribe from resource updates
-    async fn resources_unsubscribe(&self, uri: impl Into<String>) -> Result<()>;
+    async fn resources_unsubscribe(&mut self, uri: impl Into<String> + Send) -> Result<()>;
 
     /// List available prompts with optional pagination
-    async fn list_prompts(&self, cursor: impl Into<Option<Cursor>>) -> Result<ListPromptsResult>;
+    async fn list_prompts(
+        &mut self,
+        cursor: impl Into<Option<Cursor>> + Send,
+    ) -> Result<ListPromptsResult>;
 
     /// Get a prompt by name with optional arguments
     async fn get_prompt(
-        &self,
-        name: impl Into<String>,
+        &mut self,
+        name: impl Into<String> + Send,
         arguments: Option<HashMap<String, String>>,
     ) -> Result<GetPromptResult>;
 
     /// Handle completion requests
     async fn complete(
-        &self,
+        &mut self,
         reference: Reference,
         argument: ArgumentInfo,
     ) -> Result<CompleteResult>;
 
     /// Set the logging level
-    async fn set_level(&self, level: LoggingLevel) -> Result<()>;
+    async fn set_level(&mut self, level: LoggingLevel) -> Result<()>;
 }
 
 /// Client API trait defining all methods that an MCP client must implement.
@@ -82,11 +89,11 @@ pub trait ServerAPI: Send + Sync {
 #[async_trait]
 pub trait ClientAPI: Send + Sync {
     /// Respond to ping requests from the server
-    async fn ping(&self) -> Result<()>;
+    async fn ping(&mut self) -> Result<()>;
 
     /// Handle LLM sampling requests from the server
-    async fn create_message(&self, params: CreateMessageParams) -> Result<CreateMessageResult>;
+    async fn create_message(&mut self, params: CreateMessageParams) -> Result<CreateMessageResult>;
 
     /// List available filesystem roots
-    async fn list_roots(&self) -> Result<ListRootsResult>;
+    async fn list_roots(&mut self) -> Result<ListRootsResult>;
 }
