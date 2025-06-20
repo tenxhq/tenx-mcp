@@ -1689,6 +1689,12 @@ impl ClientRequest {
     }
 }
 
+impl crate::request_handler::RequestMethod for ClientRequest {
+    fn method(&self) -> &'static str {
+        self.method()
+    }
+}
+
 #[cfg(test)]
 mod pagination_tests {
     use super::*;
@@ -1795,6 +1801,12 @@ impl ServerRequest {
             ServerRequest::CreateMessage { .. } => "sampling/createMessage",
             ServerRequest::ListRoots => "roots/list",
         }
+    }
+}
+
+impl crate::request_handler::RequestMethod for ServerRequest {
+    fn method(&self) -> &'static str {
+        self.method()
     }
 }
 

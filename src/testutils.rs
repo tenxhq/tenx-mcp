@@ -15,8 +15,12 @@
 //! their own test suites.
 
 use tokio::io::{self, AsyncRead, AsyncWrite};
+use tokio::sync::broadcast;
 
-use crate::{error::Result, Client, ClientConn, Server, ServerConn, ServerHandle};
+use crate::{
+    error::Result, schema::ClientNotification, server::ServerCtx, Client, ClientConn, Server,
+    ServerConn, ServerHandle,
+};
 
 /// Conveniently create **two** independent in-memory duplex pipes that together
 /// form a bidirectional channel suitable for wiring up a test client and
@@ -112,4 +116,10 @@ where
     drop(client);
 
     let _ = timeout(Duration::from_millis(100), server.stop()).await;
+}
+
+/// Create a ServerCtx for testing purposes.
+/// This creates a ServerCtx with only notification capability (no request/response).
+pub fn test_server_ctx(notification_tx: broadcast::Sender<ClientNotification>) -> ServerCtx {
+    ServerCtx::new(notification_tx, None)
 }

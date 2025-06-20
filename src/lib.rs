@@ -4,6 +4,7 @@ mod client_connection;
 mod codec;
 mod connection;
 mod error;
+mod request_handler;
 mod server;
 mod server_connection;
 mod transport;

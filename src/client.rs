@@ -1,11 +1,8 @@
-use futures::stream::SplitSink;
 use futures::{SinkExt, StreamExt};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::process::Stdio;
-use std::sync::Arc;
 use tokio::process::{Child, Command};
-use tokio::sync::{oneshot, Mutex};
 use tracing::{debug, error, info, warn};
 
 use crate::api::ServerAPI;
@@ -14,21 +11,9 @@ use crate::{
     connection::result_to_jsonrpc_response,
     error::{Error, Result},
     schema::*,
-    transport::{
-        GenericDuplex, StdioTransport, StreamTransport, TcpClientTransport, Transport,
-        TransportStream,
-    },
+    transport::{GenericDuplex, StdioTransport, StreamTransport, TcpClientTransport, Transport},
 };
 use async_trait::async_trait;
-
-/// Type for handling either a response or error from JSON-RPC
-#[derive(Debug)]
-enum ResponseOrError {
-    Response(JSONRPCResponse),
-    Error(JSONRPCError),
-}
-
-type TransportSink = Arc<Mutex<SplitSink<Box<dyn TransportStream>, JSONRPCMessage>>>;
 
 /// Default no-op implementation of ClientConn for unit type
 #[async_trait]
@@ -41,9 +26,7 @@ pub struct Client<C = ()>
 where
     C: ClientConn + Send,
 {
-    transport_tx: Option<TransportSink>,
-    pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<ResponseOrError>>>>,
-    next_request_id: Arc<Mutex<u64>>,
+    request_handler: crate::request_handler::RequestHandler,
     connection: C,
     name: String,
     version: String,
@@ -54,9 +37,7 @@ impl Client<()> {
     /// Create a new MCP client with default configuration
     pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
         Self {
-            transport_tx: None,
-            pending_requests: Arc::new(Mutex::new(HashMap::new())),
-            next_request_id: Arc::new(Mutex::new(1)),
+            request_handler: crate::request_handler::RequestHandler::new(None, "req".to_string()),
             connection: (),
             name: name.into(),
             version: version.into(),
@@ -71,9 +52,7 @@ impl Client<()> {
         connection: C,
     ) -> Client<C> {
         Client {
-            transport_tx: None,
-            pending_requests: Arc::new(Mutex::new(HashMap::new())),
-            next_request_id: Arc::new(Mutex::new(1)),
+            request_handler: crate::request_handler::RequestHandler::new(None, "req".to_string()),
             connection,
             name: name.into(),
             version: version.into(),
@@ -204,94 +183,7 @@ where
     where
         T: serde::de::DeserializeOwned,
     {
-        let id = self.next_request_id().await;
-        let (tx, rx) = oneshot::channel();
-
-        // Store the response channel
-        {
-            let mut pending = self.pending_requests.lock().await;
-            pending.insert(id.clone(), tx);
-        }
-
-        // Create the JSON-RPC request
-        let jsonrpc_request = JSONRPCRequest {
-            jsonrpc: JSONRPC_VERSION.to_string(),
-            id: RequestId::String(id.clone()),
-            request: Request {
-                method: request.method().to_string(),
-                params: Some(RequestParams {
-                    meta: None,
-                    other: serde_json::to_value(&request)?
-                        .as_object()
-                        .unwrap_or(&serde_json::Map::new())
-                        .iter()
-                        .map(|(k, v)| (k.clone(), v.clone()))
-                        .collect(),
-                }),
-            },
-        };
-
-        self.send_message(JSONRPCMessage::Request(jsonrpc_request))
-            .await?;
-
-        // Wait for response with timeout
-        match rx.await {
-            Ok(response_or_error) => {
-                match response_or_error {
-                    ResponseOrError::Response(response) => {
-                        // Create a combined Value from the result's fields
-                        let mut result_value = serde_json::Map::new();
-
-                        // Add metadata if present
-                        if let Some(meta) = response.result.meta {
-                            result_value.insert("_meta".to_string(), serde_json::to_value(meta)?);
-                        }
-
-                        // Add all other fields
-                        for (key, value) in response.result.other {
-                            result_value.insert(key, value);
-                        }
-
-                        // Deserialize directly from the combined map
-                        serde_json::from_value(serde_json::Value::Object(result_value)).map_err(
-                            |e| Error::Protocol(format!("Failed to deserialize response: {e}")),
-                        )
-                    }
-                    ResponseOrError::Error(error) => {
-                        // Map JSON-RPC errors to appropriate MCPError variants
-                        match error.error.code {
-                            METHOD_NOT_FOUND => Err(Error::MethodNotFound(error.error.message)),
-                            INVALID_PARAMS => Err(Error::InvalidParams(format!(
-                                "{}: {}",
-                                request.method(),
-                                error.error.message
-                            ))),
-                            _ => Err(Error::Protocol(format!(
-                                "JSON-RPC error {}: {}",
-                                error.error.code, error.error.message
-                            ))),
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                error!("Response channel closed for request {}: {}", id, e);
-                // Remove the pending request
-                self.pending_requests.lock().await.remove(&id);
-                Err(Error::Protocol("Response channel closed".to_string()))
-            }
-        }
-    }
-
-    /// Send a message through the transport
-    async fn send_message(&mut self, message: JSONRPCMessage) -> Result<()> {
-        if let Some(transport_tx) = &self.transport_tx {
-            let mut tx = transport_tx.lock().await;
-            tx.send(message).await?;
-            Ok(())
-        } else {
-            Err(Error::Transport("Not connected".to_string()))
-        }
+        self.request_handler.request(request).await
     }
 
     /// Send a notification to the server
@@ -300,47 +192,24 @@ where
         method: &str,
         params: Option<serde_json::Value>,
     ) -> Result<()> {
-        let notification_params = params.map(|v| NotificationParams {
-            meta: None,
-            other: if let Some(obj) = v.as_object() {
-                obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-            } else {
-                HashMap::new()
-            },
-        });
-
-        let notification = JSONRPCNotification {
-            jsonrpc: JSONRPC_VERSION.to_string(),
-            notification: Notification {
-                method: method.to_string(),
-                params: notification_params,
-            },
-        };
-
-        self.send_message(JSONRPCMessage::Notification(notification))
-            .await
-    }
-
-    /// Generate the next request ID
-    async fn next_request_id(&self) -> String {
-        let mut id = self.next_request_id.lock().await;
-        let current = *id;
-        *id += 1;
-        format!("req-{current}")
+        self.request_handler.send_notification(method, params).await
     }
 
     /// Start the background task that handles incoming messages
-    async fn start_message_handler(&mut self, stream: Box<dyn TransportStream>) -> Result<()> {
-        let pending_requests = self.pending_requests.clone();
+    async fn start_message_handler(
+        &mut self,
+        stream: Box<dyn crate::transport::TransportStream>,
+    ) -> Result<()> {
+        let request_handler = self.request_handler.clone();
 
         // Split the transport stream into read and write halves
         let (tx, mut rx) = stream.split();
 
         // Wrap the sink in an Arc<Mutex> for sharing
-        let tx = Arc::new(Mutex::new(tx));
+        let tx = std::sync::Arc::new(tokio::sync::Mutex::new(tx));
 
         // Store the sender half for sending messages
-        self.transport_tx = Some(tx.clone());
+        self.request_handler.set_transport(tx.clone());
 
         // Clone the connection for use in the handler
         let mut connection = self.connection.clone();
@@ -372,16 +241,7 @@ where
 
                                 match message {
                                     JSONRPCMessage::Response(response) => {
-                                        // Extract the ID and find the corresponding request
-                                        if let RequestId::String(id) = &response.id {
-                                            let mut pending = pending_requests.lock().await;
-                                            if let Some(tx) = pending.remove(id) {
-                                                // Send the response to the waiting request
-                                                let _ = tx.send(ResponseOrError::Response(response));
-                                            } else {
-                                                warn!("Received response for unknown request ID: {}", id);
-                                            }
-                                        }
+                                        request_handler.handle_response(response).await;
                                     }
                                     JSONRPCMessage::Notification(notification) => {
                                         // Convert the JSON-RPC notification into a typed
@@ -391,20 +251,7 @@ where
                                         }
                                     }
                                     JSONRPCMessage::Error(error) => {
-                                        // Handle JSON-RPC errors
-                                        if let RequestId::String(id) = &error.id {
-                                            let mut pending = pending_requests.lock().await;
-                                            if let Some(tx) = pending.remove(id) {
-                                                let _ = tx.send(ResponseOrError::Error(error));
-                                            } else {
-                                                warn!("Received error for unknown request ID: {}", id);
-                                            }
-                                        } else {
-                                            error!(
-                                                "Received error with non-string request ID: {:?}",
-                                                error.id
-                                            );
-                                        }
+                                        request_handler.handle_error(error).await;
                                     }
                                     JSONRPCMessage::Request(request) => {
                                         let response = handle_server_request(&mut connection, context.clone(), request).await;
@@ -708,6 +555,8 @@ async fn handle_server_notification<C: ClientConn>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
 
     #[test]
     fn test_pagination_api() {
@@ -793,7 +642,7 @@ mod tests {
         impl crate::server_connection::ServerConn for TestConnection {
             async fn initialize(
                 &mut self,
-                _context: crate::server_connection::ServerCtx,
+                _context: crate::server::ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -868,7 +717,7 @@ mod tests {
         impl crate::server_connection::ServerConn for DummyServerConnection {
             async fn initialize(
                 &mut self,
-                _context: crate::server_connection::ServerCtx,
+                _context: crate::server::ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -934,7 +783,7 @@ mod tests {
         impl crate::server_connection::ServerConn for NotifServerConnection {
             async fn initialize(
                 &mut self,
-                _context: crate::server_connection::ServerCtx,
+                _context: crate::server::ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -944,7 +793,7 @@ mod tests {
 
             async fn notification(
                 &mut self,
-                _context: crate::server_connection::ServerCtx,
+                _context: crate::server::ServerCtx,
                 notification: crate::schema::ServerNotification,
             ) -> Result<()> {
                 if matches!(
@@ -1015,14 +864,8 @@ mod tests {
     #[test]
     fn test_client_creation() {
         let client = Client::new("test-client", "1.0.0");
-        assert!(client.transport_tx.is_none());
-    }
-
-    #[tokio::test]
-    async fn test_next_request_id() {
-        let client = Client::new("test-client", "1.0.0");
-        assert_eq!(client.next_request_id().await, "req-1");
-        assert_eq!(client.next_request_id().await, "req-2");
+        assert_eq!(client.name, "test-client");
+        assert_eq!(client.version, "1.0.0");
     }
 
     #[tokio::test]
@@ -1077,7 +920,7 @@ mod tests {
         impl crate::server_connection::ServerConn for TestStreamConnection {
             async fn initialize(
                 &mut self,
-                _context: crate::server_connection::ServerCtx,
+                _context: crate::server::ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -1150,7 +993,7 @@ mod tests {
         impl crate::server_connection::ServerConn for TestConnection {
             async fn initialize(
                 &mut self,
-                _context: crate::server_connection::ServerCtx,
+                _context: crate::server::ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,

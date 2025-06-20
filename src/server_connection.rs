@@ -9,8 +9,8 @@ use crate::{
         ListResourceTemplatesResult, ListResourcesResult, ListRootsResult, ListToolsResult,
         LoggingLevel, ReadResourceResult,
     },
-    Error, Result,
     server::ServerCtx,
+    Error, Result,
 };
 
 /// Connection trait that server implementers must implement

@@ -4,11 +4,11 @@
 //! without the complexity of setting up full client-server communication.
 
 use std::collections::HashMap;
-use tenx_mcp::{schema, Error, Result, ServerConn, ServerCtx};
+use tenx_mcp::{schema, testutils, Error, Result, ServerConn, ServerCtx};
 
 fn create_test_context() -> ServerCtx {
     let (notification_tx, _) = tokio::sync::broadcast::channel(100);
-    ServerCtx::new(notification_tx)
+    testutils::test_server_ctx(notification_tx)
 }
 
 #[tokio::test]
