@@ -12,7 +12,7 @@ pub(crate) const JSONRPC_VERSION: &str = "2.0";
 /// encoded to be sent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub(crate) enum JSONRPCMessage {
+pub enum JSONRPCMessage {
     Request(JSONRPCRequest),
     Notification(JSONRPCNotification),
     BatchRequest(JSONRPCBatchRequest),
@@ -22,21 +22,21 @@ pub(crate) enum JSONRPCMessage {
 }
 
 /// A JSON-RPC batch request, as described in https://www.jsonrpc.org/specification#batch.
-pub(crate) type JSONRPCBatchRequest = Vec<JSONRPCRequestOrNotification>;
+pub type JSONRPCBatchRequest = Vec<JSONRPCRequestOrNotification>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub(crate) enum JSONRPCRequestOrNotification {
+pub enum JSONRPCRequestOrNotification {
     Request(JSONRPCRequest),
     Notification(JSONRPCNotification),
 }
 
 /// A JSON-RPC batch response, as described in https://www.jsonrpc.org/specification#batch.
-pub(crate) type JSONRPCBatchResponse = Vec<JSONRPCResponseOrError>;
+pub type JSONRPCBatchResponse = Vec<JSONRPCResponseOrError>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub(crate) enum JSONRPCResponseOrError {
+pub enum JSONRPCResponseOrError {
     Response(JSONRPCResponse),
     Error(JSONRPCError),
 }
@@ -80,14 +80,14 @@ impl std::fmt::Display for Cursor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Request {
+pub struct Request {
     pub method: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<RequestParams>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RequestParams {
+pub struct RequestParams {
     #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
     pub meta: Option<RequestMeta>,
     #[serde(flatten)]
@@ -95,7 +95,7 @@ pub(crate) struct RequestParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RequestMeta {
+pub struct RequestMeta {
     /// If specified, the caller is requesting out-of-band progress
     /// notifications for this request (as represented by
     /// notifications/progress). The value of this parameter is an opaque token
@@ -106,14 +106,14 @@ pub(crate) struct RequestMeta {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Notification {
+pub struct Notification {
     pub method: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<NotificationParams>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct NotificationParams {
+pub struct NotificationParams {
     /// This parameter name is reserved by MCP to allow clients and servers to
     /// attach additional metadata to their notifications.
     #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
@@ -123,7 +123,7 @@ pub(crate) struct NotificationParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Result {
+pub struct Result {
     /// This result property is reserved by the protocol to allow clients and
     /// servers to attach additional metadata to their responses.
     #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
@@ -142,7 +142,7 @@ pub enum RequestId {
 
 /// A request that expects a response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct JSONRPCRequest {
+pub struct JSONRPCRequest {
     pub jsonrpc: String,
     pub id: RequestId,
     #[serde(flatten)]
@@ -151,7 +151,7 @@ pub(crate) struct JSONRPCRequest {
 
 /// A notification which does not expect a response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct JSONRPCNotification {
+pub struct JSONRPCNotification {
     pub jsonrpc: String,
     #[serde(flatten)]
     pub notification: Notification,
@@ -159,7 +159,7 @@ pub(crate) struct JSONRPCNotification {
 
 /// A successful (non-error) response to a request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct JSONRPCResponse {
+pub struct JSONRPCResponse {
     pub jsonrpc: String,
     pub id: RequestId,
     pub result: Result,
@@ -174,14 +174,14 @@ pub(crate) const INTERNAL_ERROR: i32 = -32603;
 
 /// A response to a request that indicates an error occurred.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct JSONRPCError {
+pub struct JSONRPCError {
     pub jsonrpc: String,
     pub id: RequestId,
     pub error: ErrorObject,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ErrorObject {
+pub struct ErrorObject {
     /// The error type that occurred.
     pub code: i32,
     /// A short description of the error. The message SHOULD be limited to a

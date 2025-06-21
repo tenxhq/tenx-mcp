@@ -10,6 +10,7 @@ use crate::{
     connection::ClientConn,
     context::ClientCtx,
     error::{Error, Result},
+    http::HttpClientTransport,
     jsonrpc::{create_jsonrpc_notification, result_to_jsonrpc_response},
     request_handler::RequestHandler,
     schema::*,
@@ -123,6 +124,16 @@ where
     /// connects to the server, and performs the initialization handshake.
     pub async fn connect_stdio(&mut self) -> Result<InitializeResult> {
         let transport = Box::new(StdioTransport::new());
+        self.connect(transport).await?;
+        self.init().await
+    }
+
+    /// Connect via HTTP and initialize the connection
+    ///
+    /// This is a convenience method that creates an HTTP transport,
+    /// connects to the server, and performs the initialization handshake.
+    pub async fn connect_http(&mut self, endpoint: impl Into<String>) -> Result<InitializeResult> {
+        let transport = Box::new(HttpClientTransport::new(endpoint));
         self.connect(transport).await?;
         self.init().await
     }

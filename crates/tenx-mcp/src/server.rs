@@ -292,6 +292,15 @@ impl ServerHandle {
         Self::new(server, transport).await
     }
 
+    /// Create a ServerHandle from a transport
+    /// This allows using any transport implementation
+    pub async fn from_transport<F>(server: Server<F>, transport: Box<dyn Transport>) -> Result<Self>
+    where
+        F: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
+    {
+        Self::new(server, transport).await
+    }
+
     pub async fn stop(self) -> Result<()> {
         // Wait for the server task to complete
         self.handle

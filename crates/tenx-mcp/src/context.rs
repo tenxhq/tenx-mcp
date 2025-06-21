@@ -68,7 +68,9 @@ impl ClientCtx {
                 reason,
             })
         } else {
-            Err(Error::InternalError("No request ID available to cancel".into()))
+            Err(Error::InternalError(
+                "No request ID available to cancel".into(),
+            ))
         }
     }
 }
@@ -274,7 +276,9 @@ impl ServerCtx {
                 reason,
             })
         } else {
-            Err(Error::InternalError("No request ID available to cancel".into()))
+            Err(Error::InternalError(
+                "No request ID available to cancel".into(),
+            ))
         }
     }
 }

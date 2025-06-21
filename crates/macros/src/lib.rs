@@ -588,15 +588,10 @@ mod tests {
             let result = inner_mcp_server(TokenStream::new(), input).unwrap();
             let result_str = result.to_string();
 
+            let expected_pattern = format!(r#"name : "{expected_snake_case}" . to_string ()"#);
             assert!(
-                result_str.contains(&format!(
-                    r#"name : "{}" . to_string ()"#,
-                    expected_snake_case
-                )),
-                "Expected server name '{}' for struct '{}', but got: {}",
-                expected_snake_case,
-                struct_name,
-                result_str
+                result_str.contains(&expected_pattern),
+                "Expected server name '{expected_snake_case}' for struct '{struct_name}', but got: {result_str}"
             );
         }
     }
