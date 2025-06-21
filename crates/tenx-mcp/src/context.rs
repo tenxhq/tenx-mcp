@@ -20,6 +20,8 @@ pub struct ClientCtx {
     pub(crate) notification_tx: broadcast::Sender<schema::ClientNotification>,
     /// Request handler for making requests to server
     request_handler: RequestHandler,
+    /// The current request ID, if this context is handling a request
+    pub(crate) request_id: Option<schema::RequestId>,
 }
 
 impl ClientCtx {
@@ -31,6 +33,7 @@ impl ClientCtx {
         Self {
             notification_tx,
             request_handler: RequestHandler::new(transport_tx, "client-req".to_string()),
+            request_id: None,
         }
     }
 
@@ -42,12 +45,31 @@ impl ClientCtx {
         Ok(())
     }
 
+    /// Create a new context with a specific request ID
+    pub(crate) fn with_request_id(&self, request_id: schema::RequestId) -> Self {
+        let mut ctx = self.clone();
+        ctx.request_id = Some(request_id);
+        ctx
+    }
+
     /// Send a request to the server and wait for response
     async fn request<T>(&mut self, request: schema::ClientRequest) -> Result<T>
     where
         T: serde::de::DeserializeOwned,
     {
         self.request_handler.request(request).await
+    }
+
+    /// Send a cancellation notification for the current request
+    pub fn cancel(&self, reason: Option<String>) -> Result<()> {
+        if let Some(request_id) = &self.request_id {
+            self.send_notification(schema::ClientNotification::Cancelled {
+                request_id: request_id.clone(),
+                reason,
+            })
+        } else {
+            Err(Error::InternalError("No request ID available to cancel".into()))
+        }
     }
 }
 
@@ -190,6 +212,8 @@ pub struct ServerCtx {
     pub(crate) notification_tx: broadcast::Sender<schema::ServerNotification>,
     /// Request handler for making requests to clients
     request_handler: RequestHandler,
+    /// The current request ID, if this context is handling a request
+    pub(crate) request_id: Option<schema::RequestId>,
 }
 
 impl ServerCtx {
@@ -201,6 +225,7 @@ impl ServerCtx {
         Self {
             notification_tx,
             request_handler: RequestHandler::new(transport_tx, "srv-req".to_string()),
+            request_id: None,
         }
     }
 
@@ -210,6 +235,13 @@ impl ServerCtx {
             .send(notification)
             .map_err(|_| Error::InternalError("Failed to send notification".into()))?;
         Ok(())
+    }
+
+    /// Create a new context with a specific request ID
+    pub(crate) fn with_request_id(&self, request_id: schema::RequestId) -> Self {
+        let mut ctx = self.clone();
+        ctx.request_id = Some(request_id);
+        ctx
     }
 
     /// Send a request to the client and wait for response
@@ -232,6 +264,18 @@ impl ServerCtx {
         // Clone the handler to avoid holding locks across await points
         let handler = self.request_handler.clone();
         handler.handle_error(error).await
+    }
+
+    /// Send a cancellation notification for the current request
+    pub fn cancel(&self, reason: Option<String>) -> Result<()> {
+        if let Some(request_id) = &self.request_id {
+            self.notify(schema::ServerNotification::Cancelled {
+                request_id: request_id.clone(),
+                reason,
+            })
+        } else {
+            Err(Error::InternalError("No request ID available to cancel".into()))
+        }
     }
 }
 

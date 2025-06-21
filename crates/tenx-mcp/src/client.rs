@@ -472,7 +472,9 @@ async fn handle_server_request<C: ClientConn>(
     context: &ClientCtx,
     request: JSONRPCRequest,
 ) -> JSONRPCMessage {
-    let result = handle_server_request_inner(connection, context, request.clone()).await;
+    // Create a context with the request ID
+    let ctx_with_request = context.with_request_id(request.id.clone());
+    let result = handle_server_request_inner(connection, &ctx_with_request, request.clone()).await;
     result_to_jsonrpc_response(request.id, result)
 }
 

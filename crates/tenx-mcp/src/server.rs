@@ -369,7 +369,9 @@ async fn handle_request(
         request.id,
         request.request.method
     );
-    let result = handle_request_inner(connection, request.clone(), context).await;
+    // Create a context with the request ID
+    let ctx_with_request = context.with_request_id(request.id.clone());
+    let result = handle_request_inner(connection, request.clone(), &ctx_with_request).await;
 
     match result {
         Ok(value) => {
