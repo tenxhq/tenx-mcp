@@ -628,8 +628,6 @@ pub struct BlobResourceContents {
     pub blob: String,
 }
 
-// Prompts
-
 /// The server's response to a prompts/list request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListPromptsResult {
