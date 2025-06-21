@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
 use tenx_mcp::{
     schema::*,
-    testutils::{connected_client_and_server_with_conn, shutdown_client_and_server},
+    testutils::{connected_client_and_server_with_conn, shutdown_client_and_server, test_client_ctx},
     ClientConn, ClientCtx, Result, ServerAPI, ServerConn, ServerCtx,
 };
 
@@ -149,7 +149,7 @@ async fn test_client_handles_server_requests_unit() {
 
     // Create a dummy context for testing
     let (notification_tx, _) = tokio::sync::broadcast::channel(10);
-    let context = ClientCtx::new(notification_tx);
+    let context = test_client_ctx(notification_tx);
 
     // Test ping
     connection.pong(context.clone()).await.expect("Ping failed");

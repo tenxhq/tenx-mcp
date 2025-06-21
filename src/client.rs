@@ -221,7 +221,7 @@ where
             tokio::sync::broadcast::channel(100);
 
         // Create the context for the connection
-        let context = ClientCtx::new(client_notification_tx.clone());
+        let context = ClientCtx::new(client_notification_tx.clone(), Some(tx.clone()));
 
         // Initialize connection
         connection.on_connect(context.clone()).await?;

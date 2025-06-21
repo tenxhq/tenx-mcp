@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
-use tenx_mcp::{schema::*, ClientConn, ClientCtx, Result};
+use tenx_mcp::{schema::*, testutils::test_client_ctx, ClientConn, ClientCtx, Result};
 
 /// Test client connection that tracks method calls
 #[derive(Default, Clone)]
@@ -66,7 +66,7 @@ async fn test_client_connection_trait_methods() {
 
     // Create a dummy context for testing
     let (notification_tx, _) = tokio::sync::broadcast::channel(10);
-    let context = ClientCtx::new(notification_tx);
+    let context = test_client_ctx(notification_tx);
 
     // Test ping
     connection.pong(context.clone()).await.expect("Ping failed");

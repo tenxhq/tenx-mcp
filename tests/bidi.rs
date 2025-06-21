@@ -63,11 +63,8 @@ impl ServerConn for SimpleServer {
         _context: ServerCtx,
         notification: ClientNotification,
     ) -> Result<()> {
-        match notification {
-            ClientNotification::RootsListChanged => {
-                self.calls.lock().unwrap().push("roots_changed".to_string());
-            }
-            _ => {}
+        if let ClientNotification::RootsListChanged = notification {
+            self.calls.lock().unwrap().push("roots_changed".to_string());
         }
         Ok(())
     }

@@ -1,7 +1,7 @@
 use tokio::sync::broadcast;
 
 use crate::{
-    api::ClientAPI,
+    api::{ClientAPI, ServerAPI},
     error::{Error, Result},
     request_handler::{RequestHandler, TransportSink},
     schema,
@@ -10,16 +10,24 @@ use crate::{
 use async_trait::async_trait;
 
 /// Context provided to ClientConnection implementations for interacting with the client
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ClientCtx {
     /// Sender for client notifications
     pub(crate) notification_tx: broadcast::Sender<schema::ClientNotification>,
+    /// Request handler for making requests to server
+    request_handler: RequestHandler,
 }
 
 impl ClientCtx {
     /// Create a new ClientConnectionContext with the given notification sender
-    pub fn new(notification_tx: broadcast::Sender<schema::ClientNotification>) -> Self {
-        Self { notification_tx }
+    pub(crate) fn new(
+        notification_tx: broadcast::Sender<schema::ClientNotification>,
+        transport_tx: Option<TransportSink>,
+    ) -> Self {
+        Self {
+            notification_tx,
+            request_handler: RequestHandler::new(transport_tx, "client-req".to_string()),
+        }
     }
 
     /// Send a notification to the client
@@ -27,6 +35,142 @@ impl ClientCtx {
         self.notification_tx
             .send(notification)
             .map_err(|_| Error::InternalError("Failed to send notification".into()))?;
+        Ok(())
+    }
+
+    /// Send a request to the server and wait for response
+    async fn request<T>(&mut self, request: schema::ClientRequest) -> Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        self.request_handler.request(request).await
+    }
+}
+
+/// Implementation of ServerAPI trait for ClientCtx
+#[async_trait]
+impl ServerAPI for ClientCtx {
+    async fn initialize(
+        &mut self,
+        protocol_version: String,
+        capabilities: schema::ClientCapabilities,
+        client_info: schema::Implementation,
+    ) -> Result<schema::InitializeResult> {
+        self.request(schema::ClientRequest::Initialize {
+            protocol_version,
+            capabilities,
+            client_info,
+        })
+        .await
+    }
+
+    async fn ping(&mut self) -> Result<()> {
+        let _: schema::EmptyResult = self.request(schema::ClientRequest::Ping).await?;
+        Ok(())
+    }
+
+    async fn list_tools(
+        &mut self,
+        cursor: impl Into<Option<schema::Cursor>> + Send,
+    ) -> Result<schema::ListToolsResult> {
+        self.request(schema::ClientRequest::ListTools {
+            cursor: cursor.into(),
+        })
+        .await
+    }
+
+    async fn call_tool(
+        &mut self,
+        name: impl Into<String> + Send,
+        arguments: impl Into<Option<std::collections::HashMap<String, serde_json::Value>>> + Send,
+    ) -> Result<schema::CallToolResult> {
+        self.request(schema::ClientRequest::CallTool {
+            name: name.into(),
+            arguments: arguments.into(),
+        })
+        .await
+    }
+
+    async fn list_resources(
+        &mut self,
+        cursor: impl Into<Option<schema::Cursor>> + Send,
+    ) -> Result<schema::ListResourcesResult> {
+        self.request(schema::ClientRequest::ListResources {
+            cursor: cursor.into(),
+        })
+        .await
+    }
+
+    async fn list_resource_templates(
+        &mut self,
+        cursor: impl Into<Option<schema::Cursor>> + Send,
+    ) -> Result<schema::ListResourceTemplatesResult> {
+        self.request(schema::ClientRequest::ListResourceTemplates {
+            cursor: cursor.into(),
+        })
+        .await
+    }
+
+    async fn resources_read(
+        &mut self,
+        uri: impl Into<String> + Send,
+    ) -> Result<schema::ReadResourceResult> {
+        self.request(schema::ClientRequest::ReadResource { uri: uri.into() })
+            .await
+    }
+
+    async fn resources_subscribe(&mut self, uri: impl Into<String> + Send) -> Result<()> {
+        let _: schema::EmptyResult = self
+            .request(schema::ClientRequest::Subscribe { uri: uri.into() })
+            .await?;
+        Ok(())
+    }
+
+    async fn resources_unsubscribe(&mut self, uri: impl Into<String> + Send) -> Result<()> {
+        let _: schema::EmptyResult = self
+            .request(schema::ClientRequest::Unsubscribe { uri: uri.into() })
+            .await?;
+        Ok(())
+    }
+
+    async fn list_prompts(
+        &mut self,
+        cursor: impl Into<Option<schema::Cursor>> + Send,
+    ) -> Result<schema::ListPromptsResult> {
+        self.request(schema::ClientRequest::ListPrompts {
+            cursor: cursor.into(),
+        })
+        .await
+    }
+
+    async fn get_prompt(
+        &mut self,
+        name: impl Into<String> + Send,
+        arguments: Option<std::collections::HashMap<String, String>>,
+    ) -> Result<schema::GetPromptResult> {
+        self.request(schema::ClientRequest::GetPrompt {
+            name: name.into(),
+            arguments,
+        })
+        .await
+    }
+
+    async fn complete(
+        &mut self,
+        reference: schema::Reference,
+        argument: schema::ArgumentInfo,
+    ) -> Result<schema::CompleteResult> {
+        self.request(schema::ClientRequest::Complete {
+            reference,
+            argument,
+        })
+        .await
+    }
+
+    async fn set_level(&mut self, level: schema::LoggingLevel) -> Result<()> {
+        let _: schema::EmptyResult = self
+            .request(schema::ClientRequest::SetLevel { level })
+            .await?;
         Ok(())
     }
 }
@@ -103,4 +247,3 @@ impl ClientAPI for ServerCtx {
         self.request(schema::ServerRequest::ListRoots).await
     }
 }
-
