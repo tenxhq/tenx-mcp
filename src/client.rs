@@ -12,7 +12,10 @@ use crate::{
     error::{Error, Result},
     request_handler::RequestHandler,
     schema::*,
-    transport::{GenericDuplex, StdioTransport, StreamTransport, TcpClientTransport, Transport, TransportStream},
+    transport::{
+        GenericDuplex, StdioTransport, StreamTransport, TcpClientTransport, Transport,
+        TransportStream,
+    },
 };
 use async_trait::async_trait;
 
@@ -197,10 +200,7 @@ where
     }
 
     /// Start the background task that handles incoming messages
-    async fn start_message_handler(
-        &mut self,
-        stream: Box<dyn TransportStream>,
-    ) -> Result<()> {
+    async fn start_message_handler(&mut self, stream: Box<dyn TransportStream>) -> Result<()> {
         let request_handler = self.request_handler.clone();
 
         // Split the transport stream into read and write halves
@@ -637,10 +637,10 @@ mod tests {
 
     use crate::{
         client_connection::{ClientConn as ClientConnTrait, ClientCtx as ClientCtxType},
+        schema::{ClientNotification, ServerNotification},
         server::{Server, ServerCtx, ServerHandle},
         server_connection::ServerConn as ServerConnTrait,
-        schema::{ClientNotification, ServerNotification},
-        transport::{TestTransport, GenericDuplex, StreamTransport},
+        transport::{GenericDuplex, StreamTransport, TestTransport},
     };
 
     async fn setup_client_server() -> (Client, ServerHandle) {
@@ -708,10 +708,7 @@ mod tests {
                 _context: ClientCtxType,
                 notification: ServerNotification,
             ) -> Result<()> {
-                if matches!(
-                    notification,
-                    ServerNotification::ToolListChanged
-                ) {
+                if matches!(notification, ServerNotification::ToolListChanged) {
                     let mut tx_guard = self.tx.lock().await;
                     if let Some(tx) = tx_guard.take() {
                         let _ = tx.send(());

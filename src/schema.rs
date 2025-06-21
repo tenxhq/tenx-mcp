@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::request_handler::RequestMethod;
 
 pub const LATEST_PROTOCOL_VERSION: &str = "2025-03-26";
-pub const JSONRPC_VERSION: &str = "2.0";
+pub(crate) const JSONRPC_VERSION: &str = "2.0";
 
 /// Refers to any valid JSON-RPC object that can be decoded off the wire, or
 /// encoded to be sent.
@@ -181,7 +181,7 @@ pub(crate) struct JSONRPCError {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ErrorObject {
+pub(crate) struct ErrorObject {
     /// The error type that occurred.
     pub code: i32,
     /// A short description of the error. The message SHOULD be limited to a
@@ -197,51 +197,6 @@ pub struct ErrorObject {
 // Empty result
 /// A response that indicates success but carries no data.
 pub(crate) type EmptyResult = Result;
-
-// Cancellation
-/// This notification can be sent by either side to indicate that it is
-/// cancelling a previously-issued request.
-///
-/// The request SHOULD still be in-flight, but due to communication latency, it
-/// is always possible that this notification MAY arrive after the request has
-/// already finished.
-///
-/// This notification indicates that the result will be unused, so any
-/// associated processing SHOULD cease.
-///
-/// A client MUST NOT attempt to cancel its `initialize` request.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CancelledNotification {
-    pub method: String,
-    pub params: CancelledParams,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CancelledParams {
-    /// The ID of the request to cancel.
-    ///
-    /// This MUST correspond to the ID of a request previously issued in the
-    /// same direction.
-    #[serde(rename = "requestId")]
-    pub request_id: RequestId,
-    /// An optional string describing the reason for the cancellation. This MAY
-    /// be logged or presented to the user.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reason: Option<String>,
-}
-
-// Initialization
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InitializeParams {
-    /// The latest version of the Model Context Protocol that the client
-    /// supports. The client MAY decide to support older versions as well.
-    #[serde(rename = "protocolVersion")]
-    pub protocol_version: String,
-    pub capabilities: ClientCapabilities,
-    #[serde(rename = "clientInfo")]
-    pub client_info: Implementation,
-}
 
 /// After receiving an initialize request from the client, the server sends this
 /// response.
@@ -332,13 +287,6 @@ impl InitializeResult {
         self.capabilities.completions = Some(serde_json::Value::Object(serde_json::Map::new()));
         self
     }
-}
-
-/// This notification is sent from the client to the server after initialization
-/// has finished.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InitializedNotification {
-    pub method: String,
 }
 
 /// Capabilities a client may support. Known capabilities are defined here, in
@@ -495,34 +443,6 @@ pub struct Implementation {
     pub version: String,
 }
 
-// Ping
-
-// Progress notifications
-/// An out-of-band notification used to inform the receiver of a progress update
-/// for a long-running request.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProgressNotification {
-    pub method: String,
-    pub params: ProgressParams,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProgressParams {
-    /// The progress token which was given in the initial request, used to
-    /// associate this notification with the request that is proceeding.
-    #[serde(rename = "progressToken")]
-    pub progress_token: ProgressToken,
-    /// The progress thus far. This should increase every time progress is made,
-    /// even if the total is unknown.
-    pub progress: f64,
-    /// Total number of items to process (or total progress required), if known.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub total: Option<f64>,
-    /// An optional message describing the current progress.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-}
-
 /// The server's response to a resources/list request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListResourcesResult {
@@ -572,13 +492,6 @@ pub struct ListResourceTemplatesResult {
     pub next_cursor: Option<Cursor>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReadResourceParams {
-    /// The URI of the resource to read. The URI can use any protocol; it is up
-    /// to the server how to interpret it.
-    pub uri: String,
-}
-
 /// The server's response to a resources/read request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ReadResourceResult {
@@ -623,30 +536,6 @@ impl ReadResourceResult {
             .insert(key.into(), value);
         self
     }
-}
-
-/// An optional notification from the server to the client, informing it that
-/// the list of resources it can read from has changed. This may be issued by
-/// servers without any previous subscription from the client.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceListChangedNotification {
-    pub method: String,
-}
-
-/// A notification from the server to the client, informing it that a resource
-/// has changed and may need to be read again. This should only be sent if the
-/// client previously sent a resources/subscribe request.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceUpdatedNotification {
-    pub method: String,
-    pub params: ResourceUpdatedParams,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceUpdatedParams {
-    /// The URI of the resource that has been updated. This might be a
-    /// sub-resource of the one that the client actually subscribed to.
-    pub uri: String,
 }
 
 /// A known resource that the server is capable of reading.
@@ -857,16 +746,6 @@ pub struct EmbeddedResource {
     pub annotations: Option<Annotations>,
 }
 
-/// An optional notification from the server to the client, informing it that
-/// the list of prompts it offers has changed. This may be issued by servers
-/// without any previous subscription from the client.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PromptListChangedNotification {
-    pub method: String,
-}
-
-// Tools
-
 /// The server's response to a tools/list request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListToolsResult {
@@ -981,14 +860,6 @@ impl Default for CallToolResult {
     }
 }
 
-/// An optional notification from the server to the client, informing it that
-/// the list of tools it offers has changed. This may be issued by servers
-/// without any previous subscription from the client.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolListChangedNotification {
-    pub method: String,
-}
-
 /// Additional properties describing a Tool to clients.
 ///
 /// NOTE: all properties in ToolAnnotations are **hints**.
@@ -1031,26 +902,6 @@ pub struct ToolAnnotations {
     /// Default: true
     #[serde(rename = "openWorldHint", skip_serializing_if = "Option::is_none")]
     pub open_world_hint: Option<bool>,
-}
-
-/// Parameters for calling a tool.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CallToolParams {
-    /// The name of the tool to call.
-    pub name: String,
-    /// Arguments to pass to the tool.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub arguments: Option<HashMap<String, Value>>,
-}
-
-/// Parameters for getting a prompt.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetPromptParams {
-    /// The name of the prompt to get.
-    pub name: String,
-    /// Arguments to use for templating the prompt.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub arguments: Option<HashMap<String, Value>>,
 }
 
 /// Definition for a tool the client can call.
@@ -1231,29 +1082,6 @@ impl ToolInputSchema {
     }
 }
 
-// Logging
-
-/// Notification of a log message passed from server to client. If no
-/// logging/setLevel request has been sent from the client, the server MAY
-/// decide which messages to send automatically.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoggingMessageNotification {
-    pub method: String,
-    pub params: LoggingMessageParams,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoggingMessageParams {
-    /// The severity of this log message.
-    pub level: LoggingLevel,
-    /// An optional name of the logger issuing this message.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub logger: Option<String>,
-    /// The data to be logged, such as a string message or an object. Any JSON
-    /// serializable type is allowed here.
-    pub data: Value,
-}
-
 /// The severity of a log message.
 ///
 /// These map to syslog message severities, as specified in RFC-5424:
@@ -1269,17 +1097,6 @@ pub enum LoggingLevel {
     Critical,
     Alert,
     Emergency,
-}
-
-// Sampling
-/// A request from the server to sample an LLM via the client. The client has
-/// full discretion over which model to select. The client should also inform
-/// the user before beginning sampling, to allow them to inspect the request
-/// (human in the loop) and decide whether to approve it.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateMessageRequest {
-    pub method: String,
-    pub params: CreateMessageParams,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1575,15 +1392,6 @@ pub struct Root {
     pub name: Option<String>,
 }
 
-/// A notification from the client to the server, informing it that the list of
-/// roots has changed. This notification should be sent whenever the client
-/// adds, removes, or modifies any root. The server should then request an
-/// updated list of roots using the ListRootsRequest.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RootsListChangedNotification {
-    pub method: String,
-}
-
 // Messages sent from the client to the server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
@@ -1592,6 +1400,8 @@ pub(crate) enum ClientRequest {
     Ping,
     #[serde(rename = "initialize")]
     Initialize {
+        /// The latest version of the Model Context Protocol that the client
+        /// supports. The client MAY decide to support older versions as well.
         #[serde(rename = "protocolVersion")]
         protocol_version: String,
         capabilities: ClientCapabilities,
@@ -1701,6 +1511,18 @@ impl RequestMethod for ClientRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
 pub enum ClientNotification {
+    // Cancellation
+    /// This notification can be sent by either side to indicate that it is
+    /// cancelling a previously-issued request.
+    ///
+    /// The request SHOULD still be in-flight, but due to communication latency, it
+    /// is always possible that this notification MAY arrive after the request has
+    /// already finished.
+    ///
+    /// This notification indicates that the result will be unused, so any
+    /// associated processing SHOULD cease.
+    ///
+    /// A client MUST NOT attempt to cancel its `initialize` request.
     #[serde(rename = "notifications/cancelled")]
     Cancelled {
         /// The ID of the request to cancel.
@@ -1724,8 +1546,16 @@ pub enum ClientNotification {
         #[serde(skip_serializing_if = "Option::is_none")]
         message: Option<String>,
     },
+
+    /// This notification is sent from the client to the server after initialization
+    /// has finished.
     #[serde(rename = "notifications/initialized")]
     Initialized,
+
+    /// A notification from the client to the server, informing it that the list of
+    /// roots has changed. This notification should be sent whenever the client
+    /// adds, removes, or modifies any root. The server should then request an
+    /// updated list of roots using the ListRootsRequest.
     #[serde(rename = "notifications/roots/list_changed")]
     RootsListChanged,
 }
@@ -1738,14 +1568,20 @@ pub(crate) enum ClientResult {
     ListRoots(ListRootsResult),
 }
 
-// Messages sent from the server to the client
+/// Requests sent from the server to the client
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
 pub enum ServerRequest {
     #[serde(rename = "ping")]
     Ping,
+
+    /// A request from the server to sample an LLM via the client. The client has
+    /// full discretion over which model to select. The client should also inform
+    /// the user before beginning sampling, to allow them to inspect the request
+    /// (human in the loop) and decide whether to approve it.
     #[serde(rename = "sampling/createMessage")]
     CreateMessage(Box<CreateMessageParams>),
+
     #[serde(rename = "roots/list")]
     ListRoots,
 }
@@ -1771,6 +1607,17 @@ impl RequestMethod for ServerRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
 pub enum ServerNotification {
+    /// This notification can be sent by either side to indicate that it is
+    /// cancelling a previously-issued request.
+    ///
+    /// The request SHOULD still be in-flight, but due to communication latency, it
+    /// is always possible that this notification MAY arrive after the request has
+    /// already finished.
+    ///
+    /// This notification indicates that the result will be unused, so any
+    /// associated processing SHOULD cease.
+    ///
+    /// A client MUST NOT attempt to cancel its `initialize` request.
     #[serde(rename = "notifications/cancelled")]
     Cancelled {
         /// The ID of the request to cancel.
@@ -1794,6 +1641,9 @@ pub enum ServerNotification {
         #[serde(skip_serializing_if = "Option::is_none")]
         message: Option<String>,
     },
+    /// Notification of a log message passed from server to client. If no
+    /// logging/setLevel request has been sent from the client, the server MAY
+    /// decide which messages to send automatically.
     #[serde(rename = "notifications/message")]
     LoggingMessage {
         /// The severity of this log message.
@@ -1804,15 +1654,31 @@ pub enum ServerNotification {
         /// The data to be logged.
         data: Value,
     },
+
+    /// A notification from the server to the client, informing it that a resource
+    /// has changed and may need to be read again. This should only be sent if the
+    /// client previously sent a resources/subscribe request.
     #[serde(rename = "notifications/resources/updated")]
     ResourceUpdated {
         /// The URI of the resource that has been updated.
         uri: String,
     },
+
+    /// An optional notification from the server to the client, informing it that
+    /// the list of resources it can read from has changed. This may be issued by
+    /// servers without any previous subscription from the client.
     #[serde(rename = "notifications/resources/list_changed")]
     ResourceListChanged,
+
+    /// An optional notification from the server to the client, informing it that
+    /// the list of tools it offers has changed. This may be issued by servers
+    /// without any previous subscription from the client.
     #[serde(rename = "notifications/tools/list_changed")]
     ToolListChanged,
+
+    /// An optional notification from the server to the client, informing it that
+    /// the list of prompts it offers has changed. This may be issued by servers
+    /// without any previous subscription from the client.
     #[serde(rename = "notifications/prompts/list_changed")]
     PromptListChanged,
 }
