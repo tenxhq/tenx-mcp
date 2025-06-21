@@ -1582,7 +1582,7 @@ pub struct RootsListChangedNotification {
     pub method: String,
 }
 
-// Client messages
+// Messages sent from the client to the server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
 pub(crate) enum ClientRequest {
@@ -1695,52 +1695,7 @@ impl crate::request_handler::RequestMethod for ClientRequest {
     }
 }
 
-#[cfg(test)]
-mod pagination_tests {
-    use super::*;
-
-    #[test]
-    fn test_paginated_request_serialization() {
-        // Test ListTools with cursor
-        let request = ClientRequest::ListTools {
-            cursor: Some("test-cursor".into()),
-        };
-        let json = serde_json::to_value(&request).unwrap();
-        assert_eq!(json["method"], "tools/list");
-        assert_eq!(json["cursor"], "test-cursor");
-
-        // Test ListTools without cursor
-        let request = ClientRequest::ListTools { cursor: None };
-        let json = serde_json::to_value(&request).unwrap();
-        assert_eq!(json["method"], "tools/list");
-        assert!(!json.as_object().unwrap().contains_key("cursor"));
-
-        // Test ListResources with cursor
-        let request = ClientRequest::ListResources {
-            cursor: Some("res-cursor".into()),
-        };
-        let json = serde_json::to_value(&request).unwrap();
-        assert_eq!(json["method"], "resources/list");
-        assert_eq!(json["cursor"], "res-cursor");
-
-        // Test ListPrompts with cursor
-        let request = ClientRequest::ListPrompts {
-            cursor: Some("prompt-cursor".into()),
-        };
-        let json = serde_json::to_value(&request).unwrap();
-        assert_eq!(json["method"], "prompts/list");
-        assert_eq!(json["cursor"], "prompt-cursor");
-
-        // Test ListResourceTemplates with cursor
-        let request = ClientRequest::ListResourceTemplates {
-            cursor: Some("template-cursor".into()),
-        };
-        let json = serde_json::to_value(&request).unwrap();
-        assert_eq!(json["method"], "resources/templates/list");
-        assert_eq!(json["cursor"], "template-cursor");
-    }
-}
-
+/// Notifications sent from the client to the server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
 pub enum ClientNotification {
@@ -1781,7 +1736,7 @@ pub(crate) enum ClientResult {
     ListRoots(ListRootsResult),
 }
 
-// Server messages
+// Messages sent from the server to the client
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
 pub enum ServerRequest {
@@ -1810,6 +1765,7 @@ impl crate::request_handler::RequestMethod for ServerRequest {
     }
 }
 
+/// Notifications sent from the server to the client
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
 pub enum ServerNotification {
@@ -1935,5 +1891,46 @@ mod tests {
             metadata_schema.get("type").and_then(|v| v.as_str()),
             Some("object")
         );
+    }
+
+    #[test]
+    fn test_paginated_request_serialization() {
+        // Test ListTools with cursor
+        let request = ClientRequest::ListTools {
+            cursor: Some("test-cursor".into()),
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["method"], "tools/list");
+        assert_eq!(json["cursor"], "test-cursor");
+
+        // Test ListTools without cursor
+        let request = ClientRequest::ListTools { cursor: None };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["method"], "tools/list");
+        assert!(!json.as_object().unwrap().contains_key("cursor"));
+
+        // Test ListResources with cursor
+        let request = ClientRequest::ListResources {
+            cursor: Some("res-cursor".into()),
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["method"], "resources/list");
+        assert_eq!(json["cursor"], "res-cursor");
+
+        // Test ListPrompts with cursor
+        let request = ClientRequest::ListPrompts {
+            cursor: Some("prompt-cursor".into()),
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["method"], "prompts/list");
+        assert_eq!(json["cursor"], "prompt-cursor");
+
+        // Test ListResourceTemplates with cursor
+        let request = ClientRequest::ListResourceTemplates {
+            cursor: Some("template-cursor".into()),
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["method"], "resources/templates/list");
+        assert_eq!(json["cursor"], "template-cursor");
     }
 }

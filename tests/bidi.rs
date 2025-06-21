@@ -1,4 +1,4 @@
-/// Test bi-dirctional client-server and server-client messages
+/// Test bidirectional client-server and server-client messages
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
 use tenx_mcp::{
@@ -7,10 +7,12 @@ use tenx_mcp::{
     ClientAPI, ClientConn, ClientCtx, Result, ServerAPI, ServerConn, ServerCtx,
 };
 
+type CallLog = Arc<Mutex<Vec<String>>>;
+
 /// Simple test client that responds to server requests
 #[derive(Clone)]
 struct SimpleClient {
-    calls: Arc<Mutex<Vec<String>>>,
+    calls: CallLog,
 }
 
 #[async_trait]
@@ -32,15 +34,16 @@ impl ClientConn for SimpleClient {
     }
 }
 
+type StoredContext = Arc<Mutex<Option<ServerCtx>>>;
+
 /// Simple test server that makes requests to the client
 struct SimpleServer {
-    stored_context: Arc<Mutex<Option<ServerCtx>>>,
+    stored_context: StoredContext,
 }
 
 #[async_trait]
 impl ServerConn for SimpleServer {
     async fn on_connect(&self, context: ServerCtx) -> Result<()> {
-        // Store the context for later use
         *self.stored_context.lock().unwrap() = Some(context);
         Ok(())
     }
@@ -55,7 +58,6 @@ impl ServerConn for SimpleServer {
         Ok(InitializeResult::new("simple-server", "1.0.0"))
     }
 
-    /// A simple tool that demonstrates server->client requests
     async fn tools_call(
         &self,
         mut context: ServerCtx,
@@ -64,12 +66,10 @@ impl ServerConn for SimpleServer {
     ) -> Result<CallToolResult> {
         match name.as_str() {
             "test_ping" => {
-                // Server pings the client
                 context.ping().await?;
                 Ok(CallToolResult::new().with_text_content("Ping successful"))
             }
             "test_roots" => {
-                // Server asks client for roots
                 let roots = context.list_roots().await?;
                 let text = format!("Client has {} roots", roots.roots.len());
                 Ok(CallToolResult::new().with_text_content(text))
@@ -102,10 +102,9 @@ impl ServerConn for SimpleServer {
 async fn test_server_to_client_requests() {
     let _ = tracing_subscriber::fmt::try_init();
 
-    let client_calls = Arc::new(Mutex::new(Vec::<String>::new()));
-    let server_context = Arc::new(Mutex::new(None));
+    let client_calls = CallLog::default();
+    let server_context = StoredContext::default();
 
-    // Create client and server
     let (mut client, server_handle) = connected_client_and_server_with_conn(
         {
             let ctx = server_context.clone();
@@ -122,7 +121,6 @@ async fn test_server_to_client_requests() {
     .await
     .expect("Failed to create client/server pair");
 
-    // Initialize
     client
         .initialize(
             LATEST_PROTOCOL_VERSION.to_string(),
@@ -135,41 +133,29 @@ async fn test_server_to_client_requests() {
         .await
         .expect("Initialize failed");
 
-    // Small delay to ensure initialization completes
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
-    // Test 1: Server pings client
-    println!("\n=== Test: Server pings client ===");
+    // Test server pinging client
     client_calls.lock().unwrap().clear();
-
-    let result = client
+    client
         .call_tool("test_ping", None)
         .await
         .expect("Tool call failed");
-    println!("Result: {result:?}");
-
-    // Verify client received ping
     assert!(client_calls
         .lock()
         .unwrap()
         .contains(&"client_pong".to_string()));
 
-    // Test 2: Server gets roots from client
-    println!("\n=== Test: Server gets roots from client ===");
+    // Test server getting roots from client
     client_calls.lock().unwrap().clear();
-
-    let result = client
+    client
         .call_tool("test_roots", None)
         .await
         .expect("Tool call failed");
-    println!("Result: {result:?}");
-
-    // Verify client received list_roots request
     assert!(client_calls
         .lock()
         .unwrap()
         .contains(&"list_roots".to_string()));
 
-    // Clean up
     shutdown_client_and_server(client, server_handle).await;
 }
