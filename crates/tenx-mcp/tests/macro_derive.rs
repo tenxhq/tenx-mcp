@@ -60,7 +60,7 @@ async fn test_initialize() {
         .await
         .unwrap();
 
-    assert_eq!(result.server_info.name, "TestServer");
+    assert_eq!(result.server_info.name, "test_server");
     assert_eq!(result.instructions, Some("Test server with echo and add tools".to_string()));
 }
 

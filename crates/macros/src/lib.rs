@@ -2,9 +2,9 @@
 //!
 //! Using the #[mcp_server] macro on an impl block, this crate will pick up all methods
 //! marked with #[tool] and derive the necessary ServerConn::call_tool, ServerConn::list_tools and
-//! ServerConn::initialize methods. The name of the server is derived from the name of the struct,
-//! and the description is derived from the doc comment on the impl block. The version is set to
-//! "0.1.0" by default.
+//! ServerConn::initialize methods. The name of the server is derived from the name of the struct
+//! converted to snake_case (e.g., MyServer becomes my_server), and the description is derived
+//! from the doc comment on the impl block. The version is set to "0.1.0" by default.
 //!
 //! All tool methods have the following exact signature:  
 //!
@@ -45,6 +45,7 @@
 //! }
 //! ```
 
+use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{spanned::Spanned, Expr, ExprLit, ImplItem, ItemImpl, Lit, Meta};
@@ -262,7 +263,7 @@ fn generate_list_tools(info: &ServerInfo) -> TokenStream {
 }
 
 fn generate_initialize(info: &ServerInfo) -> TokenStream {
-    let name = &info.struct_name;
+    let snake_case_name = info.struct_name.to_snake_case();
     let description = &info.description;
 
     quote! {
@@ -282,7 +283,7 @@ fn generate_initialize(info: &ServerInfo) -> TokenStream {
                     ..Default::default()
                 },
                 server_info: tenx_mcp::schema::Implementation {
-                    name: #name.to_string(),
+                    name: #snake_case_name.to_string(),
                     version: "0.1.0".to_string(),
                 },
                 instructions: Some(#description.to_string()),
@@ -539,6 +540,9 @@ mod tests {
         assert!(result_str.contains("async fn initialize"));
         assert!(result_str.contains("async fn list_tools"));
         assert!(result_str.contains("async fn call_tool"));
+
+        // Check that snake_case conversion is applied
+        assert!(result_str.contains(r#"name : "test_server" . to_string ()"#));
     }
 
     #[test]
@@ -557,5 +561,43 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("No tool methods found"));
+    }
+
+    #[test]
+    fn test_snake_case_conversion() {
+        // Test various struct name patterns
+        let test_cases = vec![
+            ("TestServer", "test_server"),
+            ("MyMCPServer", "my_mcp_server"),
+            ("HTTPServer", "http_server"),
+            ("SimpleServer", "simple_server"),
+            ("MyHTTPAPIServer", "my_httpapi_server"),
+        ];
+
+        for (struct_name, expected_snake_case) in test_cases {
+            let struct_ident = syn::Ident::new(struct_name, proc_macro2::Span::call_site());
+            let input = quote! {
+                impl #struct_ident {
+                    #[tool]
+                    async fn echo(&self, context: &ServerCtx, params: EchoParams) -> Result<schema::CallToolResult> {
+                        Ok(schema::CallToolResult::new())
+                    }
+                }
+            };
+
+            let result = inner_mcp_server(TokenStream::new(), input).unwrap();
+            let result_str = result.to_string();
+
+            assert!(
+                result_str.contains(&format!(
+                    r#"name : "{}" . to_string ()"#,
+                    expected_snake_case
+                )),
+                "Expected server name '{}' for struct '{}', but got: {}",
+                expected_snake_case,
+                struct_name,
+                result_str
+            );
+        }
     }
 }
