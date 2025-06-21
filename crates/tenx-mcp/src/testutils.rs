@@ -130,3 +130,85 @@ pub fn test_server_ctx(notification_tx: broadcast::Sender<ServerNotification>) -
 pub fn test_client_ctx(notification_tx: broadcast::Sender<ClientNotification>) -> ClientCtx {
     ClientCtx::new(notification_tx, None)
 }
+
+/// Test context for ServerConn implementations.
+/// Provides a ServerCtx and channels for testing.
+pub struct TestServerContext {
+    pub ctx: ServerCtx,
+    pub notification_tx: broadcast::Sender<ServerNotification>,
+    pub notification_rx: broadcast::Receiver<ServerNotification>,
+}
+
+impl TestServerContext {
+    /// Create a new test server context with notification channels
+    pub fn new() -> Self {
+        let (notification_tx, notification_rx) = broadcast::channel(100);
+        let ctx = test_server_ctx(notification_tx.clone());
+        Self {
+            ctx,
+            notification_tx,
+            notification_rx,
+        }
+    }
+
+    /// Get a reference to the ServerCtx
+    pub fn ctx(&self) -> &ServerCtx {
+        &self.ctx
+    }
+
+    /// Try to receive a notification, returning None if no notification is available
+    pub async fn try_recv_notification(&mut self) -> Option<ServerNotification> {
+        use tokio::time::{timeout, Duration};
+        timeout(Duration::from_millis(10), self.notification_rx.recv())
+            .await
+            .ok()
+            .and_then(|result| result.ok())
+    }
+}
+
+impl Default for TestServerContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test context for ClientConn implementations.
+/// Provides a ClientCtx and channels for testing.
+pub struct TestClientContext {
+    pub ctx: ClientCtx,
+    pub notification_tx: broadcast::Sender<ClientNotification>,
+    pub notification_rx: broadcast::Receiver<ClientNotification>,
+}
+
+impl TestClientContext {
+    /// Create a new test client context with notification channels
+    pub fn new() -> Self {
+        let (notification_tx, notification_rx) = broadcast::channel(100);
+        let ctx = test_client_ctx(notification_tx.clone());
+        Self {
+            ctx,
+            notification_tx,
+            notification_rx,
+        }
+    }
+
+    /// Get a reference to the ClientCtx
+    pub fn ctx(&self) -> &ClientCtx {
+        &self.ctx
+    }
+
+    /// Try to receive a notification, returning None if no notification is available
+    pub async fn try_recv_notification(&mut self) -> Option<ClientNotification> {
+        use tokio::time::{timeout, Duration};
+        timeout(Duration::from_millis(10), self.notification_rx.recv())
+            .await
+            .ok()
+            .and_then(|result| result.ok())
+    }
+}
+
+impl Default for TestClientContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
