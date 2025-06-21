@@ -28,7 +28,7 @@ impl ServerConn for EchoConnection {
         Ok(InitializeResult::new("test-server", "0.1.0").with_tools(true))
     }
 
-    async fn tools_list(
+    async fn list_tools(
         &self,
         _context: &ServerCtx,
         _cursor: Option<Cursor>,
@@ -54,7 +54,7 @@ impl ServerConn for EchoConnection {
             .with_tool(Tool::new("echo", schema).with_description("Echoes the input message")))
     }
 
-    async fn tools_call(
+    async fn call_tool(
         &self,
         _context: &ServerCtx,
         name: String,

@@ -55,7 +55,7 @@ impl ServerConn for TimeoutTestConnection {
         )
     }
 
-    async fn tools_list(
+    async fn list_tools(
         &self,
         _context: &ServerCtx,
         _cursor: Option<schema::Cursor>,
@@ -85,7 +85,7 @@ impl ServerConn for TimeoutTestConnection {
             ))
     }
 
-    async fn tools_call(
+    async fn call_tool(
         &self,
         _context: &ServerCtx,
         name: String,

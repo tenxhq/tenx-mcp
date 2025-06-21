@@ -97,7 +97,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// List available tools
-    async fn tools_list(
+    async fn list_tools(
         &self,
         _context: &ServerCtx,
         _cursor: Option<Cursor>,
@@ -106,7 +106,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// Call a tool
-    async fn tools_call(
+    async fn call_tool(
         &self,
         _context: &ServerCtx,
         name: String,
@@ -140,11 +140,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// Read a resource
-    async fn resources_read(
-        &self,
-        _context: &ServerCtx,
-        uri: String,
-    ) -> Result<ReadResourceResult> {
+    async fn read_resource(&self, _context: &ServerCtx, uri: String) -> Result<ReadResourceResult> {
         Err(Error::ResourceNotFound { uri })
     }
 
@@ -168,7 +164,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// Get a prompt
-    async fn prompts_get(
+    async fn get_prompt(
         &self,
         _context: &ServerCtx,
         name: String,
@@ -181,7 +177,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// Handle completion request
-    async fn completion_complete(
+    async fn complete(
         &self,
         _context: &ServerCtx,
         _reference: schema::Reference,
@@ -198,7 +194,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// Set logging level
-    async fn logging_set_level(&self, _context: &ServerCtx, _level: LoggingLevel) -> Result<()> {
+    async fn set_level(&self, _context: &ServerCtx, _level: LoggingLevel) -> Result<()> {
         Ok(())
     }
 
@@ -211,7 +207,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// Handle sampling/createMessage request from server
-    async fn sampling_create_message(
+    async fn create_message(
         &self,
         _context: &ServerCtx,
         _params: schema::CreateMessageParams,

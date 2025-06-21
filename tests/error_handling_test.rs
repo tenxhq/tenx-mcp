@@ -45,7 +45,7 @@ async fn test_method_not_found() {
     // This should use the default implementation which returns ToolNotFound
     let context = create_test_context();
     let result = conn
-        .tools_call(&context, "non_existent".to_string(), None)
+        .call_tool(&context, "non_existent".to_string(), None)
         .await;
 
     assert!(result.is_err());
@@ -88,7 +88,7 @@ async fn test_invalid_params() {
             })
         }
 
-        async fn tools_list(
+        async fn list_tools(
             &self,
             _context: &ServerCtx,
             _cursor: Option<schema::Cursor>,
@@ -115,7 +115,7 @@ async fn test_invalid_params() {
             ))
         }
 
-        async fn tools_call(
+        async fn call_tool(
             &self,
             _context: &ServerCtx,
             name: String,
@@ -144,14 +144,14 @@ async fn test_invalid_params() {
     // Test 1: Call with missing arguments
     let context = create_test_context();
     let result = conn
-        .tools_call(&context, "test_tool".to_string(), None)
+        .call_tool(&context, "test_tool".to_string(), None)
         .await;
     assert!(matches!(result, Err(Error::InvalidParams(_))));
 
     // Test 2: Call with empty object (missing required param)
     let context = create_test_context();
     let result = conn
-        .tools_call(&context, "test_tool".to_string(), Some(HashMap::new()))
+        .call_tool(&context, "test_tool".to_string(), Some(HashMap::new()))
         .await;
     match result {
         Err(Error::InvalidParams(msg)) => {
@@ -165,7 +165,7 @@ async fn test_invalid_params() {
     let mut args = HashMap::new();
     args.insert("required_param".to_string(), serde_json::json!("test"));
     let result = conn
-        .tools_call(&context, "test_tool".to_string(), Some(args))
+        .call_tool(&context, "test_tool".to_string(), Some(args))
         .await;
     assert!(result.is_ok());
 }
@@ -204,7 +204,7 @@ async fn test_successful_response() {
             })
         }
 
-        async fn tools_list(
+        async fn list_tools(
             &self,
             _context: &ServerCtx,
             _cursor: Option<schema::Cursor>,
@@ -261,7 +261,7 @@ async fn test_successful_response() {
 
     // Test successful tools listing
     let context = create_test_context();
-    let tools = conn.tools_list(&context, None).await.unwrap();
+    let tools = conn.list_tools(&context, None).await.unwrap();
     assert_eq!(tools.tools.len(), 2);
     assert_eq!(tools.tools[0].name, "echo");
     assert_eq!(tools.tools[1].name, "add");
@@ -292,7 +292,7 @@ async fn test_error_propagation() {
             Err(Error::InternalError("Connection failed".to_string()))
         }
 
-        async fn resources_read(
+        async fn read_resource(
             &self,
             _context: &ServerCtx,
             uri: String,
@@ -301,7 +301,7 @@ async fn test_error_propagation() {
             Err(Error::ResourceNotFound { uri })
         }
 
-        async fn prompts_get(
+        async fn get_prompt(
             &self,
             _context: &ServerCtx,
             name: String,
@@ -338,7 +338,7 @@ async fn test_error_propagation() {
     // Test resource not found
     let context = create_test_context();
     let read_result = conn
-        .resources_read(&context, "file:///missing.txt".to_string())
+        .read_resource(&context, "file:///missing.txt".to_string())
         .await;
     match read_result {
         Err(Error::ResourceNotFound { uri }) => {
@@ -350,7 +350,7 @@ async fn test_error_propagation() {
     // Test prompt not found (using MethodNotFound)
     let context = create_test_context();
     let prompt_result = conn
-        .prompts_get(&context, "missing_prompt".to_string(), None)
+        .get_prompt(&context, "missing_prompt".to_string(), None)
         .await;
     match prompt_result {
         Err(Error::MethodNotFound(method)) => {

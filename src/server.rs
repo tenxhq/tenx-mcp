@@ -458,11 +458,11 @@ async fn handle_request_inner(
             conn.pong(ctx).await.map(|_| serde_json::json!({}))
         }
         ClientRequest::ListTools { cursor } => conn
-            .tools_list(ctx, cursor)
+            .list_tools(ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::CallTool { name, arguments } => conn
-            .tools_call(ctx, name, arguments)
+            .call_tool(ctx, name, arguments)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::ListResources { cursor } => conn
@@ -474,7 +474,7 @@ async fn handle_request_inner(
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::ReadResource { uri } => conn
-            .resources_read(ctx, uri)
+            .read_resource(ctx, uri)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::Subscribe { uri } => conn
@@ -490,18 +490,18 @@ async fn handle_request_inner(
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::GetPrompt { name, arguments } => conn
-            .prompts_get(ctx, name, arguments)
+            .get_prompt(ctx, name, arguments)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::Complete {
             reference,
             argument,
         } => conn
-            .completion_complete(ctx, reference, argument)
+            .complete(ctx, reference, argument)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::SetLevel { level } => conn
-            .logging_set_level(ctx, level)
+            .set_level(ctx, level)
             .await
             .map(|_| serde_json::json!({})),
     }

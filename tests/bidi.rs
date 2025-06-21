@@ -123,7 +123,7 @@ impl ServerConn for TestServer {
         Ok(InitializeResult::new("test-server", "1.0.0"))
     }
 
-    async fn tools_call(
+    async fn call_tool(
         &self,
         context: &ServerCtx,
         name: String,
@@ -180,7 +180,7 @@ impl ServerConn for TestServer {
         }
     }
 
-    async fn tools_list(
+    async fn list_tools(
         &self,
         _context: &ServerCtx,
         _cursor: Option<Cursor>,

@@ -45,7 +45,7 @@ impl ServerConn for BasicConnection {
             .with_capabilities(ServerCapabilities::default().with_tools(None)))
     }
 
-    async fn tools_list(
+    async fn list_tools(
         &self,
         _context: &ServerCtx,
         _cursor: Option<Cursor>,
@@ -56,7 +56,7 @@ impl ServerConn for BasicConnection {
         ))
     }
 
-    async fn tools_call(
+    async fn call_tool(
         &self,
         _context: &ServerCtx,
         name: String,
