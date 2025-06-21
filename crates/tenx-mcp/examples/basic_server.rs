@@ -30,10 +30,10 @@ struct EchoParams {
 
 /// Basic server connection that provides an echo tool
 #[derive(Debug, Default)]
-struct BasicConnection {}
+struct BasicServer {}
 
 #[async_trait]
-impl ServerConn for BasicConnection {
+impl ServerConn for BasicServer {
     async fn initialize(
         &self,
         _context: &ServerCtx,
@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
     if is_stdio {
         // Run in stdio mode - no logging to avoid interfering with JSON-RPC
         Server::default()
-            .with_connection(BasicConnection::default)
+            .with_connection(BasicServer::default)
             .serve_stdio()
             .await?;
     } else {
@@ -119,7 +119,7 @@ async fn main() -> Result<()> {
         info!("Starting basic MCP server on {}", addr);
 
         Server::default()
-            .with_connection(BasicConnection::default)
+            .with_connection(BasicServer::default)
             .serve_tcp(addr)
             .await?;
     }

@@ -1,13 +1,13 @@
-
 [workspace.package]
 version = "0.0.1"
 edition = "2021"
 authors = ["Aldo Cortesi <aldo@corte.si>"]
+description = "Complete, ergonomic implementation of the Model Context Protocol (MCP)"
+license = "MIT"
+repository = "https://github.com/tenxhq/tenx-mcp"
+keywords = ["mcp", "ai"]
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "examples/*"]
+members = ["crates/*"]
 
-[workspace.dependencies]
-
-tokio = "1.38.0"

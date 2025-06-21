@@ -19,6 +19,8 @@ pub use context::{ClientCtx, ServerCtx};
 pub use error::{Error, Result};
 pub use server::{Server, ServerHandle};
 
+pub use macros;
+
 // Re-export schemars for users
 pub use schemars;
 
