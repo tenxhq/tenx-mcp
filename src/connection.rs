@@ -4,14 +4,65 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::{
+    context::{ClientCtx, ServerCtx},
     schema::{
         self, Cursor, GetPromptResult, InitializeResult, ListPromptsResult,
         ListResourceTemplatesResult, ListResourcesResult, ListRootsResult, ListToolsResult,
         LoggingLevel, ReadResourceResult,
     },
-    server::ServerCtx,
     Error, Result,
 };
+
+/// Connection trait that client implementers must implement
+/// Each client connection will have its own instance of the implementation
+///
+/// All methods take &self to allow concurrent request handling.
+/// Implementations should use interior mutability (Arc<Mutex<_>>, RwLock, etc.)
+/// for any mutable state.
+#[async_trait]
+pub trait ClientConn: Send + Sync + Clone {
+    /// Called when a new connection is established
+    async fn on_connect(&self, _context: ClientCtx) -> Result<()> {
+        Ok(())
+    }
+
+    /// Called when the connection is being closed
+    async fn on_disconnect(&self, _context: ClientCtx) -> Result<()> {
+        Ok(())
+    }
+
+    /// Responde to a ping request from the server
+    async fn pong(&self, _context: ClientCtx) -> Result<()> {
+        Ok(())
+    }
+
+    async fn create_message(
+        &self,
+        _context: ClientCtx,
+        _method: &str,
+        _params: schema::CreateMessageParams,
+    ) -> Result<schema::CreateMessageResult> {
+        Err(Error::InvalidRequest(
+            "create_message not implemented".into(),
+        ))
+    }
+
+    async fn list_roots(&self, _context: ClientCtx) -> Result<schema::ListRootsResult> {
+        Err(Error::InvalidRequest("list_roots not implemented".into()))
+    }
+
+    /// Handle a notification sent from the server
+    ///
+    /// The default implementation ignores the notification. Implementations
+    /// can override this method to react to server-initiated notifications.
+    async fn notification(
+        &self,
+        _context: ClientCtx,
+        _notification: schema::ServerNotification,
+    ) -> Result<()> {
+        Ok(())
+    }
+}
 
 /// Connection trait that server implementers must implement
 /// Each client connection will have its own instance of the implementation
@@ -177,3 +228,4 @@ pub trait ServerConn: Send + Sync {
         Ok(())
     }
 }
+

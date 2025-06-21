@@ -7,7 +7,8 @@ use tracing::{debug, error, info, warn};
 
 use crate::api::ServerAPI;
 use crate::{
-    client_connection::{ClientConn, ClientCtx},
+    connection::ClientConn,
+    context::ClientCtx,
     error::{Error, Result},
     jsonrpc::{create_jsonrpc_notification, result_to_jsonrpc_response},
     request_handler::RequestHandler,
@@ -636,10 +637,10 @@ mod tests {
     }
 
     use crate::{
-        client_connection::{ClientConn as ClientConnTrait, ClientCtx as ClientCtxType},
+        connection::{ClientConn as ClientConnTrait, ServerConn as ServerConnTrait},
+        context::{ClientCtx as ClientCtxType, ServerCtx},
         schema::{ClientNotification, ServerNotification},
-        server::{Server, ServerCtx, ServerHandle},
-        server_connection::ServerConn as ServerConnTrait,
+        server::{Server, ServerHandle},
         transport::{GenericDuplex, StreamTransport, TestTransport},
     };
 

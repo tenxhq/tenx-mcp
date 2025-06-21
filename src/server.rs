@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -7,84 +6,14 @@ use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    api::ClientAPI,
+    connection::ServerConn,
+    context::ServerCtx,
     error::{Error, Result},
     jsonrpc::create_jsonrpc_notification,
-    request_handler::{RequestHandler, TransportSink},
     schema::{self, *},
-    server_connection::ServerConn,
     transport::{GenericDuplex, StdioTransport, StreamTransport, Transport},
 };
 
-/// Context provided to ServerConn implementations for interacting with clients
-#[derive(Clone)]
-pub struct ServerCtx {
-    /// Sender for server notifications
-    pub(crate) notification_tx: broadcast::Sender<schema::ServerNotification>,
-    /// Request handler for making requests to clients
-    request_handler: RequestHandler,
-}
-
-impl ServerCtx {
-    /// Create a new ServerCtx with notification channel and transport
-    pub(crate) fn new(
-        notification_tx: broadcast::Sender<schema::ServerNotification>,
-        transport_tx: Option<TransportSink>,
-    ) -> Self {
-        Self {
-            notification_tx,
-            request_handler: RequestHandler::new(transport_tx, "srv-req".to_string()),
-        }
-    }
-
-    /// Send a notification to the client
-    pub fn notify(&self, notification: schema::ServerNotification) -> Result<()> {
-        self.notification_tx
-            .send(notification)
-            .map_err(|_| Error::InternalError("Failed to send notification".into()))?;
-        Ok(())
-    }
-
-    /// Send a request to the client and wait for response
-    async fn request<T>(&mut self, request: ServerRequest) -> Result<T>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        self.request_handler.request(request).await
-    }
-
-    /// Handle a response from the client
-    pub(crate) async fn handle_client_response(&self, response: JSONRPCResponse) {
-        // Clone the handler to avoid holding locks across await points
-        let handler = self.request_handler.clone();
-        handler.handle_response(response).await
-    }
-
-    /// Handle an error response from the client
-    pub(crate) async fn handle_client_error(&self, error: JSONRPCError) {
-        // Clone the handler to avoid holding locks across await points
-        let handler = self.request_handler.clone();
-        handler.handle_error(error).await
-    }
-}
-
-/// Implementation of ClientAPI trait for ServerCtx
-#[async_trait]
-impl ClientAPI for ServerCtx {
-    async fn ping(&mut self) -> Result<()> {
-        let _: EmptyResult = self.request(ServerRequest::Ping).await?;
-        Ok(())
-    }
-
-    async fn create_message(&mut self, params: CreateMessageParams) -> Result<CreateMessageResult> {
-        self.request(ServerRequest::CreateMessage(Box::new(params)))
-            .await
-    }
-
-    async fn list_roots(&mut self) -> Result<ListRootsResult> {
-        self.request(ServerRequest::ListRoots).await
-    }
-}
 
 pub struct ServerHandle {
     pub handle: JoinHandle<()>,

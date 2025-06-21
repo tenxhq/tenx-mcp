@@ -1,12 +1,12 @@
 mod api;
 mod client;
-mod client_connection;
 mod codec;
+mod connection;
+mod context;
 mod error;
 mod jsonrpc;
 mod request_handler;
 mod server;
-mod server_connection;
 mod transport;
 
 pub mod schema;
@@ -14,10 +14,10 @@ pub mod testutils;
 
 pub use api::*;
 pub use client::Client;
-pub use client_connection::{ClientConn, ClientCtx};
+pub use connection::{ClientConn, ServerConn};
+pub use context::{ClientCtx, ServerCtx};
 pub use error::{Error, Result};
-pub use server::{Server, ServerCtx, ServerHandle};
-pub use server_connection::ServerConn;
+pub use server::{Server, ServerHandle};
 
 // Re-export schemars for users
 pub use schemars;

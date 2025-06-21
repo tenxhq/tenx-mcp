@@ -18,8 +18,8 @@ use tokio::io::{self, AsyncRead, AsyncWrite};
 use tokio::sync::broadcast;
 
 use crate::{
-    error::Result, schema::ServerNotification, server::ServerCtx, Client, ClientConn, Server,
-    ServerConn, ServerHandle,
+    error::Result, schema::ServerNotification, Client, ClientConn, Server,
+    ServerConn, ServerCtx, ServerHandle,
 };
 
 /// Conveniently create **two** independent in-memory duplex pipes that together
