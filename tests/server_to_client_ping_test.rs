@@ -2,7 +2,9 @@ use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
 use tenx_mcp::{
     schema::*,
-    testutils::{connected_client_and_server_with_conn, shutdown_client_and_server, test_client_ctx},
+    testutils::{
+        connected_client_and_server_with_conn, shutdown_client_and_server, test_client_ctx,
+    },
     ClientConn, ClientCtx, Result, ServerAPI, ServerConn, ServerCtx,
 };
 

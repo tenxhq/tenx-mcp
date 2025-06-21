@@ -14,7 +14,6 @@ use crate::{
     transport::{GenericDuplex, StdioTransport, StreamTransport, Transport},
 };
 
-
 pub struct ServerHandle {
     pub handle: JoinHandle<()>,
     notification_tx: broadcast::Sender<ServerNotification>,

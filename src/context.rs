@@ -9,7 +9,7 @@ use crate::{
 
 use async_trait::async_trait;
 
-/// Context provided to ClientConnection implementations for interacting with the client
+/// Context provided to ClientConnection implementations for interacting with the server
 #[derive(Clone)]
 pub struct ClientCtx {
     /// Sender for client notifications
