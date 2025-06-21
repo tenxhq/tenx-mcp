@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::request_handler::RequestMethod;
+
 pub const LATEST_PROTOCOL_VERSION: &str = "2025-03-26";
 pub const JSONRPC_VERSION: &str = "2.0";
 
@@ -1689,7 +1691,7 @@ impl ClientRequest {
     }
 }
 
-impl crate::request_handler::RequestMethod for ClientRequest {
+impl RequestMethod for ClientRequest {
     fn method(&self) -> &'static str {
         self.method()
     }
@@ -1759,7 +1761,7 @@ impl ServerRequest {
     }
 }
 
-impl crate::request_handler::RequestMethod for ServerRequest {
+impl RequestMethod for ServerRequest {
     fn method(&self) -> &'static str {
         self.method()
     }

@@ -10,10 +10,10 @@ use crate::{
     api::ClientAPI,
     connection::create_jsonrpc_notification,
     error::{Error, Result},
-    request_handler::TransportSink,
+    request_handler::{RequestHandler, TransportSink},
     schema::{self, *},
     server_connection::ServerConn,
-    transport::Transport,
+    transport::{Transport, GenericDuplex, StdioTransport, StreamTransport},
 };
 
 /// Context provided to ServerConn implementations for interacting with clients
@@ -22,7 +22,7 @@ pub struct ServerCtx {
     /// Sender for server notifications
     pub(crate) notification_tx: broadcast::Sender<schema::ServerNotification>,
     /// Request handler for making requests to clients
-    request_handler: crate::request_handler::RequestHandler,
+    request_handler: RequestHandler,
 }
 
 impl ServerCtx {
@@ -33,7 +33,7 @@ impl ServerCtx {
     ) -> Self {
         Self {
             notification_tx,
-            request_handler: crate::request_handler::RequestHandler::new(
+            request_handler: RequestHandler::new(
                 transport_tx,
                 "srv-req".to_string(),
             ),
@@ -161,7 +161,7 @@ where
     /// Serve connections from stdin/stdout
     /// This is a convenience method for the common stdio use case
     pub async fn serve_stdio(self) -> Result<()> {
-        let transport = Box::new(crate::transport::StdioTransport::new());
+        let transport = Box::new(StdioTransport::new());
         self.serve(transport).await
     }
 
@@ -172,8 +172,8 @@ where
         R: tokio::io::AsyncRead + Send + Sync + Unpin + 'static,
         W: tokio::io::AsyncWrite + Send + Sync + Unpin + 'static,
     {
-        let duplex = crate::transport::GenericDuplex::new(reader, writer);
-        let transport = Box::new(crate::transport::StreamTransport::new(duplex));
+        let duplex = GenericDuplex::new(reader, writer);
+        let transport = Box::new(StreamTransport::new(duplex));
         self.serve(transport).await
     }
 
@@ -211,7 +211,7 @@ where
                             connection_factory: factory.as_ref().clone(),
                         };
 
-                        let transport = Box::new(crate::transport::StreamTransport::new(stream));
+                        let transport = Box::new(StreamTransport::new(stream));
 
                         match server.serve(transport).await {
                             Ok(()) => info!("Connection from {} closed", peer_addr),
@@ -362,8 +362,8 @@ impl ServerHandle {
         R: tokio::io::AsyncRead + Send + Sync + Unpin + 'static,
         W: tokio::io::AsyncWrite + Send + Sync + Unpin + 'static,
     {
-        let duplex = crate::transport::GenericDuplex::new(reader, writer);
-        let transport = Box::new(crate::transport::StreamTransport::new(duplex));
+        let duplex = GenericDuplex::new(reader, writer);
+        let transport = Box::new(StreamTransport::new(duplex));
         Self::new(server, transport).await
     }
 

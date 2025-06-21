@@ -7,7 +7,8 @@ use tokio::sync::{oneshot, Mutex};
 use crate::{
     error::{Error, Result},
     schema::{
-        JSONRPCError, JSONRPCMessage, JSONRPCRequest, JSONRPCResponse, RequestId, RequestParams,
+        JSONRPCError, JSONRPCMessage, JSONRPCNotification, JSONRPCRequest, JSONRPCResponse,
+        Notification, NotificationParams, Request, RequestId, RequestParams,
         INVALID_PARAMS, JSONRPC_VERSION, METHOD_NOT_FOUND,
     },
     transport::TransportStream,
@@ -75,7 +76,7 @@ impl RequestHandler {
         let jsonrpc_request = JSONRPCRequest {
             jsonrpc: JSONRPC_VERSION.to_string(),
             id: RequestId::String(id.clone()),
-            request: crate::schema::Request {
+            request: Request {
                 method: request.method().to_string(),
                 params: Some(RequestParams {
                     meta: None,
@@ -163,7 +164,7 @@ impl RequestHandler {
         method: &str,
         params: Option<serde_json::Value>,
     ) -> Result<()> {
-        let notification_params = params.map(|v| crate::schema::NotificationParams {
+        let notification_params = params.map(|v| NotificationParams {
             meta: None,
             other: if let Some(obj) = v.as_object() {
                 obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
@@ -172,9 +173,9 @@ impl RequestHandler {
             },
         });
 
-        let notification = crate::schema::JSONRPCNotification {
+        let notification = JSONRPCNotification {
             jsonrpc: JSONRPC_VERSION.to_string(),
-            notification: crate::schema::Notification {
+            notification: Notification {
                 method: method.to_string(),
                 params: notification_params,
             },

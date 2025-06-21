@@ -22,7 +22,7 @@ impl ClientCtx {
     /// Send a notification to the client
     pub fn send_notification(&self, notification: schema::ClientNotification) -> Result<()> {
         self.notification_tx.send(notification).map_err(|_| {
-            crate::error::Error::InternalError("Failed to send notification".into())
+            Error::InternalError("Failed to send notification".into())
         })?;
         Ok(())
     }

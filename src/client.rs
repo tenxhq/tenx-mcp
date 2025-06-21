@@ -8,10 +8,11 @@ use tracing::{debug, error, info, warn};
 use crate::api::ServerAPI;
 use crate::{
     client_connection::{ClientConn, ClientCtx},
-    connection::result_to_jsonrpc_response,
+    connection::{create_jsonrpc_notification, result_to_jsonrpc_response},
     error::{Error, Result},
+    request_handler::RequestHandler,
     schema::*,
-    transport::{GenericDuplex, StdioTransport, StreamTransport, TcpClientTransport, Transport},
+    transport::{GenericDuplex, StdioTransport, StreamTransport, TcpClientTransport, Transport, TransportStream},
 };
 use async_trait::async_trait;
 
@@ -26,7 +27,7 @@ pub struct Client<C = ()>
 where
     C: ClientConn + Send,
 {
-    request_handler: crate::request_handler::RequestHandler,
+    request_handler: RequestHandler,
     connection: C,
     name: String,
     version: String,
@@ -37,7 +38,7 @@ impl Client<()> {
     /// Create a new MCP client with default configuration
     pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
         Self {
-            request_handler: crate::request_handler::RequestHandler::new(None, "req".to_string()),
+            request_handler: RequestHandler::new(None, "req".to_string()),
             connection: (),
             name: name.into(),
             version: version.into(),
@@ -52,7 +53,7 @@ impl Client<()> {
         connection: C,
     ) -> Client<C> {
         Client {
-            request_handler: crate::request_handler::RequestHandler::new(None, "req".to_string()),
+            request_handler: RequestHandler::new(None, "req".to_string()),
             connection,
             name: name.into(),
             version: version.into(),
@@ -198,7 +199,7 @@ where
     /// Start the background task that handles incoming messages
     async fn start_message_handler(
         &mut self,
-        stream: Box<dyn crate::transport::TransportStream>,
+        stream: Box<dyn TransportStream>,
     ) -> Result<()> {
         let request_handler = self.request_handler.clone();
 
@@ -294,7 +295,7 @@ where
                     result = client_notification_rx.recv() => {
                         match result {
                             Ok(notification) => {
-                                let jsonrpc_notification = crate::connection::create_jsonrpc_notification(notification);
+                                let jsonrpc_notification = create_jsonrpc_notification(notification);
                                 let mut sink = notification_sink.lock().await;
                                 if let Err(e) = sink.send(JSONRPCMessage::Notification(jsonrpc_notification)).await {
                                     error!("Error sending notification to server: {}", e);
@@ -634,8 +635,13 @@ mod tests {
         });
     }
 
-    use crate::server::{Server, ServerHandle};
-    use crate::transport::TestTransport;
+    use crate::{
+        client_connection::{ClientConn as ClientConnTrait, ClientCtx as ClientCtxType},
+        server::{Server, ServerCtx, ServerHandle},
+        server_connection::ServerConn as ServerConnTrait,
+        schema::{ClientNotification, ServerNotification},
+        transport::{TestTransport, GenericDuplex, StreamTransport},
+    };
 
     async fn setup_client_server() -> (Client, ServerHandle) {
         let (client_transport, server_transport) = TestTransport::create_pair();
@@ -645,10 +651,10 @@ mod tests {
         struct TestConnection;
 
         #[async_trait::async_trait]
-        impl crate::server_connection::ServerConn for TestConnection {
+        impl ServerConnTrait for TestConnection {
             async fn initialize(
                 &self,
-                _context: crate::server::ServerCtx,
+                _context: ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -696,15 +702,15 @@ mod tests {
         }
 
         #[async_trait::async_trait]
-        impl crate::client_connection::ClientConn for NotifClientConnection {
+        impl ClientConnTrait for NotifClientConnection {
             async fn notification(
                 &self,
-                _context: crate::client_connection::ClientCtx,
-                notification: crate::schema::ServerNotification,
+                _context: ClientCtxType,
+                notification: ServerNotification,
             ) -> Result<()> {
                 if matches!(
                     notification,
-                    crate::schema::ServerNotification::ToolListChanged
+                    ServerNotification::ToolListChanged
                 ) {
                     let mut tx_guard = self.tx.lock().await;
                     if let Some(tx) = tx_guard.take() {
@@ -720,10 +726,10 @@ mod tests {
         struct DummyServerConnection;
 
         #[async_trait::async_trait]
-        impl crate::server_connection::ServerConn for DummyServerConnection {
+        impl ServerConnTrait for DummyServerConnection {
             async fn initialize(
                 &self,
-                _context: crate::server::ServerCtx,
+                _context: ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -759,7 +765,7 @@ mod tests {
         client.init().await.expect("Failed to initialize");
 
         // Send server notification
-        server_handle.send_server_notification(crate::schema::ServerNotification::ToolListChanged);
+        server_handle.send_server_notification(ServerNotification::ToolListChanged);
 
         // Wait for notification to be received
         tokio::time::timeout(std::time::Duration::from_secs(1), rx_notif)
@@ -786,10 +792,10 @@ mod tests {
         }
 
         #[async_trait::async_trait]
-        impl crate::server_connection::ServerConn for NotifServerConnection {
+        impl ServerConnTrait for NotifServerConnection {
             async fn initialize(
                 &self,
-                _context: crate::server::ServerCtx,
+                _context: ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -799,10 +805,10 @@ mod tests {
 
             async fn notification(
                 &self,
-                _context: crate::server::ServerCtx,
-                notification: crate::schema::ClientNotification,
+                _context: ServerCtx,
+                notification: ClientNotification,
             ) -> Result<()> {
-                if matches!(notification, crate::schema::ClientNotification::Initialized) {
+                if matches!(notification, ClientNotification::Initialized) {
                     let maybe_tx = self.tx.lock().unwrap().take();
                     if let Some(tx) = maybe_tx {
                         let _ = tx.send(());
@@ -817,9 +823,9 @@ mod tests {
         struct NotifierClientConnection;
 
         #[async_trait::async_trait]
-        impl crate::client_connection::ClientConn for NotifierClientConnection {
-            async fn on_connect(&self, context: crate::client_connection::ClientCtx) -> Result<()> {
-                context.send_notification(crate::schema::ClientNotification::Initialized)?;
+        impl ClientConnTrait for NotifierClientConnection {
+            async fn on_connect(&self, context: ClientCtxType) -> Result<()> {
+                context.send_notification(ClientNotification::Initialized)?;
                 Ok(())
             }
         }
@@ -917,10 +923,10 @@ mod tests {
         struct TestStreamConnection;
 
         #[async_trait::async_trait]
-        impl crate::server_connection::ServerConn for TestStreamConnection {
+        impl ServerConnTrait for TestStreamConnection {
             async fn initialize(
                 &self,
-                _context: crate::server::ServerCtx,
+                _context: ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -940,8 +946,8 @@ mod tests {
             });
 
         // Create server transport from the streams
-        let server_duplex = crate::transport::GenericDuplex::new(server_reader, server_writer);
-        let server_transport = Box::new(crate::transport::StreamTransport::new(server_duplex));
+        let server_duplex = GenericDuplex::new(server_reader, server_writer);
+        let server_transport = Box::new(StreamTransport::new(server_duplex));
 
         let _server_handle = ServerHandle::new(server, server_transport)
             .await
@@ -990,10 +996,10 @@ mod tests {
         struct TestConnection;
 
         #[async_trait::async_trait]
-        impl crate::server_connection::ServerConn for TestConnection {
+        impl ServerConnTrait for TestConnection {
             async fn initialize(
                 &self,
-                _context: crate::server::ServerCtx,
+                _context: ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
