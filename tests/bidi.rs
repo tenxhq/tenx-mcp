@@ -22,8 +22,12 @@ impl ClientConn for SimpleClient {
         Ok(())
     }
 
-    async fn list_roots(&self, _context: ClientCtx) -> Result<ListRootsResult> {
+    async fn list_roots(&self, context: ClientCtx) -> Result<ListRootsResult> {
         self.calls.lock().unwrap().push("list_roots".to_string());
+
+        // Client sends notification to server during request handling
+        context.send_notification(ClientNotification::RootsListChanged)?;
+
         Ok(ListRootsResult {
             roots: vec![Root {
                 uri: "file:///test".to_string(),
@@ -39,12 +43,32 @@ type StoredContext = Arc<Mutex<Option<ServerCtx>>>;
 /// Simple test server that makes requests to the client
 struct SimpleServer {
     stored_context: StoredContext,
+    calls: CallLog,
 }
 
 #[async_trait]
 impl ServerConn for SimpleServer {
     async fn on_connect(&self, context: ServerCtx) -> Result<()> {
         *self.stored_context.lock().unwrap() = Some(context);
+        Ok(())
+    }
+
+    async fn pong(&self, _context: ServerCtx) -> Result<()> {
+        self.calls.lock().unwrap().push("server_pong".to_string());
+        Ok(())
+    }
+
+    async fn notification(
+        &self,
+        _context: ServerCtx,
+        notification: ClientNotification,
+    ) -> Result<()> {
+        match notification {
+            ClientNotification::RootsListChanged => {
+                self.calls.lock().unwrap().push("roots_changed".to_string());
+            }
+            _ => {}
+        }
         Ok(())
     }
 
@@ -99,18 +123,21 @@ impl ServerConn for SimpleServer {
 }
 
 #[tokio::test]
-async fn test_server_to_client_requests() {
+async fn test_bidirectional_communication() {
     let _ = tracing_subscriber::fmt::try_init();
 
     let client_calls = CallLog::default();
+    let server_calls = CallLog::default();
     let server_context = StoredContext::default();
 
     let (mut client, server_handle) = connected_client_and_server_with_conn(
         {
             let ctx = server_context.clone();
+            let calls = server_calls.clone();
             move || {
                 Box::new(SimpleServer {
                     stored_context: ctx.clone(),
+                    calls: calls.clone(),
                 })
             }
         },
@@ -146,16 +173,25 @@ async fn test_server_to_client_requests() {
         .unwrap()
         .contains(&"client_pong".to_string()));
 
-    // Test server getting roots from client
+    // Test server getting roots from client (and client notifying server)
     client_calls.lock().unwrap().clear();
+    server_calls.lock().unwrap().clear();
     client
         .call_tool("test_roots", None)
         .await
         .expect("Tool call failed");
+
+    // Small delay to ensure notification is processed
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
     assert!(client_calls
         .lock()
         .unwrap()
         .contains(&"list_roots".to_string()));
+    assert!(server_calls
+        .lock()
+        .unwrap()
+        .contains(&"roots_changed".to_string()));
 
     shutdown_client_and_server(client, server_handle).await;
 }
