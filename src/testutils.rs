@@ -8,7 +8,7 @@
 //!
 //! The intent is **not** to provide a full-blown test framework but rather to
 //! centralise the small bits of boiler-plate that were previously copied into
-//! each individual test file (creation of in-memory duplex streams, sending
+//! each individual test file (creation of in-emory duplex streams, sending
 //! and receiving newline-delimited JSON-RPC messages, spinning up an in-process
 //! server, …). Centralising this logic makes the tests shorter, avoids subtle
 //! divergences, and gives downstream users example code they can re-use in

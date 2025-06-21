@@ -8,12 +8,12 @@ use tracing::{debug, error, info, warn};
 
 use crate::{
     api::ClientAPI,
-    connection::create_jsonrpc_notification,
     error::{Error, Result},
+    jsonrpc::create_jsonrpc_notification,
     request_handler::{RequestHandler, TransportSink},
     schema::{self, *},
     server_connection::ServerConn,
-    transport::{Transport, GenericDuplex, StdioTransport, StreamTransport},
+    transport::{GenericDuplex, StdioTransport, StreamTransport, Transport},
 };
 
 /// Context provided to ServerConn implementations for interacting with clients
@@ -33,10 +33,7 @@ impl ServerCtx {
     ) -> Self {
         Self {
             notification_tx,
-            request_handler: RequestHandler::new(
-                transport_tx,
-                "srv-req".to_string(),
-            ),
+            request_handler: RequestHandler::new(transport_tx, "srv-req".to_string()),
         }
     }
 

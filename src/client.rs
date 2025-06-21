@@ -8,8 +8,8 @@ use tracing::{debug, error, info, warn};
 use crate::api::ServerAPI;
 use crate::{
     client_connection::{ClientConn, ClientCtx},
-    connection::{create_jsonrpc_notification, result_to_jsonrpc_response},
     error::{Error, Result},
+    jsonrpc::{create_jsonrpc_notification, result_to_jsonrpc_response},
     request_handler::RequestHandler,
     schema::*,
     transport::{
