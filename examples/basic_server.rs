@@ -36,7 +36,7 @@ struct BasicConnection {}
 impl ServerConn for BasicConnection {
     async fn initialize(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -47,7 +47,7 @@ impl ServerConn for BasicConnection {
 
     async fn tools_list(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListToolsResult> {
         Ok(ListToolsResult::default().with_tool(
@@ -58,7 +58,7 @@ impl ServerConn for BasicConnection {
 
     async fn tools_call(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         name: String,
         arguments: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<CallToolResult> {

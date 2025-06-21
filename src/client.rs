@@ -224,7 +224,7 @@ where
         let context = ClientCtx::new(client_notification_tx.clone(), Some(tx.clone()));
 
         // Initialize connection
-        connection.on_connect(context.clone()).await?;
+        connection.on_connect(&context).await?;
 
         // Clone sink for notification handler
         let notification_sink = tx.clone();
@@ -248,7 +248,7 @@ where
                                     JSONRPCMessage::Notification(notification) => {
                                         // Convert the JSON-RPC notification into a typed
                                         // ServerNotification and pass it to the connection handler.
-                                        if let Err(err) = handle_server_notification(&connection, context.clone(), notification).await {
+                                        if let Err(err) = handle_server_notification(&connection, &context, notification).await {
                                             error!("Failed to handle server notification: {}", err);
                                         }
                                     }
@@ -257,7 +257,7 @@ where
                                     }
                                     JSONRPCMessage::Request(request) => {
                                         tracing::info!("Client received request from server: {:?}", request.id);
-                                        let response = handle_server_request(&connection, context.clone(), request).await;
+                                        let response = handle_server_request(&connection, &context, request).await;
                                         tracing::info!("Client sending response to server: {:?}", match &response {
                                             JSONRPCMessage::Response(r) => format!("{:?}", r.id),
                                             JSONRPCMessage::Error(e) => format!("{:?}", e.id),
@@ -313,7 +313,7 @@ where
             }
 
             // Clean up connection
-            if let Err(e) = connection.on_disconnect(context).await {
+            if let Err(e) = connection.on_disconnect(&context).await {
                 error!("Error during connection disconnect: {}", e);
             }
 
@@ -469,7 +469,7 @@ where
 /// Handle a request from the server using the ClientConnection trait
 async fn handle_server_request<C: ClientConn>(
     connection: &C,
-    context: ClientCtx,
+    context: &ClientCtx,
     request: JSONRPCRequest,
 ) -> JSONRPCMessage {
     let result = handle_server_request_inner(connection, context, request.clone()).await;
@@ -479,7 +479,7 @@ async fn handle_server_request<C: ClientConn>(
 /// Inner handler that returns Result<serde_json::Value>
 async fn handle_server_request_inner<C: ClientConn>(
     connection: &C,
-    ctx: ClientCtx,
+    ctx: &ClientCtx,
     request: JSONRPCRequest,
 ) -> Result<serde_json::Value> {
     let mut request_obj = serde_json::Map::new();
@@ -531,7 +531,7 @@ async fn handle_server_request_inner<C: ClientConn>(
 /// to the connection implementation for further handling.
 async fn handle_server_notification<C: ClientConn>(
     connection: &C,
-    context: ClientCtx,
+    context: &ClientCtx,
     notification: JSONRPCNotification,
 ) -> Result<()> {
     // Build a serde_json::Value representing the notification in the shape
@@ -655,7 +655,7 @@ mod tests {
         impl ServerConnTrait for TestConnection {
             async fn initialize(
                 &self,
-                _context: ServerCtx,
+                _context: &ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -706,7 +706,7 @@ mod tests {
         impl ClientConnTrait for NotifClientConnection {
             async fn notification(
                 &self,
-                _context: ClientCtxType,
+                _context: &ClientCtxType,
                 notification: ServerNotification,
             ) -> Result<()> {
                 if matches!(notification, ServerNotification::ToolListChanged) {
@@ -727,7 +727,7 @@ mod tests {
         impl ServerConnTrait for DummyServerConnection {
             async fn initialize(
                 &self,
-                _context: ServerCtx,
+                _context: &ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -793,7 +793,7 @@ mod tests {
         impl ServerConnTrait for NotifServerConnection {
             async fn initialize(
                 &self,
-                _context: ServerCtx,
+                _context: &ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -803,7 +803,7 @@ mod tests {
 
             async fn notification(
                 &self,
-                _context: ServerCtx,
+                _context: &ServerCtx,
                 notification: ClientNotification,
             ) -> Result<()> {
                 if matches!(notification, ClientNotification::Initialized) {
@@ -822,7 +822,7 @@ mod tests {
 
         #[async_trait::async_trait]
         impl ClientConnTrait for NotifierClientConnection {
-            async fn on_connect(&self, context: ClientCtxType) -> Result<()> {
+            async fn on_connect(&self, context: &ClientCtxType) -> Result<()> {
                 context.send_notification(ClientNotification::Initialized)?;
                 Ok(())
             }
@@ -924,7 +924,7 @@ mod tests {
         impl ServerConnTrait for TestStreamConnection {
             async fn initialize(
                 &self,
-                _context: ServerCtx,
+                _context: &ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
@@ -997,7 +997,7 @@ mod tests {
         impl ServerConnTrait for TestConnection {
             async fn initialize(
                 &self,
-                _context: ServerCtx,
+                _context: &ServerCtx,
                 _protocol_version: String,
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,

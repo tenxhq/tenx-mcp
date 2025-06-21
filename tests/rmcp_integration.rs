@@ -20,7 +20,7 @@ struct EchoConnection;
 impl ServerConn for EchoConnection {
     async fn initialize(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -30,7 +30,7 @@ impl ServerConn for EchoConnection {
 
     async fn tools_list(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListToolsResult> {
         tracing::info!("EchoConnection.tools_list called");
@@ -56,7 +56,7 @@ impl ServerConn for EchoConnection {
 
     async fn tools_call(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         name: String,
         arguments: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<CallToolResult> {

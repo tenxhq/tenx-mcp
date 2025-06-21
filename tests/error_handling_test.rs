@@ -21,7 +21,7 @@ async fn test_method_not_found() {
     impl ServerConn for MinimalConnection {
         async fn initialize(
             &self,
-            _context: ServerCtx,
+            _context: &ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
@@ -45,7 +45,7 @@ async fn test_method_not_found() {
     // This should use the default implementation which returns ToolNotFound
     let context = create_test_context();
     let result = conn
-        .tools_call(context, "non_existent".to_string(), None)
+        .tools_call(&context, "non_existent".to_string(), None)
         .await;
 
     assert!(result.is_err());
@@ -68,7 +68,7 @@ async fn test_invalid_params() {
     impl ServerConn for ConnectionWithValidation {
         async fn initialize(
             &self,
-            _context: ServerCtx,
+            _context: &ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
@@ -90,7 +90,7 @@ async fn test_invalid_params() {
 
         async fn tools_list(
             &self,
-            _context: ServerCtx,
+            _context: &ServerCtx,
             _cursor: Option<schema::Cursor>,
         ) -> Result<schema::ListToolsResult> {
             let schema = schema::ToolInputSchema {
@@ -117,7 +117,7 @@ async fn test_invalid_params() {
 
         async fn tools_call(
             &self,
-            _context: ServerCtx,
+            _context: &ServerCtx,
             name: String,
             arguments: Option<HashMap<String, serde_json::Value>>,
         ) -> Result<schema::CallToolResult> {
@@ -144,14 +144,14 @@ async fn test_invalid_params() {
     // Test 1: Call with missing arguments
     let context = create_test_context();
     let result = conn
-        .tools_call(context, "test_tool".to_string(), None)
+        .tools_call(&context, "test_tool".to_string(), None)
         .await;
     assert!(matches!(result, Err(Error::InvalidParams(_))));
 
     // Test 2: Call with empty object (missing required param)
     let context = create_test_context();
     let result = conn
-        .tools_call(context, "test_tool".to_string(), Some(HashMap::new()))
+        .tools_call(&context, "test_tool".to_string(), Some(HashMap::new()))
         .await;
     match result {
         Err(Error::InvalidParams(msg)) => {
@@ -165,7 +165,7 @@ async fn test_invalid_params() {
     let mut args = HashMap::new();
     args.insert("required_param".to_string(), serde_json::json!("test"));
     let result = conn
-        .tools_call(context, "test_tool".to_string(), Some(args))
+        .tools_call(&context, "test_tool".to_string(), Some(args))
         .await;
     assert!(result.is_ok());
 }
@@ -180,7 +180,7 @@ async fn test_successful_response() {
     impl ServerConn for ConnectionWithTools {
         async fn initialize(
             &self,
-            _context: ServerCtx,
+            _context: &ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
@@ -206,7 +206,7 @@ async fn test_successful_response() {
 
         async fn tools_list(
             &self,
-            _context: ServerCtx,
+            _context: &ServerCtx,
             _cursor: Option<schema::Cursor>,
         ) -> Result<schema::ListToolsResult> {
             Ok(schema::ListToolsResult::new()
@@ -222,7 +222,7 @@ async fn test_successful_response() {
 
         async fn list_resources(
             &self,
-            _context: ServerCtx,
+            _context: &ServerCtx,
             _cursor: Option<schema::Cursor>,
         ) -> Result<schema::ListResourcesResult> {
             Ok(
@@ -244,7 +244,7 @@ async fn test_successful_response() {
     let context = create_test_context();
     let init_result = conn
         .initialize(
-            context,
+            &context,
             schema::LATEST_PROTOCOL_VERSION.to_string(),
             schema::ClientCapabilities::default(),
             schema::Implementation {
@@ -261,14 +261,14 @@ async fn test_successful_response() {
 
     // Test successful tools listing
     let context = create_test_context();
-    let tools = conn.tools_list(context, None).await.unwrap();
+    let tools = conn.tools_list(&context, None).await.unwrap();
     assert_eq!(tools.tools.len(), 2);
     assert_eq!(tools.tools[0].name, "echo");
     assert_eq!(tools.tools[1].name, "add");
 
     // Test successful resources listing
     let context = create_test_context();
-    let resources = conn.list_resources(context, None).await.unwrap();
+    let resources = conn.list_resources(&context, None).await.unwrap();
     assert_eq!(resources.resources.len(), 1);
     assert_eq!(resources.resources[0].uri, "file:///test.txt");
 }
@@ -283,7 +283,7 @@ async fn test_error_propagation() {
     impl ServerConn for FaultyConnection {
         async fn initialize(
             &self,
-            _context: ServerCtx,
+            _context: &ServerCtx,
             _protocol_version: String,
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
@@ -294,7 +294,7 @@ async fn test_error_propagation() {
 
         async fn resources_read(
             &self,
-            _context: ServerCtx,
+            _context: &ServerCtx,
             uri: String,
         ) -> Result<schema::ReadResourceResult> {
             // Simulate resource not found
@@ -303,7 +303,7 @@ async fn test_error_propagation() {
 
         async fn prompts_get(
             &self,
-            _context: ServerCtx,
+            _context: &ServerCtx,
             name: String,
             _arguments: Option<HashMap<String, String>>,
         ) -> Result<schema::GetPromptResult> {
@@ -318,7 +318,7 @@ async fn test_error_propagation() {
     let context = create_test_context();
     let init_result = conn
         .initialize(
-            context,
+            &context,
             schema::LATEST_PROTOCOL_VERSION.to_string(),
             schema::ClientCapabilities::default(),
             schema::Implementation {
@@ -338,7 +338,7 @@ async fn test_error_propagation() {
     // Test resource not found
     let context = create_test_context();
     let read_result = conn
-        .resources_read(context, "file:///missing.txt".to_string())
+        .resources_read(&context, "file:///missing.txt".to_string())
         .await;
     match read_result {
         Err(Error::ResourceNotFound { uri }) => {
@@ -350,7 +350,7 @@ async fn test_error_propagation() {
     // Test prompt not found (using MethodNotFound)
     let context = create_test_context();
     let prompt_result = conn
-        .prompts_get(context, "missing_prompt".to_string(), None)
+        .prompts_get(&context, "missing_prompt".to_string(), None)
         .await;
     match prompt_result {
         Err(Error::MethodNotFound(method)) => {

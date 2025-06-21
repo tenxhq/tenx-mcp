@@ -10,24 +10,24 @@ struct TestClientConnection {
 
 #[async_trait]
 impl ClientConn for TestClientConnection {
-    async fn on_connect(&self, _context: ClientCtx) -> Result<()> {
+    async fn on_connect(&self, _context: &ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_connect".to_string());
         Ok(())
     }
 
-    async fn on_disconnect(&self, _context: ClientCtx) -> Result<()> {
+    async fn on_disconnect(&self, _context: &ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_disconnect".to_string());
         Ok(())
     }
 
-    async fn pong(&self, _context: ClientCtx) -> Result<()> {
+    async fn pong(&self, _context: &ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("ping".to_string());
         Ok(())
     }
 
     async fn create_message(
         &self,
-        _context: ClientCtx,
+        _context: &ClientCtx,
         _method: &str,
         _params: CreateMessageParams,
     ) -> Result<CreateMessageResult> {
@@ -47,7 +47,7 @@ impl ClientConn for TestClientConnection {
         })
     }
 
-    async fn list_roots(&self, _context: ClientCtx) -> Result<ListRootsResult> {
+    async fn list_roots(&self, _context: &ClientCtx) -> Result<ListRootsResult> {
         self.calls.lock().unwrap().push("list_roots".to_string());
         Ok(ListRootsResult {
             roots: vec![Root {
@@ -69,7 +69,7 @@ async fn test_client_connection_trait_methods() {
     let context = test_client_ctx(notification_tx);
 
     // Test ping
-    connection.pong(context.clone()).await.expect("Ping failed");
+    connection.pong(&context).await.expect("Ping failed");
 
     // Test create_message
     let params = CreateMessageParams {
@@ -90,14 +90,14 @@ async fn test_client_connection_trait_methods() {
     };
 
     let result = connection
-        .create_message(context.clone(), "test", params)
+        .create_message(&context, "test", params)
         .await
         .expect("Create message failed");
     assert_eq!(result.model, "test-model");
 
     // Test list_roots
     let roots = connection
-        .list_roots(context.clone())
+        .list_roots(&context)
         .await
         .expect("List roots failed");
     assert_eq!(roots.roots.len(), 1);

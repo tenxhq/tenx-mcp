@@ -188,7 +188,7 @@ impl ServerHandle {
 
         // Initialize connection if present
         if let Some(conn) = &connection {
-            conn.on_connect(server_ctx.clone()).await?;
+            conn.on_connect(&server_ctx).await?;
         }
 
         // Start the main server loop in a background task
@@ -211,7 +211,7 @@ impl ServerHandle {
                                             server_ctx.handle_client_error(error.clone()).await;
                                         }
                                         _ => {
-                                            if let Err(e) = handle_message_with_connection(conn.clone(), message, response_tx.clone(), server_ctx.clone()).await {
+                                            if let Err(e) = handle_message_with_connection(conn.clone(), message, response_tx.clone(), &server_ctx).await {
                                                 error!("Error handling message: {}", e);
                                             }
                                         }
@@ -317,7 +317,7 @@ async fn handle_message_with_connection(
     connection: Arc<Box<dyn ServerConn>>,
     message: JSONRPCMessage,
     response_tx: tokio::sync::mpsc::UnboundedSender<JSONRPCMessage>,
-    context: ServerCtx,
+    context: &ServerCtx,
 ) -> Result<()> {
     match message {
         JSONRPCMessage::Request(request) => {
@@ -327,7 +327,7 @@ async fn handle_message_with_connection(
             let tx = response_tx.clone();
 
             tokio::spawn(async move {
-                let response_message = handle_request(&**conn, request.clone(), ctx).await;
+                let response_message = handle_request(&**conn, request.clone(), &ctx).await;
                 tracing::info!("Server sending response: {:?}", response_message);
 
                 // Queue the response to be sent
@@ -362,7 +362,7 @@ async fn handle_message_with_connection(
 async fn handle_request(
     connection: &dyn ServerConn,
     request: JSONRPCRequest,
-    context: ServerCtx,
+    context: &ServerCtx,
 ) -> JSONRPCMessage {
     tracing::info!(
         "Server handling request: {:?} method: {}",
@@ -413,7 +413,7 @@ async fn handle_request(
 async fn handle_request_inner(
     conn: &dyn ServerConn,
     request: JSONRPCRequest,
-    ctx: ServerCtx,
+    ctx: &ServerCtx,
 ) -> Result<serde_json::Value> {
     let mut request_obj = serde_json::Map::new();
     request_obj.insert(
@@ -450,58 +450,58 @@ async fn handle_request_inner(
             capabilities,
             client_info,
         } => conn
-            .initialize(ctx, protocol_version, capabilities, client_info)
+            .initialize(&ctx, protocol_version, capabilities, client_info)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::Ping => {
             info!("Server received ping request, sending automatic response");
-            conn.pong(ctx).await.map(|_| serde_json::json!({}))
+            conn.pong(&ctx).await.map(|_| serde_json::json!({}))
         }
         ClientRequest::ListTools { cursor } => conn
-            .tools_list(ctx, cursor)
+            .tools_list(&ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::CallTool { name, arguments } => conn
-            .tools_call(ctx, name, arguments)
+            .tools_call(&ctx, name, arguments)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::ListResources { cursor } => conn
-            .list_resources(ctx, cursor)
+            .list_resources(&ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::ListResourceTemplates { cursor } => conn
-            .list_resource_templates(ctx, cursor)
+            .list_resource_templates(&ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::ReadResource { uri } => conn
-            .resources_read(ctx, uri)
+            .resources_read(&ctx, uri)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::Subscribe { uri } => conn
-            .resources_subscribe(ctx, uri)
+            .resources_subscribe(&ctx, uri)
             .await
             .map(|_| serde_json::json!({})),
         ClientRequest::Unsubscribe { uri } => conn
-            .resources_unsubscribe(ctx, uri)
+            .resources_unsubscribe(&ctx, uri)
             .await
             .map(|_| serde_json::json!({})),
         ClientRequest::ListPrompts { cursor } => conn
-            .list_prompts(ctx, cursor)
+            .list_prompts(&ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::GetPrompt { name, arguments } => conn
-            .prompts_get(ctx, name, arguments)
+            .prompts_get(&ctx, name, arguments)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::Complete {
             reference,
             argument,
         } => conn
-            .completion_complete(ctx, reference, argument)
+            .completion_complete(&ctx, reference, argument)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::SetLevel { level } => conn
-            .logging_set_level(ctx, level)
+            .logging_set_level(&ctx, level)
             .await
             .map(|_| serde_json::json!({})),
     }
@@ -511,7 +511,7 @@ async fn handle_request_inner(
 async fn handle_notification(
     connection: &dyn ServerConn,
     notification: JSONRPCNotification,
-    context: ServerCtx,
+    context: &ServerCtx,
 ) -> Result<()> {
     debug!(
         "Received notification: {}",
@@ -534,7 +534,7 @@ async fn handle_notification(
     let value = serde_json::Value::Object(object);
 
     match serde_json::from_value::<ClientNotification>(value) {
-        Ok(typed) => connection.notification(context, typed).await,
+        Ok(typed) => connection.notification(&context, typed).await,
         Err(e) => {
             warn!("Failed to deserialize client notification: {}", e);
             Ok(())

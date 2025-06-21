@@ -16,17 +16,17 @@ struct TestClientConnection {
 
 #[async_trait]
 impl ClientConn for TestClientConnection {
-    async fn on_connect(&self, _context: ClientCtx) -> Result<()> {
+    async fn on_connect(&self, _context: &ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_connect".to_string());
         Ok(())
     }
 
-    async fn on_disconnect(&self, _context: ClientCtx) -> Result<()> {
+    async fn on_disconnect(&self, _context: &ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("on_disconnect".to_string());
         Ok(())
     }
 
-    async fn pong(&self, _context: ClientCtx) -> Result<()> {
+    async fn pong(&self, _context: &ClientCtx) -> Result<()> {
         self.calls.lock().unwrap().push("ping".to_string());
         println!("Client received ping from server!");
         Ok(())
@@ -34,7 +34,7 @@ impl ClientConn for TestClientConnection {
 
     async fn create_message(
         &self,
-        _context: ClientCtx,
+        _context: &ClientCtx,
         _method: &str,
         _params: CreateMessageParams,
     ) -> Result<CreateMessageResult> {
@@ -54,7 +54,7 @@ impl ClientConn for TestClientConnection {
         })
     }
 
-    async fn list_roots(&self, _context: ClientCtx) -> Result<ListRootsResult> {
+    async fn list_roots(&self, _context: &ClientCtx) -> Result<ListRootsResult> {
         self.calls.lock().unwrap().push("list_roots".to_string());
         Ok(ListRootsResult {
             roots: vec![Root {
@@ -67,20 +67,18 @@ impl ClientConn for TestClientConnection {
 }
 
 /// Test server connection
-struct TestServerConnection {
-    context: Arc<Mutex<Option<ServerCtx>>>,
-}
+struct TestServerConnection {}
 
 #[async_trait]
 impl ServerConn for TestServerConnection {
-    async fn on_connect(&self, context: ServerCtx) -> Result<()> {
-        *self.context.lock().unwrap() = Some(context);
+    async fn on_connect(&self, _context: &ServerCtx) -> Result<()> {
+        // Context is only valid during this call, not stored
         Ok(())
     }
 
     async fn initialize(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -88,7 +86,7 @@ impl ServerConn for TestServerConnection {
         Ok(InitializeResult::new("test-server", "1.0.0"))
     }
 
-    async fn pong(&self, _context: ServerCtx) -> Result<()> {
+    async fn pong(&self, _context: &ServerCtx) -> Result<()> {
         Ok(())
     }
 }
@@ -105,11 +103,7 @@ async fn test_server_to_client_ping_integration() {
 
     // Create client and server connected via in-memory duplex streams.
     let (mut client, server_handle) = connected_client_and_server_with_conn(
-        || {
-            Box::new(TestServerConnection {
-                context: Arc::new(Mutex::new(None)),
-            })
-        },
+        || Box::new(TestServerConnection {}),
         TestClientConnection {
             calls: calls.clone(),
         },
@@ -154,7 +148,7 @@ async fn test_client_handles_server_requests_unit() {
     let context = test_client_ctx(notification_tx);
 
     // Test ping
-    connection.pong(context.clone()).await.expect("Ping failed");
+    connection.pong(&context).await.expect("Ping failed");
     assert!(calls.lock().unwrap().contains(&"ping".to_string()));
 
     // Test create_message
@@ -176,7 +170,7 @@ async fn test_client_handles_server_requests_unit() {
     };
 
     let result = connection
-        .create_message(context.clone(), "sampling/createMessage", create_params)
+        .create_message(&context, "sampling/createMessage", create_params)
         .await
         .expect("Create message failed");
     assert_eq!(result.model, "test-model");
@@ -187,7 +181,7 @@ async fn test_client_handles_server_requests_unit() {
 
     // Test list_roots
     let roots_result = connection
-        .list_roots(context)
+        .list_roots(&context)
         .await
         .expect("List roots failed");
     assert_eq!(roots_result.roots.len(), 1);

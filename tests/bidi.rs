@@ -39,12 +39,12 @@ impl TestClient {
 
 #[async_trait]
 impl ClientConn for TestClient {
-    async fn pong(&self, _context: ClientCtx) -> Result<()> {
+    async fn pong(&self, _context: &ClientCtx) -> Result<()> {
         self.track_call("client_pong");
         Ok(())
     }
 
-    async fn list_roots(&self, _context: ClientCtx) -> Result<ListRootsResult> {
+    async fn list_roots(&self, _context: &ClientCtx) -> Result<ListRootsResult> {
         self.track_call("list_roots");
         Ok(ListRootsResult {
             roots: vec![Root {
@@ -57,7 +57,7 @@ impl ClientConn for TestClient {
 
     async fn create_message(
         &self,
-        _context: ClientCtx,
+        _context: &ClientCtx,
         _method: &str,
         params: CreateMessageParams,
     ) -> Result<CreateMessageResult> {
@@ -108,14 +108,14 @@ impl TestServer {
 
 #[async_trait]
 impl ServerConn for TestServer {
-    async fn pong(&self, _context: ServerCtx) -> Result<()> {
+    async fn pong(&self, _context: &ServerCtx) -> Result<()> {
         self.track_call("server_pong");
         Ok(())
     }
 
     async fn initialize(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         _protocol_version: String,
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
@@ -125,7 +125,7 @@ impl ServerConn for TestServer {
 
     async fn tools_call(
         &self,
-        mut context: ServerCtx,
+        context: &ServerCtx,
         name: String,
         _arguments: Option<std::collections::HashMap<String, serde_json::Value>>,
     ) -> Result<CallToolResult> {
@@ -133,12 +133,14 @@ impl ServerConn for TestServer {
 
         match name.as_str() {
             "ping_client" => {
-                context.ping().await?;
+                let mut ctx = context.clone();
+                ctx.ping().await?;
                 Ok(CallToolResult::new().with_text_content("Client pinged"))
             }
 
             "query_client_roots" => {
-                let roots = context.list_roots().await?;
+                let mut ctx = context.clone();
+                let roots = ctx.list_roots().await?;
                 Ok(CallToolResult::new()
                     .with_text_content(format!("Found {} client roots", roots.roots.len())))
             }
@@ -161,7 +163,8 @@ impl ServerConn for TestServer {
                     model_preferences: None,
                 };
 
-                let result = context.create_message(params).await?;
+                let mut ctx = context.clone();
+                let result = ctx.create_message(params).await?;
                 match result.content {
                     SamplingContent::Text(text) => {
                         Ok(CallToolResult::new().with_text_content(text.text))
@@ -179,7 +182,7 @@ impl ServerConn for TestServer {
 
     async fn tools_list(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListToolsResult> {
         Ok(ListToolsResult::new()

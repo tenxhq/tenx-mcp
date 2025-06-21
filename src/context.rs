@@ -10,6 +10,10 @@ use crate::{
 use async_trait::async_trait;
 
 /// Context provided to ClientConnection implementations for interacting with the server
+/// 
+/// This context is only valid for the duration of a single method call and should not
+/// be stored or used outside of that scope. The Clone implementation is for internal
+/// framework use only.
 #[derive(Clone)]
 pub struct ClientCtx {
     /// Sender for client notifications
@@ -176,6 +180,10 @@ impl ServerAPI for ClientCtx {
 }
 
 /// Context provided to ServerConn implementations for interacting with clients
+/// 
+/// This context is only valid for the duration of a single method call and should not
+/// be stored or used outside of that scope. The Clone implementation is for internal
+/// framework use only.
 #[derive(Clone)]
 pub struct ServerCtx {
     /// Sender for server notifications

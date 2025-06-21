@@ -44,7 +44,7 @@ impl TimeoutTestConnection {
 impl ServerConn for TimeoutTestConnection {
     async fn initialize(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         _protocol_version: String,
         _capabilities: schema::ClientCapabilities,
         _client_info: schema::Implementation,
@@ -57,7 +57,7 @@ impl ServerConn for TimeoutTestConnection {
 
     async fn tools_list(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         _cursor: Option<schema::Cursor>,
     ) -> Result<schema::ListToolsResult> {
         let object_schema = schema::ToolInputSchema {
@@ -87,7 +87,7 @@ impl ServerConn for TimeoutTestConnection {
 
     async fn tools_call(
         &self,
-        _context: ServerCtx,
+        _context: &ServerCtx,
         name: String,
         _arguments: Option<std::collections::HashMap<String, serde_json::Value>>,
     ) -> Result<schema::CallToolResult> {
