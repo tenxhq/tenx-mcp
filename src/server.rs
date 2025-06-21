@@ -450,58 +450,58 @@ async fn handle_request_inner(
             capabilities,
             client_info,
         } => conn
-            .initialize(&ctx, protocol_version, capabilities, client_info)
+            .initialize(ctx, protocol_version, capabilities, client_info)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::Ping => {
             info!("Server received ping request, sending automatic response");
-            conn.pong(&ctx).await.map(|_| serde_json::json!({}))
+            conn.pong(ctx).await.map(|_| serde_json::json!({}))
         }
         ClientRequest::ListTools { cursor } => conn
-            .tools_list(&ctx, cursor)
+            .tools_list(ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::CallTool { name, arguments } => conn
-            .tools_call(&ctx, name, arguments)
+            .tools_call(ctx, name, arguments)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::ListResources { cursor } => conn
-            .list_resources(&ctx, cursor)
+            .list_resources(ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::ListResourceTemplates { cursor } => conn
-            .list_resource_templates(&ctx, cursor)
+            .list_resource_templates(ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::ReadResource { uri } => conn
-            .resources_read(&ctx, uri)
+            .resources_read(ctx, uri)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::Subscribe { uri } => conn
-            .resources_subscribe(&ctx, uri)
+            .resources_subscribe(ctx, uri)
             .await
             .map(|_| serde_json::json!({})),
         ClientRequest::Unsubscribe { uri } => conn
-            .resources_unsubscribe(&ctx, uri)
+            .resources_unsubscribe(ctx, uri)
             .await
             .map(|_| serde_json::json!({})),
         ClientRequest::ListPrompts { cursor } => conn
-            .list_prompts(&ctx, cursor)
+            .list_prompts(ctx, cursor)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::GetPrompt { name, arguments } => conn
-            .prompts_get(&ctx, name, arguments)
+            .prompts_get(ctx, name, arguments)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::Complete {
             reference,
             argument,
         } => conn
-            .completion_complete(&ctx, reference, argument)
+            .completion_complete(ctx, reference, argument)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
         ClientRequest::SetLevel { level } => conn
-            .logging_set_level(&ctx, level)
+            .logging_set_level(ctx, level)
             .await
             .map(|_| serde_json::json!({})),
     }
@@ -534,7 +534,7 @@ async fn handle_notification(
     let value = serde_json::Value::Object(object);
 
     match serde_json::from_value::<ClientNotification>(value) {
-        Ok(typed) => connection.notification(&context, typed).await,
+        Ok(typed) => connection.notification(context, typed).await,
         Err(e) => {
             warn!("Failed to deserialize client notification: {}", e);
             Ok(())

@@ -140,7 +140,11 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// Read a resource
-    async fn resources_read(&self, _context: &ServerCtx, uri: String) -> Result<ReadResourceResult> {
+    async fn resources_read(
+        &self,
+        _context: &ServerCtx,
+        uri: String,
+    ) -> Result<ReadResourceResult> {
         Err(Error::ResourceNotFound { uri })
     }
 
