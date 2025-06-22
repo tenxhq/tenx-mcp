@@ -1,5 +1,4 @@
 use futures::{SinkExt, StreamExt};
-use serde_json::Value;
 use std::collections::HashMap;
 use std::process::Stdio;
 use tokio::process::{Child, Command};
@@ -379,14 +378,27 @@ where
     }
 
     /// Call a tool with the given name and arguments
-    async fn call_tool(
+    async fn call_tool<T: serde::Serialize + Send>(
         &mut self,
         name: impl Into<String> + Send,
-        arguments: impl Into<Option<HashMap<String, Value>>> + Send,
+        arguments: T,
     ) -> Result<CallToolResult> {
+        let args_value = serde_json::to_value(arguments)
+            .map_err(|e| Error::InvalidParams(format!("Failed to serialize arguments: {}", e)))?;
+
+        let args_map = if let serde_json::Value::Object(map) = args_value {
+            Some(map.into_iter().collect())
+        } else if args_value.is_null() {
+            None // Allow passing () or Option<T> as None
+        } else {
+            return Err(Error::InvalidParams(
+                "Arguments must be a struct or map".to_string(),
+            ));
+        };
+
         let request = ClientRequest::CallTool {
             name: name.into(),
-            arguments: arguments.into(),
+            arguments: args_map,
         };
         self.request(request).await
     }
@@ -626,16 +638,16 @@ mod tests {
 
         // These should all compile cleanly
         std::mem::drop(async {
-            // Call without arguments - passing None
-            client.call_tool("my_tool", None).await.unwrap();
+            // Call without arguments - passing ()
+            client.call_tool("my_tool", ()).await.unwrap();
 
             // Call with String for tool name
             let tool_name = "another_tool".to_string();
-            client.call_tool(tool_name, None).await.unwrap();
+            client.call_tool(tool_name, ()).await.unwrap();
 
             // Call with &String
             let tool_name = "third_tool".to_string();
-            client.call_tool(&tool_name, None).await.unwrap();
+            client.call_tool(&tool_name, ()).await.unwrap();
 
             // Call with HashMap arguments directly
             let mut args = std::collections::HashMap::new();
