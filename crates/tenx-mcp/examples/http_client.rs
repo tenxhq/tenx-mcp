@@ -1,56 +1,68 @@
-use std::collections::HashMap;
-use tenx_mcp::{Client, Result, ServerAPI};
+use serde::{Deserialize, Serialize};
+use std::env;
+use tenx_mcp::{schema, schemars, Client, Result, ServerAPI};
+use tracing::info;
+
+/// Echo tool input parameters - must match the server definition
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
+struct EchoParams {
+    /// The message to echo back
+    message: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
+    // Initialize logging
     tracing_subscriber::fmt::init();
 
-    println!("Connecting to HTTP server at http://127.0.0.1:9999");
+    // Parse command line arguments
+    let args: Vec<String> = env::args().collect();
+    let url = if args.len() == 2 {
+        args[1].clone()
+    } else if args.len() == 3 {
+        format!("http://{}:{}", args[1], args[2])
+    } else {
+        "http://localhost:8080".to_string()
+    };
 
-    // Create client
-    let mut client = Client::new("example-http-client", "1.0.0");
+    info!("Connecting to MCP server at {}", url);
 
-    // Connect via HTTP
-    let init_result = client.connect_http("http://127.0.0.1:9999").await?;
-
-    println!(
-        "Connected to server: {} v{}",
-        init_result.server_info.name, init_result.server_info.version
-    );
-
-    // Test ping
-    println!("\nTesting ping...");
-    client.ping().await?;
-    println!("Ping successful!");
+    // Create client and connect using HTTP
+    let mut client = Client::new("example-http-client", "0.1.0");
+    let server_info = client.connect_http(&url).await?;
+    info!("Connected to server: {}", server_info.server_info.name);
 
     // List available tools
-    println!("\nListing available tools...");
     let tools = client.list_tools(None).await?;
+    info!("\nAvailable tools:");
     for tool in &tools.tools {
-        println!(
-            "- Tool: {} - {}",
+        info!(
+            "  - {}: {}",
             tool.name,
-            tool.description.as_deref().unwrap_or("No description")
+            tool.description.as_deref().unwrap_or("")
         );
     }
 
     // Call the echo tool
-    println!("\nCalling echo tool...");
-    let mut args = HashMap::new();
-    args.insert(
-        "message".to_string(),
-        serde_json::json!("Hello from HTTP client!"),
-    );
+    info!("\nCalling echo tool...");
+    let params = EchoParams {
+        message: "Hello from tenx-mcp HTTP client!".to_string(),
+    };
 
-    let result = client.call_tool("echo", Some(args)).await?;
-    for content in &result.content {
-        if let tenx_mcp::schema::Content::Text(text) = content {
-            println!("Echo response: {}", text.text);
-        }
+    // Convert struct to HashMap<String, Value>
+    let args_value = serde_json::to_value(&params)?;
+    let args = if let serde_json::Value::Object(map) = args_value {
+        Some(map.into_iter().collect())
+    } else {
+        None
+    };
+
+    let result = client.call_tool("echo", args).await?;
+
+    // Assume text response
+    if let Some(schema::Content::Text(text_content)) = result.content.first() {
+        info!("Response: {}", text_content.text);
     }
-
-    println!("\nClient shutting down...");
 
     Ok(())
 }
