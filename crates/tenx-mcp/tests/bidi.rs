@@ -230,7 +230,7 @@ async fn test_server_calls_client_during_request() {
     // Test 1: Server pings client during tool execution
     client_calls.lock().unwrap().clear();
     client
-        .call_tool("ping_client", None)
+        .call_tool("ping_client", Option::<()>::None)
         .await
         .expect("ping_client tool failed");
 
@@ -243,7 +243,7 @@ async fn test_server_calls_client_during_request() {
     // Test 2: Server queries client roots during tool execution
     client_calls.lock().unwrap().clear();
     let result = client
-        .call_tool("query_client_roots", None)
+        .call_tool("query_client_roots", Option::<()>::None)
         .await
         .expect("query_client_roots tool failed");
 
@@ -260,7 +260,7 @@ async fn test_server_calls_client_during_request() {
     // Test 3: Server asks client to generate message during tool execution
     client_calls.lock().unwrap().clear();
     let result = client
-        .call_tool("ask_client_to_generate", None)
+        .call_tool("ask_client_to_generate", Option::<()>::None)
         .await
         .expect("ask_client_to_generate tool failed");
 
@@ -328,7 +328,7 @@ async fn test_client_server_ping_pong() {
     // Server pings client (reverse direction via tool call)
     client_calls.lock().unwrap().clear();
     client
-        .call_tool("ping_client", None)
+        .call_tool("ping_client", Option::<()>::None)
         .await
         .expect("Server->Client ping failed");
     assert!(

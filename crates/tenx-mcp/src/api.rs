@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::error::Result;
@@ -32,10 +31,10 @@ pub trait ServerAPI: Send + Sync {
     ) -> Result<ListToolsResult>;
 
     /// Call a tool with the given name and arguments
-    async fn call_tool(
+    async fn call_tool<T: serde::Serialize + Send>(
         &mut self,
         name: impl Into<String> + Send,
-        arguments: impl Into<Option<HashMap<String, Value>>> + Send,
+        arguments: T,
     ) -> Result<CallToolResult>;
 
     /// List available resources with optional pagination

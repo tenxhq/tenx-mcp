@@ -49,15 +49,7 @@ async fn main() -> Result<()> {
         message: "Hello from tenx-mcp HTTP client!".to_string(),
     };
 
-    // Convert struct to HashMap<String, Value>
-    let args_value = serde_json::to_value(&params)?;
-    let args = if let serde_json::Value::Object(map) = args_value {
-        Some(map.into_iter().collect())
-    } else {
-        None
-    };
-
-    let result = client.call_tool("echo", args).await?;
+    let result = client.call_tool("echo", params).await?;
 
     // Assume text response
     if let Some(schema::Content::Text(text_content)) = result.content.first() {
