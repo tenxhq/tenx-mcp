@@ -638,16 +638,16 @@ mod tests {
 
         // These should all compile cleanly
         std::mem::drop(async {
-            // Call without arguments - passing None
-            client.call_tool("my_tool", Option::<()>::None).await.unwrap();
+            // Call without arguments - passing ()
+            client.call_tool("my_tool", ()).await.unwrap();
 
             // Call with String for tool name
             let tool_name = "another_tool".to_string();
-            client.call_tool(tool_name, Option::<()>::None).await.unwrap();
+            client.call_tool(tool_name, ()).await.unwrap();
 
             // Call with &String
             let tool_name = "third_tool".to_string();
-            client.call_tool(&tool_name, Option::<()>::None).await.unwrap();
+            client.call_tool(&tool_name, ()).await.unwrap();
 
             // Call with HashMap arguments directly
             let mut args = std::collections::HashMap::new();
