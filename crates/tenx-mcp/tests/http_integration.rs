@@ -3,7 +3,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use tenx_mcp::{
     schema::{self, *},
-    Client, Result, Server, ServerConn, ServerCtx, ServerHandle, ServerAPI,
+    Client, Result, Server, ServerConn, ServerCtx, ServerAPI,
 };
 
 #[derive(Default)]
@@ -77,7 +77,7 @@ async fn test_http_echo_tool_integration() {
     // Connect HTTP client
     let mut client = Client::new("http-test-client", "0.1.0");
     let init = client
-        .connect_http(&format!("http://{}", addr_str))
+        .connect_http(&format!("http://{addr_str}"))
         .await
         .unwrap();
     assert_eq!(init.server_info.name, "http-echo-server");

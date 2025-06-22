@@ -399,35 +399,6 @@ impl HttpServerTransport {
 
         Ok(())
     }
-
-    /// Stop the HTTP server
-    pub async fn stop(&mut self) -> Result<()> {
-        if let Some(state) = &self.state {
-            state.shutdown.cancel();
-
-            // Close all active sessions
-            state.sessions.clear();
-        }
-
-        if let Some(handle) = self.server_handle.take() {
-            // Use select to handle both normal completion and cancellation
-            tokio::select! {
-                result = handle => {
-                    match result {
-                        Ok(Ok(())) => Ok(()),
-                        Ok(Err(e)) => Err(e),
-                        Err(_) => Ok(()), // Task was cancelled, which is expected
-                    }
-                }
-                _ = tokio::time::sleep(Duration::from_millis(100)) => {
-                    // Give it a bit more time then consider it stopped
-                    Ok(())
-                }
-            }?;
-        }
-
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -850,19 +821,5 @@ mod tests {
             }
             _ => panic!("Message type mismatch"),
         }
-    }
-
-    #[tokio::test]
-    async fn test_http_server_start_stop() {
-        let mut transport = HttpServerTransport::new("127.0.0.1:0"); // Use port 0 for random port
-
-        // Start the server
-        transport.start().await.unwrap();
-        assert!(transport.server_handle.is_some());
-        assert!(transport.state.is_some());
-
-        // Stop the server
-        transport.stop().await.unwrap();
-        assert!(transport.server_handle.is_none());
     }
 }
