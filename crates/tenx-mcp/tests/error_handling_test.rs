@@ -7,12 +7,12 @@ use std::collections::HashMap;
 use tenx_mcp::{schema, testutils, Error, Result, ServerConn, ServerCtx};
 
 fn create_test_context() -> ServerCtx {
-    let (notification_tx, _) = tokio::sync::broadcast::channel(100);
-    testutils::test_server_ctx(notification_tx)
+    testutils::new_server_ctx()
 }
 
 #[tokio::test]
 async fn test_method_not_found() {
+    testutils::init_tracing();
     // Test that the default tools_call implementation returns ToolNotFound
     #[derive(Default)]
     struct MinimalConnection;
@@ -60,6 +60,7 @@ async fn test_method_not_found() {
 
 #[tokio::test]
 async fn test_invalid_params() {
+    testutils::init_tracing();
     // Test parameter validation in tools_call
     #[derive(Default)]
     struct ConnectionWithValidation;
@@ -172,6 +173,7 @@ async fn test_invalid_params() {
 
 #[tokio::test]
 async fn test_successful_response() {
+    testutils::init_tracing();
     // Test successful tool listing and other operations
     #[derive(Default)]
     struct ConnectionWithTools;
@@ -275,6 +277,7 @@ async fn test_successful_response() {
 
 #[tokio::test]
 async fn test_error_propagation() {
+    testutils::init_tracing();
     // Test that errors are properly propagated through the Connection trait
     #[derive(Default)]
     struct FaultyConnection;

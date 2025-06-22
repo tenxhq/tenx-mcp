@@ -3,6 +3,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use tenx_mcp::{
     schema::{self, *},
+    testutils::{init_tracing, shutdown_client_and_server},
     Client, Result, Server, ServerConn, ServerCtx, ServerHandle, ServerAPI,
 };
 
@@ -63,7 +64,7 @@ impl ServerConn for EchoConnection {
 
 #[tokio::test]
 async fn test_http_echo_tool_integration() {
-    let _ = tracing_subscriber::fmt::try_init();
+    init_tracing();
 
     // Bind to an available port first to avoid conflicts
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -92,7 +93,5 @@ async fn test_http_echo_tool_integration() {
         panic!("expected text response");
     }
 
-    drop(client);
-    // Drop server handle to stop background task
-    drop(server_handle);
+    shutdown_client_and_server(client, server_handle).await;
 }

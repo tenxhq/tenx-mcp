@@ -162,15 +162,13 @@ impl ServerConn for TestConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::sync::broadcast;
-
     fn create_test_context() -> ServerCtx {
-        let (notification_tx, _) = broadcast::channel(100);
-        testutils::test_server_ctx(notification_tx)
+        testutils::new_server_ctx()
     }
 
     #[tokio::test]
     async fn test_echo_tool() {
+        testutils::init_tracing();
         let conn = TestConnection::new();
 
         // Test tools list
@@ -226,6 +224,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_tool() {
+        testutils::init_tracing();
         let conn = TestConnection::new();
 
         // Test tools list contains add tool
@@ -320,6 +319,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_protocol_compliance() {
+        testutils::init_tracing();
         // Test that our tools follow the MCP protocol specification
         let conn = TestConnection::new();
         let context = create_test_context();

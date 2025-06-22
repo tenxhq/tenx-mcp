@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use tenx_mcp::{
     schema::*,
     testutils::{
-        connected_client_and_server_with_conn, shutdown_client_and_server, test_client_ctx,
+        connected_client_and_server_with_conn, shutdown_client_and_server, TestClientContext, init_tracing,
     },
     ClientConn, ClientCtx, Result, ServerAPI, ServerConn, ServerCtx,
 };
@@ -93,9 +93,7 @@ impl ServerConn for TestServerConnection {
 
 #[tokio::test]
 async fn test_server_to_client_ping_integration() {
-    // Install tracing subscriber once so that we have helpful logs if the test
-    // hangs.
-    let _ = tracing_subscriber::fmt::try_init();
+    init_tracing();
 
     // Shared state so that we can assert on what methods the client
     // implementation received.
@@ -136,6 +134,7 @@ async fn test_server_to_client_ping_integration() {
 
 #[tokio::test]
 async fn test_client_handles_server_requests_unit() {
+    init_tracing();
     // Unit test for ClientConnection methods
 
     let calls = Arc::new(Mutex::new(Vec::<String>::new()));
@@ -144,11 +143,10 @@ async fn test_client_handles_server_requests_unit() {
     };
 
     // Create a dummy context for testing
-    let (notification_tx, _) = tokio::sync::broadcast::channel(10);
-    let context = test_client_ctx(notification_tx);
+    let context = TestClientContext::new();
 
     // Test ping
-    connection.pong(&context).await.expect("Ping failed");
+    connection.pong(context.ctx()).await.expect("Ping failed");
     assert!(calls.lock().unwrap().contains(&"ping".to_string()));
 
     // Test create_message
@@ -170,7 +168,7 @@ async fn test_client_handles_server_requests_unit() {
     };
 
     let result = connection
-        .create_message(&context, "sampling/createMessage", create_params)
+        .create_message(context.ctx(), "sampling/createMessage", create_params)
         .await
         .expect("Create message failed");
     assert_eq!(result.model, "test-model");
@@ -181,7 +179,7 @@ async fn test_client_handles_server_requests_unit() {
 
     // Test list_roots
     let roots_result = connection
-        .list_roots(&context)
+        .list_roots(context.ctx())
         .await
         .expect("List roots failed");
     assert_eq!(roots_result.roots.len(), 1);

@@ -1,6 +1,10 @@
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
-use tenx_mcp::{schema::*, testutils::test_client_ctx, ClientConn, ClientCtx, Result};
+use tenx_mcp::{
+    schema::*,
+    testutils::{init_tracing, TestClientContext},
+    ClientConn, ClientCtx, Result,
+};
 
 /// Test client connection that tracks method calls
 #[derive(Default, Clone)]
@@ -61,15 +65,15 @@ impl ClientConn for TestClientConnection {
 
 #[tokio::test]
 async fn test_client_connection_trait_methods() {
+    init_tracing();
     // Test that the trait methods can be called
     let connection = TestClientConnection::default();
 
     // Create a dummy context for testing
-    let (notification_tx, _) = tokio::sync::broadcast::channel(10);
-    let context = test_client_ctx(notification_tx);
+    let context = TestClientContext::new();
 
     // Test ping
-    connection.pong(&context).await.expect("Ping failed");
+    connection.pong(context.ctx()).await.expect("Ping failed");
 
     // Test create_message
     let params = CreateMessageParams {
@@ -90,14 +94,14 @@ async fn test_client_connection_trait_methods() {
     };
 
     let result = connection
-        .create_message(&context, "test", params)
+        .create_message(context.ctx(), "test", params)
         .await
         .expect("Create message failed");
     assert_eq!(result.model, "test-model");
 
     // Test list_roots
     let roots = connection
-        .list_roots(&context)
+        .list_roots(context.ctx())
         .await
         .expect("List roots failed");
     assert_eq!(roots.roots.len(), 1);

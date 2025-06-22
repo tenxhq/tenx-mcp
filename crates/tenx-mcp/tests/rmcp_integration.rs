@@ -90,7 +90,7 @@ async fn test_tenx_server_with_rmcp_client() {
     // Initialize a tracing subscriber so that we get helpful debug output if
     // this test fails or hangs. We deliberately call `try_init` so that it's
     // no-op when a subscriber has already been installed by another test.
-    let _ = tracing_subscriber::fmt::try_init();
+    tenx_mcp::testutils::init_tracing();
     // Create bidirectional streams for communication using the shared test
     // utility.
     let (server_reader, server_writer, client_reader, client_writer) = make_duplex_pair();
@@ -169,6 +169,7 @@ async fn test_tenx_server_with_rmcp_client() {
 
 #[tokio::test]
 async fn test_rmcp_server_with_tenx_client() {
+    tenx_mcp::testutils::init_tracing();
     use rmcp::{
         handler::server::ServerHandler,
         service::{RequestContext, RoleServer},

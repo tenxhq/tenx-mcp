@@ -1,9 +1,11 @@
 use async_trait::async_trait;
-use tenx_mcp::{schema, ClientConn, ClientCtx, Result, ServerConn, ServerCtx};
+use tenx_mcp::{
+    schema, ClientConn, ClientCtx, Result, ServerConn, ServerCtx, testutils::init_tracing,
+};
 
 #[tokio::test]
 async fn test_server_to_client_notifications() {
-    let _ = tracing_subscriber::fmt::try_init();
+    init_tracing();
 
     use tenx_mcp::testutils::connected_client_and_server_with_conn;
     use tokio::sync::oneshot;

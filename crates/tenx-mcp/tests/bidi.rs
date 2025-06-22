@@ -8,7 +8,10 @@ use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
 use tenx_mcp::{
     schema::*,
-    testutils::{connected_client_and_server_with_conn, shutdown_client_and_server},
+    testutils::{
+        connected_client_and_server_with_conn, shutdown_client_and_server,
+        init_tracing,
+    },
     ClientAPI, ClientConn, ClientCtx, Result, ServerAPI, ServerConn, ServerCtx,
 };
 
@@ -203,7 +206,7 @@ impl ServerConn for TestServer {
 
 #[tokio::test]
 async fn test_server_calls_client_during_request() {
-    let _ = tracing_subscriber::fmt::try_init();
+    init_tracing();
 
     // Create test client and server with call tracking
     let (test_client, client_calls) = TestClient::new();
@@ -293,7 +296,7 @@ async fn test_server_calls_client_during_request() {
 
 #[tokio::test]
 async fn test_client_server_ping_pong() {
-    let _ = tracing_subscriber::fmt::try_init();
+    init_tracing();
 
     let (test_client, client_calls) = TestClient::new();
     let (test_server, server_calls) = TestServer::new();

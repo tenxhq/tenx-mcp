@@ -16,6 +16,7 @@
 
 use tokio::io::{self, AsyncRead, AsyncWrite};
 use tokio::sync::broadcast;
+use tracing_subscriber as _; // bring dependency for init_tracing helper
 
 use crate::{
     error::Result,
@@ -211,4 +212,22 @@ impl Default for TestClientContext {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Create a standalone [`ServerCtx`] with its own broadcast channel.
+pub fn new_server_ctx() -> ServerCtx {
+    let (tx, _) = broadcast::channel(100);
+    test_server_ctx(tx)
+}
+
+/// Create a standalone [`ClientCtx`] with its own broadcast channel.
+pub fn new_client_ctx() -> ClientCtx {
+    let (tx, _) = broadcast::channel(100);
+    test_client_ctx(tx)
+}
+
+/// Initialize a tracing subscriber for tests.
+/// It is safe to call this multiple times.
+pub fn init_tracing() {
+    let _ = tracing_subscriber::fmt::try_init();
 }
