@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use tenx_mcp::schema::*;
-use tenx_mcp::{HttpServerTransport, Result, Server, ServerConn, ServerCtx, ServerHandle};
+use tenx_mcp::{Result, Server, ServerConn, ServerCtx};
 
 /// Minimal test server
 struct MinimalServerConn;
@@ -25,19 +25,21 @@ async fn main() -> Result<()> {
         .with_max_level(tracing::Level::DEBUG)
         .init();
 
-    let mut server_transport = HttpServerTransport::new("127.0.0.1:8888");
-    server_transport.start().await?;
-
     println!("Server listening on: http://127.0.0.1:8888");
     println!("\nTest with:");
     println!("curl -X POST http://127.0.0.1:8888 -H 'Content-Type: application/json' -H 'MCP-Protocol-Version: 2025-06-18' -d '{{\"jsonrpc\":\"2.0\",\"id\":\"test-1\",\"method\":\"initialize\",\"params\":{{}}}}'");
 
-    let server = Server::default().with_connection(|| MinimalServerConn);
-    let server_handle = ServerHandle::from_transport(server, Box::new(server_transport)).await?;
+    let handle = Server::default()
+        .with_connection(|| MinimalServerConn)
+        .serve_http("127.0.0.1:8888")
+        .await?;
 
-    // Keep running
+    // Wait for Ctrl+C signal
     tokio::signal::ctrl_c().await?;
-    server_handle.stop().await?;
+    println!("\nShutting down server...");
+
+    // Gracefully stop the server
+    handle.stop().await?;
 
     Ok(())
 }

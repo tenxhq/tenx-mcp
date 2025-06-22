@@ -9,15 +9,11 @@ use crate::{
     connection::ServerConn,
     context::ServerCtx,
     error::{Error, Result},
+    http::HttpServerTransport,
     jsonrpc::create_jsonrpc_notification,
     schema::{self, *},
     transport::{GenericDuplex, StdioTransport, StreamTransport, Transport},
 };
-
-pub struct ServerHandle {
-    pub handle: JoinHandle<()>,
-    notification_tx: broadcast::Sender<ServerNotification>,
-}
 
 /// MCP Server implementation
 pub struct Server<F = fn() -> Box<dyn ServerConn>> {
@@ -150,6 +146,21 @@ where
             }
         }
     }
+
+    /// Serve HTTP connections
+    /// This is a convenience method for the common HTTP server use case
+    /// Returns a ServerHandle that can be used to stop the server
+    pub async fn serve_http(self, addr: impl AsRef<str>) -> Result<ServerHandle> {
+        let mut http_transport = HttpServerTransport::new(addr.as_ref());
+        http_transport.start().await?;
+
+        ServerHandle::from_transport(self, Box::new(http_transport)).await
+    }
+}
+
+pub struct ServerHandle {
+    pub handle: JoinHandle<()>,
+    notification_tx: broadcast::Sender<ServerNotification>,
 }
 
 impl ServerHandle {

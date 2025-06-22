@@ -11,10 +11,7 @@ use std::{collections::HashMap, env};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tenx_mcp::{
-    schema::*, schemars, Error, HttpServerTransport, Result, Server, ServerConn, ServerCtx,
-    ServerHandle,
-};
+use tenx_mcp::{schema::*, schemars, Error, Result, Server, ServerConn, ServerCtx};
 use tracing::info;
 
 const NAME: &str = "http-server";
@@ -102,18 +99,17 @@ async fn main() -> Result<()> {
     // Create and run the server using HTTP
     info!("Starting HTTP MCP server on {}", addr);
 
-    // Start HTTP transport
-    let mut http_transport = HttpServerTransport::new(&addr);
-    http_transport.start().await?;
+    let handle = Server::default()
+        .with_connection(HttpServer::default)
+        .serve_http(addr)
+        .await?;
 
-    // Create MCP server
-    let mcp_server = Server::default().with_connection(HttpServer::default);
-    let _server_handle = ServerHandle::from_transport(mcp_server, Box::new(http_transport)).await?;
-
-    // Keep the server running
+    // Wait for Ctrl+C signal
     tokio::signal::ctrl_c().await?;
     info!("Shutting down HTTP server");
 
+    // Gracefully stop the server
+    handle.stop().await?;
+
     Ok(())
 }
-

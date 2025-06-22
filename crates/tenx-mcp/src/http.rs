@@ -55,6 +55,7 @@ struct HttpServerState {
 }
 
 /// HTTP client transport
+#[doc(hidden)]
 pub struct HttpClientTransport {
     endpoint: String,
     client: HttpClient,
@@ -65,6 +66,7 @@ pub struct HttpClientTransport {
 }
 
 /// HTTP server transport
+#[doc(hidden)]
 pub struct HttpServerTransport {
     pub bind_addr: String,
     router: Option<Router>,
@@ -317,12 +319,6 @@ impl HttpServerTransport {
             server_handle: None,
             incoming_rx: None,
         }
-    }
-
-    /// Get the actual bind address after starting
-    /// This is useful when using port 0 for automatic port assignment
-    pub fn actual_bind_addr(&self) -> &str {
-        &self.bind_addr
     }
 
     /// Start the HTTP server
@@ -748,8 +744,6 @@ async fn handle_get(State(state): State<HttpServerState>, headers: HeaderMap) ->
         .into_response()
 }
 
-// Client stream implementation
-
 impl Stream for HttpTransportStream {
     type Item = Result<JSONRPCMessage>;
 
@@ -785,22 +779,6 @@ impl Sink<JSONRPCMessage> for HttpTransportStream {
 }
 
 impl TransportStream for HttpTransportStream {}
-
-// Convenience functions
-
-/// Start an HTTP server on the specified address
-pub async fn start_http_server(bind_addr: impl Into<String>) -> Result<HttpServerTransport> {
-    let mut transport = HttpServerTransport::new(bind_addr);
-    transport.start().await?;
-    Ok(transport)
-}
-
-/// Connect to an HTTP server at the specified endpoint
-pub async fn connect_http_client(endpoint: impl Into<String>) -> Result<Box<dyn Transport>> {
-    let mut transport = Box::new(HttpClientTransport::new(endpoint));
-    transport.connect().await?;
-    Ok(transport)
-}
 
 #[cfg(test)]
 mod tests {

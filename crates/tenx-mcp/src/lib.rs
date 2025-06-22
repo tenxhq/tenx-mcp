@@ -18,7 +18,6 @@ pub use client::Client;
 pub use connection::{ClientConn, ServerConn};
 pub use context::{ClientCtx, ServerCtx};
 pub use error::{Error, Result};
-pub use http::{connect_http_client, start_http_server, HttpClientTransport, HttpServerTransport};
 pub use server::{Server, ServerHandle};
 
 pub use macros;
