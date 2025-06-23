@@ -6,6 +6,9 @@
 //! converted to snake_case (e.g., MyServer becomes my_server), and the description is derived
 //! from the doc comment on the impl block. The version is set to "0.1.0" by default.
 //!
+//! The macro supports customization through attributes:
+//! - `initialize_fn`: Specify a custom initialize function instead of using the default
+//!
 //! All tool methods have the following exact signature:  
 //!
 //! ```ignore
@@ -44,6 +47,43 @@
 //!     }
 //! }
 //! ```
+//!
+//! Example with custom initialize function:
+//!
+//! ```ignore
+//! #[mcp_server(initialize_fn = my_custom_initialize)]
+//! impl MyServer {
+//!     async fn my_custom_initialize(
+//!         &self,
+//!         context: &ServerCtx,
+//!         protocol_version: String,
+//!         capabilities: schema::ClientCapabilities,
+//!         client_info: schema::Implementation,
+//!     ) -> Result<schema::InitializeResult> {
+//!         // Custom initialization logic
+//!         Ok(schema::InitializeResult {
+//!             protocol_version: schema::LATEST_PROTOCOL_VERSION.to_string(),
+//!             capabilities: schema::ServerCapabilities {
+//!                 tools: Some(schema::ToolsCapability {
+//!                     list_changed: Some(true),
+//!                 }),
+//!                 ..Default::default()
+//!             },
+//!             server_info: schema::Implementation {
+//!                 name: "my_custom_server".to_string(),
+//!                 version: "2.0.0".to_string(),
+//!             },
+//!             instructions: Some("Custom server with advanced features".to_string()),
+//!             meta: None,
+//!         })
+//!     }
+//!
+//!     #[tool]
+//!     async fn my_tool(&self, context: &ServerCtx, params: MyParams) -> Result<schema::CallToolResult> {
+//!         // Tool implementation
+//!     }
+//! }
+//! ```
 
 use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
@@ -64,6 +104,38 @@ struct ServerInfo {
     struct_name: String,
     description: String,
     tools: Vec<ToolMethod>,
+}
+
+#[derive(Debug, Default)]
+struct ServerMacroArgs {
+    initialize_fn: Option<syn::Ident>,
+}
+
+impl syn::parse::Parse for ServerMacroArgs {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut args = ServerMacroArgs::default();
+
+        while !input.is_empty() {
+            let ident: syn::Ident = input.parse()?;
+            input.parse::<syn::Token![=]>()?;
+
+            if ident == "initialize_fn" {
+                let fn_name: syn::Ident = input.parse()?;
+                args.initialize_fn = Some(fn_name);
+            } else {
+                return Err(syn::Error::new(
+                    ident.span(),
+                    format!("Unknown argument: {ident}"),
+                ));
+            }
+
+            if !input.is_empty() {
+                input.parse::<syn::Token![,]>()?;
+            }
+        }
+
+        Ok(args)
+    }
 }
 
 fn extract_doc_comment(attrs: &[syn::Attribute]) -> String {
@@ -262,7 +334,27 @@ fn generate_list_tools(info: &ServerInfo) -> TokenStream {
     }
 }
 
-fn generate_initialize(info: &ServerInfo) -> TokenStream {
+fn generate_initialize(info: &ServerInfo, custom_init_fn: Option<&syn::Ident>) -> TokenStream {
+    if let Some(init_fn) = custom_init_fn {
+        // Use the custom initialize function
+        quote! {
+            async fn initialize(
+                &self,
+                context: &tenx_mcp::ServerCtx,
+                protocol_version: String,
+                capabilities: tenx_mcp::schema::ClientCapabilities,
+                client_info: tenx_mcp::schema::Implementation,
+            ) -> tenx_mcp::Result<tenx_mcp::schema::InitializeResult> {
+                self.#init_fn(context, protocol_version, capabilities, client_info).await
+            }
+        }
+    } else {
+        // Use the default implementation
+        generate_default_initialize(info)
+    }
+}
+
+fn generate_default_initialize(info: &ServerInfo) -> TokenStream {
     let snake_case_name = info.struct_name.to_snake_case();
     let description = &info.description;
 
@@ -293,7 +385,76 @@ fn generate_initialize(info: &ServerInfo) -> TokenStream {
     }
 }
 
-fn inner_mcp_server(_attr: TokenStream, input: TokenStream) -> Result<TokenStream> {
+fn validate_custom_initialize_fn(impl_block: &ItemImpl, fn_name: &syn::Ident) -> Result<()> {
+    // Find the method in the impl block
+    let method = impl_block.items.iter().find_map(|item| {
+        if let ImplItem::Fn(method) = item {
+            if method.sig.ident == *fn_name {
+                Some(method)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    });
+
+    let method = method.ok_or_else(|| {
+        syn::Error::new(
+            fn_name.span(),
+            format!(
+                "Custom initialize function '{fn_name}' not found in impl block"
+            ),
+        )
+    })?;
+
+    // Validate it's async
+    if method.sig.asyncness.is_none() {
+        return Err(syn::Error::new(
+            method.sig.span(),
+            "Custom initialize function must be async",
+        ));
+    }
+
+    // Validate parameters
+    let params: Vec<_> = method.sig.inputs.iter().collect();
+    if params.len() != 5 {
+        return Err(syn::Error::new(
+            method.sig.inputs.span(),
+            "Custom initialize function must have exactly 5 parameters: &self, context: &ServerCtx, protocol_version: String, capabilities: ClientCapabilities, client_info: Implementation",
+        ));
+    }
+
+    // Validate &self
+    match params[0] {
+        syn::FnArg::Receiver(_) => {}
+        _ => {
+            return Err(syn::Error::new(
+                params[0].span(),
+                "First parameter must be &self",
+            ));
+        }
+    }
+
+    // Validate return type exists
+    match &method.sig.output {
+        syn::ReturnType::Type(_, _) => {
+            // We just check it exists, full type validation would be complex
+        }
+        _ => {
+            return Err(syn::Error::new(
+                method.sig.output.span(),
+                "Custom initialize function must return Result<InitializeResult>",
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn inner_mcp_server(attr: TokenStream, input: TokenStream) -> Result<TokenStream> {
+    // Parse macro attributes
+    let args = syn::parse2::<ServerMacroArgs>(attr).unwrap_or_default();
     let (impl_block, info) = parse_impl_block(&input)?;
 
     if info.tools.is_empty() {
@@ -303,10 +464,15 @@ fn inner_mcp_server(_attr: TokenStream, input: TokenStream) -> Result<TokenStrea
         ));
     }
 
+    // Validate custom initialize function if provided
+    if let Some(ref init_fn) = args.initialize_fn {
+        validate_custom_initialize_fn(&impl_block, init_fn)?;
+    }
+
     let struct_name = syn::Ident::new(&info.struct_name, proc_macro2::Span::call_site());
     let call_tool = generate_call_tool(&info);
     let list_tools = generate_list_tools(&info);
-    let initialize = generate_initialize(&info);
+    let initialize = generate_initialize(&info, args.initialize_fn.as_ref());
 
     Ok(quote! {
         #impl_block

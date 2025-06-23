@@ -3,7 +3,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use tenx_mcp::{
     schema::{self, *},
-    Client, Result, Server, ServerConn, ServerCtx, ServerAPI,
+    Client, Result, Server, ServerAPI, ServerConn, ServerCtx,
 };
 
 #[derive(Default)]
@@ -18,9 +18,8 @@ impl ServerConn for EchoConnection {
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
     ) -> Result<InitializeResult> {
-        Ok(InitializeResult::new("http-echo-server", "0.1.0").with_capabilities(
-            ServerCapabilities::default().with_tools(None),
-        ))
+        Ok(InitializeResult::new("http-echo-server", "0.1.0")
+            .with_capabilities(ServerCapabilities::default().with_tools(None)))
     }
 
     async fn list_tools(
@@ -37,9 +36,8 @@ impl ServerConn for EchoConnection {
             }),
             required: Some(vec!["message".to_string()]),
         };
-        Ok(ListToolsResult::default().with_tool(
-            Tool::new("echo", schema).with_description("Echo message"),
-        ))
+        Ok(ListToolsResult::default()
+            .with_tool(Tool::new("echo", schema).with_description("Echo message")))
     }
 
     async fn call_tool(
@@ -57,7 +55,9 @@ impl ServerConn for EchoConnection {
             .get("message")
             .and_then(|v| v.as_str())
             .ok_or_else(|| Error::InvalidParams("Missing message".into()))?;
-        Ok(CallToolResult::new().with_text_content(message.to_string()).is_error(false))
+        Ok(CallToolResult::new()
+            .with_text_content(message.to_string())
+            .is_error(false))
     }
 }
 

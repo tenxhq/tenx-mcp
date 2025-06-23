@@ -384,7 +384,7 @@ where
         arguments: T,
     ) -> Result<CallToolResult> {
         let args_value = serde_json::to_value(arguments)
-            .map_err(|e| Error::InvalidParams(format!("Failed to serialize arguments: {}", e)))?;
+            .map_err(|e| Error::InvalidParams(format!("Failed to serialize arguments: {e}")))?;
 
         let args_map = if let serde_json::Value::Object(map) = args_value {
             Some(map.into_iter().collect())

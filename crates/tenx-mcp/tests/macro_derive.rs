@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tenx_mcp::{
     macros::*, schema::*, schemars, testutils::TestServerContext, Error, Result, ServerConn,
+    ServerCtx,
 };
 
 #[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -139,4 +140,99 @@ async fn test_error_handling() {
         .await
         .unwrap_err();
     assert!(matches!(err, Error::InvalidParams(_)));
+}
+
+// Test for custom initialize function
+#[derive(Debug, Default)]
+struct CustomInitServer;
+
+#[mcp_server(initialize_fn = custom_init)]
+/// Server with custom initialization
+impl CustomInitServer {
+    async fn custom_init(
+        &self,
+        _context: &ServerCtx,
+        _protocol_version: String,
+        _capabilities: ClientCapabilities,
+        _client_info: Implementation,
+    ) -> Result<InitializeResult> {
+        Ok(InitializeResult {
+            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
+            capabilities: ServerCapabilities {
+                tools: Some(ToolsCapability {
+                    list_changed: Some(true),
+                }),
+                ..Default::default()
+            },
+            server_info: Implementation {
+                name: "custom_init_server".to_string(),
+                version: "2.0.0".to_string(),
+            },
+            instructions: Some("Custom initialized server".to_string()),
+            meta: None,
+        })
+    }
+
+    #[tool]
+    /// A simple test tool
+    async fn test_tool(&self, _ctx: &ServerCtx, params: EchoParams) -> Result<CallToolResult> {
+        Ok(CallToolResult::new().with_text_content(format!("Custom: {}", params.message)))
+    }
+}
+
+#[tokio::test]
+async fn test_custom_initialize() {
+    let server = CustomInitServer;
+    let ctx = TestServerContext::new();
+
+    let result = server
+        .initialize(
+            ctx.ctx(),
+            "1.0.0".to_string(),
+            ClientCapabilities::default(),
+            Implementation {
+                name: "test-client".to_string(),
+                version: "1.0.0".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+    // Verify custom initialization was used
+    assert_eq!(result.server_info.name, "custom_init_server");
+    assert_eq!(result.server_info.version, "2.0.0");
+    assert_eq!(result.protocol_version, LATEST_PROTOCOL_VERSION);
+    assert_eq!(
+        result.instructions,
+        Some("Custom initialized server".to_string())
+    );
+
+    // Verify custom capabilities
+    let tools_cap = result.capabilities.tools.unwrap();
+    assert_eq!(tools_cap.list_changed, Some(true));
+}
+
+#[tokio::test]
+async fn test_custom_init_with_tools() {
+    let server = CustomInitServer;
+    let ctx = TestServerContext::new();
+
+    // Verify tools still work with custom init
+    let tools = server.list_tools(ctx.ctx(), None).await.unwrap();
+    assert_eq!(tools.tools.len(), 1);
+    assert_eq!(tools.tools[0].name, "test_tool");
+
+    // Test calling the tool
+    let mut args = HashMap::new();
+    args.insert("message".to_string(), serde_json::json!("test"));
+
+    let result = server
+        .call_tool(ctx.ctx(), "test_tool".to_string(), Some(args))
+        .await
+        .unwrap();
+
+    match &result.content[0] {
+        Content::Text(text) => assert_eq!(text.text, "Custom: test"),
+        _ => panic!("Expected text content"),
+    }
 }
