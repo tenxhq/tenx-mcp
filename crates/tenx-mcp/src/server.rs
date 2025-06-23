@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex};
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
 use crate::{
@@ -153,14 +154,20 @@ where
     pub async fn serve_http(self, addr: impl AsRef<str>) -> Result<ServerHandle> {
         let mut http_transport = HttpServerTransport::new(addr.as_ref());
         http_transport.start().await?;
+        let bound_addr = http_transport.bind_addr.clone();
 
-        ServerHandle::from_transport(self, Box::new(http_transport)).await
+        let mut handle = ServerHandle::from_transport(self, Box::new(http_transport)).await?;
+        handle.bound_addr = Some(bound_addr);
+        Ok(handle)
     }
 }
 
 pub struct ServerHandle {
     pub handle: JoinHandle<()>,
     notification_tx: broadcast::Sender<ServerNotification>,
+    shutdown_token: CancellationToken,
+    /// The actual bound address (for servers that bind to a network port)
+    pub bound_addr: Option<String>,
 }
 
 impl ServerHandle {
@@ -202,10 +209,19 @@ impl ServerHandle {
             conn.on_connect(&server_ctx).await?;
         }
 
+        // Create shutdown token for coordinating shutdown
+        let shutdown_token = CancellationToken::new();
+        let shutdown_token_task = shutdown_token.clone();
+
         // Start the main server loop in a background task
         let handle = tokio::spawn(async move {
             loop {
                 tokio::select! {
+                    // Check for shutdown signal
+                    _ = shutdown_token_task.cancelled() => {
+                        info!("Server received shutdown signal");
+                        break;
+                    }
                     // Handle incoming messages from client
                     result = stream_rx.next() => {
                         match result {
@@ -287,6 +303,8 @@ impl ServerHandle {
         Ok(ServerHandle {
             handle,
             notification_tx: notification_tx_handle,
+            shutdown_token,
+            bound_addr: None,
         })
     }
 
@@ -313,6 +331,9 @@ impl ServerHandle {
     }
 
     pub async fn stop(self) -> Result<()> {
+        // Signal shutdown
+        self.shutdown_token.cancel();
+
         // Wait for the server task to complete
         self.handle
             .await

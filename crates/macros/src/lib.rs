@@ -402,9 +402,7 @@ fn validate_custom_initialize_fn(impl_block: &ItemImpl, fn_name: &syn::Ident) ->
     let method = method.ok_or_else(|| {
         syn::Error::new(
             fn_name.span(),
-            format!(
-                "Custom initialize function '{fn_name}' not found in impl block"
-            ),
+            format!("Custom initialize function '{fn_name}' not found in impl block"),
         )
     })?;
 

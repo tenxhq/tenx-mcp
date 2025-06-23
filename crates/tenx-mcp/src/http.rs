@@ -73,6 +73,7 @@ pub struct HttpServerTransport {
     state: Option<HttpServerState>,
     server_handle: Option<JoinHandle<Result<()>>>,
     incoming_rx: Option<mpsc::UnboundedReceiver<(JSONRPCMessage, String)>>,
+    shutdown_token: Option<CancellationToken>,
 }
 
 /// Stream wrapper for HTTP transport
@@ -318,6 +319,7 @@ impl HttpServerTransport {
             state: None,
             server_handle: None,
             incoming_rx: None,
+            shutdown_token: None,
         }
     }
 
@@ -338,6 +340,7 @@ impl HttpServerTransport {
         };
 
         self.state = Some(state.clone());
+        self.shutdown_token = Some(state.shutdown.clone());
 
         let router = Router::new()
             .route("/", post(handle_post))
@@ -509,6 +512,15 @@ impl Sink<JSONRPCMessage> for HttpServerStream {
 }
 
 impl TransportStream for HttpServerStream {}
+
+impl Drop for HttpServerTransport {
+    fn drop(&mut self) {
+        // Trigger shutdown when transport is dropped
+        if let Some(token) = &self.shutdown_token {
+            token.cancel();
+        }
+    }
+}
 
 // HTTP handlers
 

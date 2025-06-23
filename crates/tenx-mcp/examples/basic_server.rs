@@ -18,7 +18,6 @@ use serde::{Deserialize, Serialize};
 use tenx_mcp::{macros::*, schema::*, schemars, Result, Server, ServerCtx};
 use tracing::info;
 
-
 /// Echo tool input parameters
 #[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 struct EchoParams {
@@ -35,11 +34,7 @@ struct BasicServer {}
 impl BasicServer {
     #[tool]
     /// Echoes back the provided message
-    async fn echo(
-        &self,
-        _context: &ServerCtx,
-        params: EchoParams,
-    ) -> Result<CallToolResult> {
+    async fn echo(&self, _context: &ServerCtx, params: EchoParams) -> Result<CallToolResult> {
         Ok(CallToolResult::new()
             .with_text_content(params.message)
             .is_error(false))
