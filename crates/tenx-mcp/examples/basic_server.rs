@@ -1,18 +1,19 @@
 //! Basic MCP server example that pairs with basic_client.rs
 //!
-//! This server can run in two modes:
+//! This server can run in three modes:
 //! 1. TCP mode: listens on TCP port 3000 (by default)
-//! 2. Stdio mode: communicates via stdin/stdout
+//! 2. HTTP mode: listens on HTTP port 8080 (by default)
+//! 3. Stdio mode: communicates via stdin/stdout
 //!
-//! Both modes provide a simple echo tool that can be called by clients.
+//! All modes provide a simple echo tool that can be called by clients.
 //!
 //! Usage:
-//!   cargo run --example basic_server [host] [port]  # TCP mode
-//!   cargo run --example basic_server                # TCP mode, defaults to 127.0.0.1:3000
-//!   cargo run --example basic_server --stdio        # Stdio mode
+//!   cargo run --example basic_server tcp [host] [port]  # TCP mode
+//!   cargo run --example basic_server http [host] [port] # HTTP mode
+//!   cargo run --example basic_server stdio              # Stdio mode
+//!   cargo run --example basic_server                    # Default to TCP mode on 127.0.0.1:3000
 
-use std::env;
-
+use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use tenx_mcp::{macros::*, schema::*, schemars, Result, Server, ServerCtx};
 use tracing::info;
@@ -45,53 +46,84 @@ impl BasicServer {
     }
 }
 
+#[derive(Parser)]
+#[command(name = "basic_server")]
+#[command(about = "Basic MCP server with echo tool", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Run server in TCP mode
+    Tcp {
+        /// Host to bind to
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        /// Port to bind to
+        #[arg(short, long, default_value_t = 3000)]
+        port: u16,
+    },
+    /// Run server in HTTP mode
+    Http {
+        /// Host to bind to
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        /// Port to bind to
+        #[arg(short, long, default_value_t = 8080)]
+        port: u16,
+    },
+    /// Run server in stdio mode
+    Stdio,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Parse command line arguments
-    let args: Vec<String> = env::args().collect();
+    let cli = Cli::parse();
 
-    // Check for --stdio flag
-    let is_stdio = args.iter().any(|arg| arg == "--stdio");
+    match cli.command.unwrap_or(Commands::Tcp {
+        host: "127.0.0.1".to_string(),
+        port: 3000,
+    }) {
+        Commands::Stdio => {
+            // Run in stdio mode - no logging to avoid interfering with JSON-RPC
+            Server::default()
+                .with_connection(BasicServer::default)
+                .serve_stdio()
+                .await?;
+        }
+        Commands::Tcp { host, port } => {
+            // Initialize logging for network modes
+            tracing_subscriber::fmt::init();
 
-    // Only initialize logging for TCP mode
-    // In stdio mode, logging would interfere with JSON-RPC communication
-    if !is_stdio {
-        tracing_subscriber::fmt::init();
-    }
+            let addr = format!("{host}:{port}");
+            info!("Starting TCP MCP server on {}", addr);
 
-    if is_stdio {
-        // Run in stdio mode - no logging to avoid interfering with JSON-RPC
-        Server::default()
-            .with_connection(BasicServer::default)
-            .serve_stdio()
-            .await?;
-    } else {
-        // Run in TCP mode
-        let (host, port) = if args.len() == 3 {
-            (
-                args[1].clone(),
-                args[2].parse::<u16>().expect("Invalid port number"),
-            )
-        } else if args.len() == 1 {
-            // Default to localhost:3000 to match basic_client
-            ("127.0.0.1".to_string(), 3000)
-        } else {
-            eprintln!("Usage: {} [host] [port] or {} --stdio", args[0], args[0]);
-            eprintln!("Example: {} 127.0.0.1 3000", args[0]);
-            eprintln!("Example: {} --stdio", args[0]);
-            eprintln!("If no arguments provided, defaults to 127.0.0.1:3000");
-            std::process::exit(1);
-        };
+            Server::default()
+                .with_connection(BasicServer::default)
+                .serve_tcp(addr)
+                .await?;
+        }
+        Commands::Http { host, port } => {
+            // Initialize logging for network modes
+            tracing_subscriber::fmt::init();
 
-        let addr = format!("{host}:{port}");
+            let addr = format!("{host}:{port}");
+            info!("Starting HTTP MCP server on {}", addr);
 
-        // Create and run the server using the new simplified API
-        info!("Starting basic MCP server on {}", addr);
+            let handle = Server::default()
+                .with_connection(BasicServer::default)
+                .serve_http(addr)
+                .await?;
 
-        Server::default()
-            .with_connection(BasicServer::default)
-            .serve_tcp(addr)
-            .await?;
+            // Wait for Ctrl+C signal
+            tokio::signal::ctrl_c().await?;
+            info!("Shutting down HTTP server");
+
+            // Gracefully stop the server
+            handle.stop().await?;
+        }
     }
 
     Ok(())
