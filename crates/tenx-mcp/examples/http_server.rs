@@ -7,15 +7,12 @@
 //!   cargo run --example http_server [host] [port]  # HTTP mode
 //!   cargo run --example http_server                # HTTP mode, defaults to 127.0.0.1:8080
 
-use std::{collections::HashMap, env};
+use std::env;
 
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tenx_mcp::{schema::*, schemars, Error, Result, Server, ServerConn, ServerCtx};
+use tenx_mcp::{macros::*, schema::*, schemars, Result, Server, ServerCtx};
 use tracing::info;
 
-const NAME: &str = "http-server";
-const VERSION: &str = "0.1.0";
 
 /// Echo tool input parameters
 #[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -28,43 +25,16 @@ struct EchoParams {
 #[derive(Debug, Default)]
 struct HttpServer {}
 
-#[async_trait]
-impl ServerConn for HttpServer {
-    async fn initialize(
+#[mcp_server]
+/// HTTP MCP server that provides an echo tool
+impl HttpServer {
+    #[tool]
+    /// Echoes back the provided message
+    async fn echo(
         &self,
         _context: &ServerCtx,
-        _protocol_version: String,
-        _capabilities: ClientCapabilities,
-        _client_info: Implementation,
-    ) -> Result<InitializeResult> {
-        Ok(InitializeResult::new(NAME, VERSION)
-            .with_capabilities(ServerCapabilities::default().with_tools(None)))
-    }
-
-    async fn list_tools(
-        &self,
-        _context: &ServerCtx,
-        _cursor: Option<Cursor>,
-    ) -> Result<ListToolsResult> {
-        Ok(ListToolsResult::default().with_tool(
-            Tool::new("echo", ToolInputSchema::from_json_schema::<EchoParams>())
-                .with_description("Echoes back the provided message"),
-        ))
-    }
-
-    async fn call_tool(
-        &self,
-        _context: &ServerCtx,
-        name: String,
-        arguments: Option<HashMap<String, serde_json::Value>>,
+        params: EchoParams,
     ) -> Result<CallToolResult> {
-        if name != "echo" {
-            return Err(Error::ToolNotFound(name));
-        }
-        let params = match arguments {
-            Some(args) => serde_json::from_value::<EchoParams>(serde_json::to_value(args)?)?,
-            None => return Err(Error::InvalidParams("No arguments provided".to_string())),
-        };
         Ok(CallToolResult::new()
             .with_text_content(params.message)
             .is_error(false))
