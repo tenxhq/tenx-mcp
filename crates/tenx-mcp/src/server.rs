@@ -77,7 +77,10 @@ where
     /// This is a convenience method that starts the server and waits for completion
     pub(crate) async fn serve(self, transport: Box<dyn Transport>) -> Result<()> {
         let handle = ServerHandle::new(self, transport).await?;
-        handle.stop().await
+        handle
+            .handle
+            .await
+            .map_err(|e| Error::InternalError(format!("Server task failed: {e}")))
     }
 
     /// Serve connections from stdin/stdout
