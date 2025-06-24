@@ -165,11 +165,7 @@ async fn main() -> Result<()> {
     let addr = format!("{host}:{port}");
 
     // Create server configuration
-    let server_info = schema::Implementation {
-        name: "timeout-test-server".to_string(),
-        version: "1.0.0".to_string(),
-        title: None,
-    };
+    let server_info = schema::Implementation::new("timeout-test-server", "1.0.0");
 
     let capabilities = schema::ServerCapabilities::default();
 

@@ -29,11 +29,7 @@ async fn test_method_not_found() {
             Ok(schema::InitializeResult {
                 protocol_version: schema::LATEST_PROTOCOL_VERSION.to_string(),
                 capabilities: schema::ServerCapabilities::default(),
-                server_info: schema::Implementation {
-                    name: "test-server".to_string(),
-                    version: "1.0.0".to_string(),
-                    title: None,
-                },
+                server_info: schema::Implementation::new("test-server", "1.0.0"),
                 instructions: None,
                 meta: None,
             })
@@ -80,11 +76,7 @@ async fn test_invalid_params() {
                     tools: Some(schema::ToolsCapability { list_changed: None }),
                     ..Default::default()
                 },
-                server_info: schema::Implementation {
-                    name: "test-server".to_string(),
-                    version: "1.0.0".to_string(),
-                    title: None,
-                },
+                server_info: schema::Implementation::new("test-server", "1.0.0"),
                 instructions: None,
                 meta: None,
             })
@@ -197,11 +189,7 @@ async fn test_successful_response() {
                     }),
                     ..Default::default()
                 },
-                server_info: schema::Implementation {
-                    name: "test-server".to_string(),
-                    version: "1.0.0".to_string(),
-                    title: None,
-                },
+                server_info: schema::Implementation::new("test-server", "1.0.0"),
                 instructions: None,
                 meta: None,
             })
@@ -251,11 +239,7 @@ async fn test_successful_response() {
             &context,
             schema::LATEST_PROTOCOL_VERSION.to_string(),
             schema::ClientCapabilities::default(),
-            schema::Implementation {
-                name: "test-client".to_string(),
-                version: "1.0.0".to_string(),
-                title: None,
-            },
+            schema::Implementation::new("test-client", "1.0.0"),
         )
         .await
         .unwrap();
@@ -326,11 +310,7 @@ async fn test_error_propagation() {
             &context,
             schema::LATEST_PROTOCOL_VERSION.to_string(),
             schema::ClientCapabilities::default(),
-            schema::Implementation {
-                name: "test-client".to_string(),
-                version: "1.0.0".to_string(),
-                title: None,
-            },
+            schema::Implementation::new("test-client", "1.0.0"),
         )
         .await;
 

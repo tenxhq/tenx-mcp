@@ -230,11 +230,7 @@ impl InitializeResult {
         Self {
             protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
             capabilities: ServerCapabilities::default(),
-            server_info: Implementation {
-                name: name.into(),
-                version: version.into(),
-                title: None,
-            },
+            server_info: Implementation::new(name, version),
             instructions: None,
             meta: None,
         }
@@ -441,6 +437,7 @@ pub struct ToolsCapability {
 // Extends BaseMetadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Implementation {
+    /// The name of the MCP implementation.
     pub name: String,
     pub version: String,
 
@@ -448,6 +445,23 @@ pub struct Implementation {
     /// even by those unfamiliar with domain-specific terminology.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+}
+
+impl Implementation {
+    /// Create a new Implementation with the given name and version
+    pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            version: version.into(),
+            title: None,
+        }
+    }
+
+    /// Set the title for the implementation
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
 }
 
 /// The server's response to a resources/list request from the client.
@@ -1382,7 +1396,7 @@ pub struct ResourceReference {
 // Extends BaseMetadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptReference {
-    /// The name of the prompt or prompt template
+    /// The name of the prompt or prompt template.
     pub name: String,
 
     /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,

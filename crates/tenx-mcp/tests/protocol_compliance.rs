@@ -93,11 +93,7 @@ impl ServerConn for TestConnection {
                 }),
                 ..Default::default()
             },
-            server_info: Implementation {
-                name: "test-server".to_string(),
-                version: "1.0.0".to_string(),
-                title: None,
-            },
+            server_info: Implementation::new("test-server", "1.0.0"),
             instructions: None,
             meta: None,
         })

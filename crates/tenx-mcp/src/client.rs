@@ -93,11 +93,7 @@ where
     /// This is a convenience method that uses the client's configured name, version,
     /// and capabilities with the latest protocol version.
     pub async fn init(&mut self) -> Result<InitializeResult> {
-        let client_info = Implementation {
-            name: self.name.clone(),
-            version: self.version.clone(),
-            title: None,
-        };
+        let client_info = Implementation::new(self.name.clone(), self.version.clone());
 
         <Self as ServerAPI>::initialize(
             self,

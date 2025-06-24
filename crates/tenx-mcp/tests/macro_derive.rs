@@ -45,11 +45,7 @@ async fn test_initialize() {
             ctx.ctx(),
             "1.0.0".to_string(),
             ClientCapabilities::default(),
-            Implementation {
-                name: "test-client".to_string(),
-                version: "1.0.0".to_string(),
-                title: None,
-            },
+            Implementation::new("test-client", "1.0.0"),
         )
         .await
         .unwrap();
@@ -165,11 +161,7 @@ impl CustomInitServer {
                 }),
                 ..Default::default()
             },
-            server_info: Implementation {
-                name: "custom_init_server".to_string(),
-                version: "2.0.0".to_string(),
-                title: None,
-            },
+            server_info: Implementation::new("custom_init_server", "2.0.0"),
             instructions: Some("Custom initialized server".to_string()),
             meta: None,
         })
@@ -192,11 +184,7 @@ async fn test_custom_initialize() {
             ctx.ctx(),
             "1.0.0".to_string(),
             ClientCapabilities::default(),
-            Implementation {
-                name: "test-client".to_string(),
-                version: "1.0.0".to_string(),
-                title: None,
-            },
+            Implementation::new("test-client", "1.0.0"),
         )
         .await
         .unwrap();

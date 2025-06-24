@@ -219,11 +219,7 @@ async fn test_server_calls_client_during_request() {
         .initialize(
             LATEST_PROTOCOL_VERSION.to_string(),
             ClientCapabilities::default(),
-            Implementation {
-                name: "test-client".to_string(),
-                version: "1.0.0".to_string(),
-                title: None,
-            },
+            Implementation::new("test-client", "1.0.0"),
         )
         .await
         .expect("Initialize failed");
@@ -308,11 +304,7 @@ async fn test_client_server_ping_pong() {
         .initialize(
             LATEST_PROTOCOL_VERSION.to_string(),
             ClientCapabilities::default(),
-            Implementation {
-                name: "test-client".to_string(),
-                version: "1.0.0".to_string(),
-                title: None,
-            },
+            Implementation::new("test-client", "1.0.0"),
         )
         .await
         .expect("Initialize failed");

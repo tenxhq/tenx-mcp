@@ -69,10 +69,7 @@
 //!                 }),
 //!                 ..Default::default()
 //!             },
-//!             server_info: schema::Implementation {
-//!                 name: "my_custom_server".to_string(),
-//!                 version: "2.0.0".to_string(),
-//!                 title: None,
+//!             server_info: schema::Implementation::new("my_custom_server", "2.0.0"),
 //!             },
 //!             instructions: Some("Custom server with advanced features".to_string()),
 //!             meta: None,
@@ -375,11 +372,7 @@ fn generate_default_initialize(info: &ServerInfo) -> TokenStream {
                     }),
                     ..Default::default()
                 },
-                server_info: tenx_mcp::schema::Implementation {
-                    name: #snake_case_name.to_string(),
-                    version: "0.1.0".to_string(),
-                    title: None,
-                },
+                server_info: tenx_mcp::schema::Implementation::new(#snake_case_name, "0.1.0"),
                 instructions: Some(#description.to_string()),
                 meta: None,
             })
@@ -708,7 +701,7 @@ mod tests {
         assert!(result_str.contains("async fn call_tool"));
 
         // Check that snake_case conversion is applied
-        assert!(result_str.contains(r#"name : "test_server" . to_string ()"#));
+        assert!(result_str.contains(r#"Implementation :: new ("test_server" , "0.1.0")"#));
     }
 
     #[test]
@@ -754,7 +747,8 @@ mod tests {
             let result = inner_mcp_server(TokenStream::new(), input).unwrap();
             let result_str = result.to_string();
 
-            let expected_pattern = format!(r#"name : "{expected_snake_case}" . to_string ()"#);
+            let expected_pattern =
+                format!(r#"Implementation :: new ("{expected_snake_case}" , "0.1.0")"#);
             assert!(
                 result_str.contains(&expected_pattern),
                 "Expected server name '{expected_snake_case}' for struct '{struct_name}', but got: {result_str}"
