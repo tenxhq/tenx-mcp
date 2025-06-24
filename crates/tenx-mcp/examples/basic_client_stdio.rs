@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
 
     // Configure the command to spawn the basic_server in stdio mode
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-q", "--example", "basic_server", "--", "--stdio"]);
+    cmd.args(["run", "-q", "--example", "basic_server", "--", "stdio"]);
 
     // Spawn the process and connect to it
     info!("Spawning basic_server in stdio mode...");
