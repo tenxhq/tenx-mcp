@@ -96,6 +96,7 @@ where
         let client_info = Implementation {
             name: self.name.clone(),
             version: self.version.clone(),
+            title: None,
         };
 
         <Self as ServerAPI>::initialize(

@@ -48,6 +48,7 @@ async fn test_initialize() {
             Implementation {
                 name: "test-client".to_string(),
                 version: "1.0.0".to_string(),
+                title: None,
             },
         )
         .await
@@ -167,6 +168,7 @@ impl CustomInitServer {
             server_info: Implementation {
                 name: "custom_init_server".to_string(),
                 version: "2.0.0".to_string(),
+                title: None,
             },
             instructions: Some("Custom initialized server".to_string()),
             meta: None,
@@ -193,6 +195,7 @@ async fn test_custom_initialize() {
             Implementation {
                 name: "test-client".to_string(),
                 version: "1.0.0".to_string(),
+                title: None,
             },
         )
         .await

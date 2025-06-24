@@ -168,6 +168,7 @@ async fn main() -> Result<()> {
     let server_info = schema::Implementation {
         name: "timeout-test-server".to_string(),
         version: "1.0.0".to_string(),
+        title: None,
     };
 
     let capabilities = schema::ServerCapabilities::default();

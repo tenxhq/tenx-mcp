@@ -96,6 +96,7 @@ impl ServerConn for TestConnection {
             server_info: Implementation {
                 name: "test-server".to_string(),
                 version: "1.0.0".to_string(),
+                title: None,
             },
             instructions: None,
             meta: None,

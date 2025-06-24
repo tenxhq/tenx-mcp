@@ -32,6 +32,7 @@ async fn test_method_not_found() {
                 server_info: schema::Implementation {
                     name: "test-server".to_string(),
                     version: "1.0.0".to_string(),
+                    title: None,
                 },
                 instructions: None,
                 meta: None,
@@ -82,6 +83,7 @@ async fn test_invalid_params() {
                 server_info: schema::Implementation {
                     name: "test-server".to_string(),
                     version: "1.0.0".to_string(),
+                    title: None,
                 },
                 instructions: None,
                 meta: None,
@@ -198,6 +200,7 @@ async fn test_successful_response() {
                 server_info: schema::Implementation {
                     name: "test-server".to_string(),
                     version: "1.0.0".to_string(),
+                    title: None,
                 },
                 instructions: None,
                 meta: None,
@@ -229,6 +232,7 @@ async fn test_successful_response() {
                 schema::ListResourcesResult::new().with_resource(schema::Resource {
                     uri: "file:///test.txt".to_string(),
                     name: "test.txt".to_string(),
+                    title: None,
                     description: Some("A test file".to_string()),
                     mime_type: Some("text/plain".to_string()),
                     size: None,
@@ -250,6 +254,7 @@ async fn test_successful_response() {
             schema::Implementation {
                 name: "test-client".to_string(),
                 version: "1.0.0".to_string(),
+                title: None,
             },
         )
         .await
@@ -324,6 +329,7 @@ async fn test_error_propagation() {
             schema::Implementation {
                 name: "test-client".to_string(),
                 version: "1.0.0".to_string(),
+                title: None,
             },
         )
         .await;

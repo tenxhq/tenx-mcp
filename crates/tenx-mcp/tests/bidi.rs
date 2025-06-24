@@ -222,6 +222,7 @@ async fn test_server_calls_client_during_request() {
             Implementation {
                 name: "test-client".to_string(),
                 version: "1.0.0".to_string(),
+                title: None,
             },
         )
         .await
@@ -310,6 +311,7 @@ async fn test_client_server_ping_pong() {
             Implementation {
                 name: "test-client".to_string(),
                 version: "1.0.0".to_string(),
+                title: None,
             },
         )
         .await

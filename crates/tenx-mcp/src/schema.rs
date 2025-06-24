@@ -233,6 +233,7 @@ impl InitializeResult {
             server_info: Implementation {
                 name: name.into(),
                 version: version.into(),
+                title: None,
             },
             instructions: None,
             meta: None,
@@ -437,10 +438,16 @@ pub struct ToolsCapability {
 }
 
 /// Describes the name and version of an MCP implementation.
+// Extends BaseMetadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Implementation {
     pub name: String,
     pub version: String,
+
+    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+    /// even by those unfamiliar with domain-specific terminology.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
 /// The server's response to a resources/list request from the client.
@@ -539,6 +546,7 @@ impl ReadResourceResult {
 }
 
 /// A known resource that the server is capable of reading.
+// Extends BaseMetadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resource {
     /// The URI of this resource.
@@ -547,6 +555,12 @@ pub struct Resource {
     ///
     /// This can be used by clients to populate UI elements.
     pub name: String,
+
+    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+    /// even by those unfamiliar with domain-specific terminology.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
     /// A description of what this resource represents.
     ///
     /// This can be used by clients to improve the LLM's understanding of
@@ -570,6 +584,7 @@ pub struct Resource {
 }
 
 /// A template description for resources available on the server.
+// Extends BaseMetadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceTemplate {
     /// A URI template (according to RFC 6570) that can be used to construct
@@ -580,6 +595,12 @@ pub struct ResourceTemplate {
     ///
     /// This can be used by clients to populate UI elements.
     pub name: String,
+
+    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+    /// even by those unfamiliar with domain-specific terminology.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
     /// A description of what this template is for.
     ///
     /// This can be used by clients to improve the LLM's understanding of
@@ -680,10 +701,17 @@ pub struct GetPromptResult {
 }
 
 /// A prompt or prompt template that the server offers.
+// Extends BaseMetadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Prompt {
     /// The name of the prompt or prompt template.
     pub name: String,
+
+    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+    /// even by those unfamiliar with domain-specific terminology.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
     /// An optional description of what this prompt provides
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -693,10 +721,17 @@ pub struct Prompt {
 }
 
 /// Describes an argument that a prompt can accept.
+// Extends BaseMetadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptArgument {
     /// The name of the argument.
     pub name: String,
+
+    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+    /// even by those unfamiliar with domain-specific terminology.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
     /// A human-readable description of the argument.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -903,10 +938,17 @@ pub struct ToolAnnotations {
 }
 
 /// Definition for a tool the client can call.
+// Extends BaseMetadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tool {
     /// The name of the tool.
     pub name: String,
+
+    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+    /// even by those unfamiliar with domain-specific terminology.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
     /// A human-readable description of the tool.
     ///
     /// This can be used by clients to improve the LLM's understanding of
@@ -926,6 +968,7 @@ impl Tool {
     pub fn new(name: impl Into<String>, schema: ToolInputSchema) -> Self {
         Self {
             name: name.into(),
+            title: None,
             description: None,
             input_schema: schema,
             annotations: None,
@@ -938,8 +981,14 @@ impl Tool {
         self
     }
 
-    /// Set the title annotation
+    /// Set the title for the tool
     pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    /// Set the title annotation (different from the tool's title field)
+    pub fn with_annotation_title(mut self, title: impl Into<String>) -> Self {
         self.annotations.get_or_insert_with(Default::default).title = Some(title.into());
         self
     }
@@ -1330,10 +1379,16 @@ pub struct ResourceReference {
 }
 
 /// Identifies a prompt.
+// Extends BaseMetadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptReference {
     /// The name of the prompt or prompt template
     pub name: String,
+
+    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+    /// even by those unfamiliar with domain-specific terminology.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
 /// The server's response to a completion/complete request
@@ -1799,4 +1854,569 @@ mod tests {
         assert_eq!(json["method"], "resources/templates/list");
         assert_eq!(json["cursor"], "template-cursor");
     }
+}
+
+// ============================================================================
+// NEW PROTOCOL STRUCTS FROM 2025-06-18 SCHEMA
+// ============================================================================
+
+/// A resource that the server is capable of reading, included in a prompt or tool call result.
+///
+/// Note: resource links returned by tools are not guaranteed to appear in the results of `resources/list` requests.
+// Extends Resource (which extends BaseMetadata)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceLink {
+    #[serde(rename = "type")]
+    pub link_type: String, // Should be "resource_link"
+
+    /// The URI of this resource.
+    pub uri: String,
+
+    /// A human-readable name for this resource.
+    pub name: String,
+
+    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+    /// even by those unfamiliar with domain-specific terminology.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
+    /// A description of what this resource represents.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    /// The MIME type of this resource, if known.
+    #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+
+    /// Optional annotations for the client.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<Annotations>,
+
+    /// The size of the raw resource content, in bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<i64>,
+
+    /// See [specification/2025-06-18/basic/index#general-fields] for notes on _meta usage.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
+}
+
+/// ContentBlock union type for various content types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ContentBlock {
+    Text(TextContent),
+    Image(ImageContent),
+    Audio(AudioContent),
+    ResourceLink(ResourceLink),
+    Resource(EmbeddedResource),
+}
+
+// Standalone request types for better modularity
+
+/// This request is sent from the client to the server when it first connects, asking it to begin initialization.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitializeRequest {
+    pub method: String, // "initialize"
+    pub params: InitializeParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitializeParams {
+    /// The latest version of the Model Context Protocol that the client supports.
+    #[serde(rename = "protocolVersion")]
+    pub protocol_version: String,
+    pub capabilities: ClientCapabilities,
+    #[serde(rename = "clientInfo")]
+    pub client_info: Implementation,
+}
+
+/// This notification is sent from the client to the server after initialization has finished.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitializedNotification {
+    pub method: String, // "notifications/initialized"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<HashMap<String, Value>>,
+}
+
+/// A ping, issued by either the server or the client, to check that the other party is still alive.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PingRequest {
+    pub method: String, // "ping"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<HashMap<String, Value>>,
+}
+
+/// This notification can be sent by either side to indicate that it is cancelling a previously-issued request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CancelledNotification {
+    pub method: String, // "notifications/cancelled"
+    pub params: CancelledParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CancelledParams {
+    /// The ID of the request to cancel.
+    #[serde(rename = "requestId")]
+    pub request_id: RequestId,
+
+    /// An optional string describing the reason for the cancellation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// An out-of-band notification used to inform the receiver of a progress update for a long-running request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgressNotification {
+    pub method: String, // "notifications/progress"
+    pub params: ProgressParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgressParams {
+    /// The progress token which was given in the initial request.
+    #[serde(rename = "progressToken")]
+    pub progress_token: ProgressToken,
+
+    /// The progress thus far. This should increase every time progress is made.
+    pub progress: f64,
+
+    /// Total number of items to process (or total progress required), if known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<f64>,
+
+    /// An optional message describing the current progress.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// Base interface for paginated requests
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginatedRequest {
+    pub method: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<PaginatedParams>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginatedParams {
+    /// An opaque token representing the current pagination position.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<Cursor>,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<RequestMeta>,
+}
+
+/// Base interface for paginated results
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginatedResult {
+    /// An opaque token representing the pagination position after the last returned result.
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<Cursor>,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
+}
+
+// Resource-related request types
+
+/// Sent from the client to request a list of resources the server has.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListResourcesRequest {
+    pub method: String, // "resources/list"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<PaginatedParams>,
+}
+
+/// Sent from the client to request a list of resource templates the server has.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListResourceTemplatesRequest {
+    pub method: String, // "resources/templates/list"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<PaginatedParams>,
+}
+
+/// Sent from the client to the server, to read a specific resource URI.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadResourceRequest {
+    pub method: String, // "resources/read"
+    pub params: ReadResourceParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadResourceParams {
+    /// The URI of the resource to read.
+    pub uri: String,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<RequestMeta>,
+}
+
+/// Sent from the client to request resources/updated notifications from the server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubscribeRequest {
+    pub method: String, // "resources/subscribe"
+    pub params: SubscribeParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubscribeParams {
+    /// The URI of the resource to subscribe to.
+    pub uri: String,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<RequestMeta>,
+}
+
+/// Sent from the client to request cancellation of resources/updated notifications.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnsubscribeRequest {
+    pub method: String, // "resources/unsubscribe"
+    pub params: UnsubscribeParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnsubscribeParams {
+    /// The URI of the resource to unsubscribe from.
+    pub uri: String,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<RequestMeta>,
+}
+
+/// An optional notification from the server to the client about resource list changes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceListChangedNotification {
+    pub method: String, // "notifications/resources/list_changed"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<HashMap<String, Value>>,
+}
+
+/// A notification from the server to the client about a resource update.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceUpdatedNotification {
+    pub method: String, // "notifications/resources/updated"
+    pub params: ResourceUpdatedParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceUpdatedParams {
+    /// The URI of the resource that has been updated.
+    pub uri: String,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
+}
+
+// Prompt-related request types
+
+/// Sent from the client to request a list of prompts and prompt templates.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListPromptsRequest {
+    pub method: String, // "prompts/list"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<PaginatedParams>,
+}
+
+/// Used by the client to get a prompt provided by the server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetPromptRequest {
+    pub method: String, // "prompts/get"
+    pub params: GetPromptParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetPromptParams {
+    /// The name of the prompt or prompt template.
+    pub name: String,
+
+    /// Arguments to use for templating the prompt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<HashMap<String, String>>,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<RequestMeta>,
+}
+
+/// An optional notification from the server about prompt list changes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptListChangedNotification {
+    pub method: String, // "notifications/prompts/list_changed"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<HashMap<String, Value>>,
+}
+
+// Tool-related request types
+
+/// Sent from the client to request a list of tools the server has.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListToolsRequest {
+    pub method: String, // "tools/list"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<PaginatedParams>,
+}
+
+/// Used by the client to invoke a tool provided by the server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallToolRequest {
+    pub method: String, // "tools/call"
+    pub params: CallToolParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallToolParams {
+    pub name: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<HashMap<String, Value>>,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<RequestMeta>,
+}
+
+/// An optional notification from the server about tool list changes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolListChangedNotification {
+    pub method: String, // "notifications/tools/list_changed"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<HashMap<String, Value>>,
+}
+
+// Logging-related types
+
+/// A request from the client to the server, to enable or adjust logging.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetLevelRequest {
+    pub method: String, // "logging/setLevel"
+    pub params: SetLevelParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetLevelParams {
+    /// The level of logging that the client wants to receive from the server.
+    pub level: LoggingLevel,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<RequestMeta>,
+}
+
+/// Notification of a log message passed from server to client.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoggingMessageNotification {
+    pub method: String, // "notifications/message"
+    pub params: LoggingMessageParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoggingMessageParams {
+    /// The severity of this log message.
+    pub level: LoggingLevel,
+
+    /// An optional name of the logger issuing this message.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logger: Option<String>,
+
+    /// The data to be logged, such as a string message or an object.
+    pub data: Value,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
+}
+
+// Sampling-related types
+
+/// A request from the server to sample an LLM via the client.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateMessageRequest {
+    pub method: String, // "sampling/createMessage"
+    pub params: CreateMessageParams,
+}
+
+// Completion-related types
+
+/// A request from the client to the server, to ask for completion options.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompleteRequest {
+    pub method: String, // "completion/complete"
+    pub params: CompleteParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompleteParams {
+    #[serde(rename = "ref")]
+    pub reference: Reference,
+
+    /// The argument's information
+    pub argument: ArgumentInfo,
+
+    /// Additional, optional context for completions
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<CompleteContext>,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<RequestMeta>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompleteContext {
+    /// Previously-resolved variables in a URI template or prompt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<HashMap<String, String>>,
+}
+
+// Roots-related types
+
+/// Sent from the server to request a list of root URIs from the client.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListRootsRequest {
+    pub method: String, // "roots/list"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<HashMap<String, Value>>,
+}
+
+/// A notification from the client to the server about roots list changes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RootsListChangedNotification {
+    pub method: String, // "notifications/roots/list_changed"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<HashMap<String, Value>>,
+}
+
+// Elicitation-related types
+
+/// A request from the server to elicit additional information from the user via the client.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElicitRequest {
+    pub method: String, // "elicitation/create"
+    pub params: ElicitParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElicitParams {
+    /// The message to present to the user.
+    pub message: String,
+
+    /// A restricted subset of JSON Schema.
+    #[serde(rename = "requestedSchema")]
+    pub requested_schema: ElicitSchema,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<RequestMeta>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElicitSchema {
+    #[serde(rename = "type")]
+    pub schema_type: String, // "object"
+
+    pub properties: HashMap<String, PrimitiveSchemaDefinition>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<Vec<String>>,
+}
+
+/// The client's response to an elicitation request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElicitResult {
+    /// The user action in response to the elicitation.
+    pub action: ElicitAction,
+
+    /// The submitted form data, only present when action is "accept".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<HashMap<String, ElicitValue>>,
+
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ElicitAction {
+    Accept,
+    Decline,
+    Cancel,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ElicitValue {
+    String(String),
+    Number(f64),
+    Boolean(bool),
+}
+
+/// Restricted schema definitions that only allow primitive types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum PrimitiveSchemaDefinition {
+    #[serde(rename = "string")]
+    String(StringSchema),
+    #[serde(rename = "number")]
+    Number(NumberSchema),
+    #[serde(rename = "integer")]
+    Integer(NumberSchema),
+    #[serde(rename = "boolean")]
+    Boolean(BooleanSchema),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StringSchema {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(rename = "minLength", skip_serializing_if = "Option::is_none")]
+    pub min_length: Option<u32>,
+
+    #[serde(rename = "maxLength", skip_serializing_if = "Option::is_none")]
+    pub max_length: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<StringFormat>,
+
+    // For enum support
+    #[serde(rename = "enum", skip_serializing_if = "Option::is_none")]
+    pub enum_values: Option<Vec<String>>,
+
+    #[serde(rename = "enumNames", skip_serializing_if = "Option::is_none")]
+    pub enum_names: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum StringFormat {
+    Email,
+    Uri,
+    Date,
+    DateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NumberSchema {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minimum: Option<f64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maximum: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BooleanSchema {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<bool>,
 }

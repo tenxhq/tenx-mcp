@@ -72,6 +72,7 @@
 //!             server_info: schema::Implementation {
 //!                 name: "my_custom_server".to_string(),
 //!                 version: "2.0.0".to_string(),
+//!                 title: None,
 //!             },
 //!             instructions: Some("Custom server with advanced features".to_string()),
 //!             meta: None,
@@ -377,6 +378,7 @@ fn generate_default_initialize(info: &ServerInfo) -> TokenStream {
                 server_info: tenx_mcp::schema::Implementation {
                     name: #snake_case_name.to_string(),
                     version: "0.1.0".to_string(),
+                    title: None,
                 },
                 instructions: Some(#description.to_string()),
                 meta: None,
