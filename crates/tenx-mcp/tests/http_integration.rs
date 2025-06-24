@@ -62,7 +62,6 @@ impl ServerConn for EchoConnection {
 }
 
 #[tokio::test]
-#[ignore = "HTTP test infrastructure needs fixing"]
 async fn test_http_echo_tool_integration() {
     let _ = tracing_subscriber::fmt::try_init();
 
@@ -72,6 +71,8 @@ async fn test_http_echo_tool_integration() {
 
     // Get the actual bound address
     let bound_addr = server_handle.bound_addr.as_ref().unwrap();
+    // Small delay to ensure server is fully ready
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     // Connect HTTP client
     let mut client = Client::new("http-test-client", "0.1.0");

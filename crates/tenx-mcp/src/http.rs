@@ -383,9 +383,7 @@ impl HttpServerTransport {
                     shutdown.cancelled().await;
                 })
                 .await
-                .map_err(|e| Error::Transport(format!("Server error: {e}")))?;
-
-            Ok(())
+                .map_err(|e| Error::Transport(format!("Server error: {e}")))
         });
 
         self.server_handle = Some(server_handle);
@@ -396,7 +394,7 @@ impl HttpServerTransport {
             .map_err(|_| Error::Transport("Server failed to start".into()))?;
 
         // Give a small delay to ensure axum is fully ready
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         info!("HTTP server ready on {}", bind_addr_clone);
 
@@ -411,6 +409,9 @@ impl Transport for HttpServerTransport {
     }
 
     fn framed(mut self: Box<Self>) -> Result<Box<dyn TransportStream>> {
+        // Take ownership of shutdown_token to prevent Drop from cancelling it
+        let _shutdown_token = self.shutdown_token.take();
+
         let incoming_rx = self
             .incoming_rx
             .take()
