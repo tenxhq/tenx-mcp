@@ -78,6 +78,7 @@ impl ServerConn for EchoConnection {
             content: vec![Content::Text(TextContent {
                 text: message.to_string(),
                 annotations: None,
+                _meta: None,
             })],
             is_error: Some(false),
             structured_content: None,

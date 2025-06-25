@@ -605,6 +605,9 @@ pub struct Resource {
     /// window usage.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<i64>,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// A template description for resources available on the server.
@@ -640,6 +643,9 @@ pub struct ResourceTemplate {
     /// Optional annotations for the client.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// The contents of a specific resource or sub-resource.
@@ -660,6 +666,9 @@ pub struct TextResourceContents {
     /// The text of the item. This must only be set if the item can actually be
     /// represented as text (not binary data).
     pub text: String,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -671,6 +680,9 @@ pub struct BlobResourceContents {
     pub mime_type: Option<String>,
     /// A base64-encoded string representing the binary data of the item.
     pub blob: String,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// The server's response to a prompts/list request from the client.
@@ -742,6 +754,9 @@ pub struct Prompt {
     /// A list of arguments to use for templating the prompt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arguments: Option<Vec<PromptArgument>>,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// Describes an argument that a prompt can accept.
@@ -789,6 +804,8 @@ pub enum Content {
     Image(ImageContent),
     Audio(AudioContent),
     Resource(EmbeddedResource),
+    #[serde(rename = "resourceLink")]
+    ResourceLink(ResourceLink),
 }
 
 /// The contents of a resource, embedded into a prompt or tool call result.
@@ -801,7 +818,11 @@ pub struct EmbeddedResource {
     /// Optional annotations for the client.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
+
 
 /// The server's response to a tools/list request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -890,6 +911,7 @@ impl CallToolResult {
         self.content.push(Content::Text(TextContent {
             text: text.into(),
             annotations: None,
+            _meta: None,
         }));
         self
     }
@@ -998,6 +1020,9 @@ pub struct Tool {
     /// Optional additional tool information.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<ToolAnnotations>,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 impl Tool {
@@ -1010,6 +1035,7 @@ impl Tool {
             input_schema: schema,
             output_schema: None,
             annotations: None,
+            _meta: None,
         }
     }
 
@@ -1305,6 +1331,9 @@ pub struct TextContent {
     /// Optional annotations for the client.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// An image provided to or from an LLM.
@@ -1319,6 +1348,9 @@ pub struct ImageContent {
     /// Optional annotations for the client.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// Audio provided to or from an LLM.
@@ -1333,6 +1365,9 @@ pub struct AudioContent {
     /// Optional annotations for the client.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// The server's preferences for model selection, requested of the client during
@@ -1493,6 +1528,9 @@ pub struct Root {
     /// application.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata.
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 // Messages sent from the client to the server

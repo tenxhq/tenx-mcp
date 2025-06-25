@@ -55,6 +55,7 @@ impl ClientConn for MyClientConnection {
             content: schema::SamplingContent::Text(schema::TextContent {
                 text: format!("Response to: {last_message_text}"),
                 annotations: None,
+                _meta: None,
             }),
             model: "example-model".to_string(),
             stop_reason: None,
@@ -69,6 +70,7 @@ impl ClientConn for MyClientConnection {
             roots: vec![tenx_mcp::schema::Root {
                 uri: "file:///home/user/project".to_string(),
                 name: Some("My Project".to_string()),
+                _meta: None,
             }],
             meta: None,
         })

@@ -347,6 +347,7 @@ mod tests {
         let text_content = Content::Text(TextContent {
             text: "Hello".to_string(),
             annotations: None,
+            _meta: None,
         });
 
         let json = serde_json::to_value(&text_content).unwrap();

@@ -50,6 +50,7 @@ impl ClientConn for TestClient {
             roots: vec![Root {
                 uri: "file:///test".to_string(),
                 name: Some("Test Root".to_string()),
+                _meta: None,
             }],
             meta: None,
         })
@@ -76,6 +77,7 @@ impl ClientConn for TestClient {
             content: SamplingContent::Text(TextContent {
                 text: format!("Client received: {request_text}"),
                 annotations: None,
+                _meta: None,
             }),
             model: "test-model".to_string(),
             stop_reason: None,
@@ -152,6 +154,7 @@ impl ServerConn for TestServer {
                         content: SamplingContent::Text(TextContent {
                             text: "Server request".to_string(),
                             annotations: None,
+                            _meta: None,
                         }),
                     }],
                     system_prompt: None,

@@ -225,6 +225,7 @@ async fn test_successful_response() {
                     mime_type: Some("text/plain".to_string()),
                     size: None,
                     annotations: None,
+                    _meta: None,
                 }),
             )
         }

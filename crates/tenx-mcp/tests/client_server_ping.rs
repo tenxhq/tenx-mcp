@@ -42,6 +42,7 @@ impl ClientConn for TestClientConnection {
             content: SamplingContent::Text(TextContent {
                 text: "Test response".into(),
                 annotations: None,
+                _meta: None,
             }),
             model: "test-model".into(),
             stop_reason: None,
@@ -55,6 +56,7 @@ impl ClientConn for TestClientConnection {
             roots: vec![Root {
                 uri: "test://root".into(),
                 name: Some("Test Root".into()),
+                _meta: None,
             }],
             meta: None,
         })
@@ -95,6 +97,7 @@ async fn client_connection_trait_methods() {
             content: SamplingContent::Text(TextContent {
                 text: "Hello".into(),
                 annotations: None,
+                _meta: None,
             }),
         }],
         system_prompt: None,
