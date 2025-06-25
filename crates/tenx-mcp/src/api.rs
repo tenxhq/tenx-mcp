@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use crate::error::Result;
 use crate::schema::{
     ArgumentInfo, CallToolResult, ClientCapabilities, CompleteResult, CreateMessageParams,
-    CreateMessageResult, Cursor, GetPromptResult, Implementation, InitializeResult,
-    ListPromptsResult, ListResourceTemplatesResult, ListResourcesResult, ListRootsResult,
-    ListToolsResult, LoggingLevel, ReadResourceResult, Reference,
+    CreateMessageResult, Cursor, ElicitParams, ElicitResult, GetPromptResult, Implementation,
+    InitializeResult, ListPromptsResult, ListResourceTemplatesResult, ListResourcesResult,
+    ListRootsResult, ListToolsResult, LoggingLevel, ReadResourceResult, Reference,
 };
 
 /// Server API trait defining all methods that an MCP server must implement.
@@ -95,4 +95,7 @@ pub trait ClientAPI: Send + Sync {
 
     /// List available filesystem roots
     async fn list_roots(&mut self) -> Result<ListRootsResult>;
+
+    /// Handle elicitation requests from the server
+    async fn elicit(&mut self, params: ElicitParams) -> Result<ElicitResult>;
 }

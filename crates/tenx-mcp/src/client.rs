@@ -547,6 +547,10 @@ async fn handle_server_request_inner<C: ClientConn>(
             .list_roots(ctx)
             .await
             .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
+        ServerRequest::Elicit(params) => connection
+            .elicit(ctx, params)
+            .await
+            .and_then(|result| serde_json::to_value(result).map_err(Into::into)),
     }
 }
 

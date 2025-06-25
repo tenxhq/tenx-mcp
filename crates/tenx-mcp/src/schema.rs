@@ -823,7 +823,6 @@ pub struct EmbeddedResource {
     pub _meta: Option<HashMap<String, Value>>,
 }
 
-
 /// The server's response to a tools/list request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListToolsResult {
@@ -1710,6 +1709,7 @@ pub(crate) enum ClientResult {
     Empty(EmptyResult),
     CreateMessage(CreateMessageResult),
     ListRoots(ListRootsResult),
+    Elicit(ElicitResult),
 }
 
 /// Requests sent from the server to the client
@@ -1728,6 +1728,11 @@ pub enum ServerRequest {
 
     #[serde(rename = "roots/list")]
     ListRoots,
+
+    /// A request from the server to elicit additional information from the client.
+    /// This allows servers to ask for user input during execution.
+    #[serde(rename = "elicitation/create")]
+    Elicit(ElicitParams),
 }
 
 impl ServerRequest {
@@ -1737,6 +1742,7 @@ impl ServerRequest {
             ServerRequest::Ping => "ping",
             ServerRequest::CreateMessage { .. } => "sampling/createMessage",
             ServerRequest::ListRoots => "roots/list",
+            ServerRequest::Elicit { .. } => "elicitation/create",
         }
     }
 }

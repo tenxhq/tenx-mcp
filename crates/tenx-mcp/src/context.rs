@@ -4,7 +4,7 @@ use crate::{
     api::{ClientAPI, ServerAPI},
     error::{Error, Result},
     request_handler::{RequestHandler, TransportSink},
-    schema,
+    schema::{self, ElicitParams, ElicitResult},
 };
 
 use async_trait::async_trait;
@@ -315,5 +315,9 @@ impl ClientAPI for ServerCtx {
 
     async fn list_roots(&mut self) -> Result<schema::ListRootsResult> {
         self.request(schema::ServerRequest::ListRoots).await
+    }
+
+    async fn elicit(&mut self, params: schema::ElicitParams) -> Result<schema::ElicitResult> {
+        self.request(schema::ServerRequest::Elicit(params)).await
     }
 }

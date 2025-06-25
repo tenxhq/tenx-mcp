@@ -6,9 +6,9 @@ use serde_json::Value;
 use crate::{
     context::{ClientCtx, ServerCtx},
     schema::{
-        self, Cursor, GetPromptResult, InitializeResult, ListPromptsResult,
-        ListResourceTemplatesResult, ListResourcesResult, ListRootsResult, ListToolsResult,
-        LoggingLevel, ReadResourceResult,
+        self, Cursor, ElicitParams, ElicitResult, GetPromptResult, InitializeResult,
+        ListPromptsResult, ListResourceTemplatesResult, ListResourcesResult, ListRootsResult,
+        ListToolsResult, LoggingLevel, ReadResourceResult,
     },
     Error, Result,
 };
@@ -49,6 +49,10 @@ pub trait ClientConn: Send + Sync + Clone {
 
     async fn list_roots(&self, _context: &ClientCtx) -> Result<schema::ListRootsResult> {
         Err(Error::InvalidRequest("list_roots not implemented".into()))
+    }
+
+    async fn elicit(&self, _context: &ClientCtx, _params: ElicitParams) -> Result<ElicitResult> {
+        Err(Error::InvalidRequest("elicit not implemented".into()))
     }
 
     /// Handle a notification sent from the server
