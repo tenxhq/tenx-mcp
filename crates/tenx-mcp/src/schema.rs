@@ -5,7 +5,8 @@ use serde_json::Value;
 
 use crate::request_handler::RequestMethod;
 
-pub const LATEST_PROTOCOL_VERSION: &str = "2025-03-26";
+pub const PREVIOUS_PROTOCOL_VERSION: &str = "2025-03-26";
+pub const LATEST_PROTOCOL_VERSION: &str = "2025-06-18";
 pub(crate) const JSONRPC_VERSION: &str = "2.0";
 
 /// Refers to any valid JSON-RPC object that can be decoded off the wire, or
@@ -300,6 +301,9 @@ pub struct ClientCapabilities {
     /// Present if the client supports sampling from an LLM.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sampling: Option<Value>,
+    /// Present if the client supports elicitation requests.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub elicitation: Option<Value>,
 }
 
 impl ClientCapabilities {
@@ -330,6 +334,12 @@ impl ClientCapabilities {
     /// Enable sampling capability
     pub fn with_sampling(mut self) -> Self {
         self.sampling = Some(Value::Object(serde_json::Map::new()));
+        self
+    }
+
+    /// Enable elicitation capability
+    pub fn with_elicitation(mut self) -> Self {
+        self.elicitation = Some(Value::Object(serde_json::Map::new()));
         self
     }
 }
@@ -849,6 +859,9 @@ pub struct CallToolResult {
     /// If not set, this is assumed to be false (the call was successful).
     #[serde(rename = "isError", skip_serializing_if = "Option::is_none")]
     pub is_error: Option<bool>,
+    /// Optional structured content representing the tool's output.
+    #[serde(rename = "structuredContent", skip_serializing_if = "Option::is_none")]
+    pub structured_content: Option<Value>,
     /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
     /// to their responses.
     #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
@@ -861,6 +874,7 @@ impl CallToolResult {
         Self {
             content: Vec::new(),
             is_error: None,
+            structured_content: None,
             meta: None,
         }
     }
@@ -883,6 +897,12 @@ impl CallToolResult {
     /// Set the error flag
     pub fn is_error(mut self, is_error: bool) -> Self {
         self.is_error = Some(is_error);
+        self
+    }
+
+    /// Set the structured content
+    pub fn with_structured_content(mut self, content: Value) -> Self {
+        self.structured_content = Some(content);
         self
     }
 
@@ -972,6 +992,9 @@ pub struct Tool {
     /// A JSON Schema object defining the expected parameters for the tool.
     #[serde(rename = "inputSchema")]
     pub input_schema: ToolInputSchema,
+    /// A JSON Schema object defining the expected output of the tool.
+    #[serde(rename = "outputSchema", skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<ToolOutputSchema>,
     /// Optional additional tool information.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<ToolAnnotations>,
@@ -985,6 +1008,7 @@ impl Tool {
             title: None,
             description: None,
             input_schema: schema,
+            output_schema: None,
             annotations: None,
         }
     }
@@ -998,6 +1022,12 @@ impl Tool {
     /// Set the title for the tool
     pub fn with_title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
+        self
+    }
+
+    /// Set the output schema for the tool
+    pub fn with_output_schema(mut self, schema: ToolOutputSchema) -> Self {
+        self.output_schema = Some(schema);
         self
     }
 
@@ -1143,6 +1173,9 @@ impl ToolInputSchema {
     }
 }
 
+/// A JSON Schema object defining the expected output of a tool.
+pub type ToolOutputSchema = ToolInputSchema;
+
 /// The severity of a log message.
 ///
 /// These map to syslog message severities, as specified in RFC-5424:
@@ -1259,6 +1292,9 @@ pub struct Annotations {
     /// that the data is entirely optional.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<f64>,
+    /// The last time this object was modified, in ISO 8601 format.
+    #[serde(rename = "lastModified", skip_serializing_if = "Option::is_none")]
+    pub last_modified: Option<String>,
 }
 
 /// Text provided to or from an LLM.
@@ -1481,6 +1517,9 @@ pub(crate) enum ClientRequest {
         reference: Reference,
         /// The argument's information
         argument: ArgumentInfo,
+        /// Additional context for the completion request
+        #[serde(skip_serializing_if = "Option::is_none")]
+        context: Option<CompleteContext>,
     },
     #[serde(rename = "logging/setLevel")]
     SetLevel {
@@ -1867,6 +1906,56 @@ mod tests {
         let json = serde_json::to_value(&request).unwrap();
         assert_eq!(json["method"], "resources/templates/list");
         assert_eq!(json["cursor"], "template-cursor");
+    }
+
+    #[test]
+    fn test_client_capabilities_elicitation() {
+        let caps = ClientCapabilities::new().with_elicitation();
+        let json = serde_json::to_value(&caps).unwrap();
+        assert!(json["elicitation"].is_object());
+    }
+
+    #[test]
+    fn test_tool_output_schema() {
+        let tool = Tool::new("test_tool", ToolInputSchema::default())
+            .with_output_schema(ToolOutputSchema::default());
+        let json = serde_json::to_value(&tool).unwrap();
+        assert!(json["outputSchema"].is_object());
+    }
+
+    #[test]
+    fn test_call_tool_result_structured_content() {
+        let structured = serde_json::json!({"type": "table"});
+        let result = CallToolResult::new().with_structured_content(structured.clone());
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["structuredContent"], structured);
+    }
+
+    #[test]
+    fn test_annotations_last_modified() {
+        let annotations = Annotations {
+            audience: None,
+            priority: None,
+            last_modified: Some("2024-01-15T10:30:00Z".to_string()),
+        };
+        let json = serde_json::to_value(&annotations).unwrap();
+        assert_eq!(json["lastModified"], "2024-01-15T10:30:00Z");
+    }
+
+    #[test]
+    fn test_complete_request_context() {
+        let request = ClientRequest::Complete {
+            reference: Reference::Resource(ResourceReference {
+                uri: "test://resource".to_string(),
+            }),
+            argument: ArgumentInfo {
+                name: "arg".to_string(),
+                value: "value".to_string(),
+            },
+            context: Some(CompleteContext::new().add_argument("sessionId", "123")),
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["context"]["arguments"]["sessionId"], "123");
     }
 }
 
@@ -2277,6 +2366,39 @@ pub struct CompleteContext {
     /// Previously-resolved variables in a URI template or prompt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arguments: Option<HashMap<String, String>>,
+}
+
+impl CompleteContext {
+    /// Create a new CompleteContext with no arguments
+    pub fn new() -> Self {
+        Self { arguments: None }
+    }
+
+    /// Create a CompleteContext with the provided arguments
+    pub fn with_arguments(arguments: HashMap<String, String>) -> Self {
+        Self {
+            arguments: Some(arguments),
+        }
+    }
+
+    /// Add a single argument to the context
+    pub fn add_argument(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        let arguments = self.arguments.get_or_insert_with(HashMap::new);
+        arguments.insert(key.into(), value.into());
+        self
+    }
+
+    /// Set the arguments, replacing any existing ones
+    pub fn set_arguments(mut self, arguments: HashMap<String, String>) -> Self {
+        self.arguments = Some(arguments);
+        self
+    }
+}
+
+impl Default for CompleteContext {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // Roots-related types

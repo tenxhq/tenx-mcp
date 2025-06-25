@@ -542,6 +542,7 @@ async fn handle_request_inner(
         ClientRequest::Complete {
             reference,
             argument,
+            context: _,
         } => conn
             .complete(ctx, reference, argument)
             .await

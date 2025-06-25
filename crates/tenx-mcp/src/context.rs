@@ -204,6 +204,7 @@ impl ServerAPI for ClientCtx {
         self.request(schema::ClientRequest::Complete {
             reference,
             argument,
+            context: None,
         })
         .await
     }

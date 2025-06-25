@@ -475,6 +475,7 @@ where
         self.request(ClientRequest::Complete {
             reference,
             argument,
+            context: None,
         })
         .await
     }
