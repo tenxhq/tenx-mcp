@@ -108,6 +108,9 @@ where
     ///
     /// This is a convenience method that creates a TCP transport,
     /// connects to the server, and performs the initialization handshake.
+    ///
+    /// # Arguments
+    /// * `addr` - Server address in the format "host:port" (e.g., "localhost:3000", "127.0.0.1:8080")
     pub async fn connect_tcp(&mut self, addr: impl Into<String>) -> Result<InitializeResult> {
         let transport = Box::new(TcpClientTransport::new(addr));
         self.connect(transport).await?;
@@ -124,10 +127,14 @@ where
         self.init().await
     }
 
-    /// Connect via HTTP and initialize the connection
+    /// Connect via HTTP/HTTPS and initialize the connection
     ///
     /// This is a convenience method that creates an HTTP transport,
     /// connects to the server, and performs the initialization handshake.
+    /// Both HTTP and HTTPS protocols are supported.
+    ///
+    /// # Arguments
+    /// * `endpoint` - Server URL including protocol and path (e.g., "http://localhost:3000", "https://api.example.com/mcp")
     pub async fn connect_http(&mut self, endpoint: impl Into<String>) -> Result<InitializeResult> {
         let transport = Box::new(HttpClientTransport::new(endpoint));
         self.connect(transport).await?;
