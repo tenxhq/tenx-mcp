@@ -12,7 +12,6 @@ A Rust implementation of the Model Context Protocol (MCP) for building AI-integr
 Want to contribute? Have ideas or feature requests? Come tell us about it on
 [Discord](https://discord.gg/fHmRmuBDxF). 
 
-
 ---
 
 ## Overview
@@ -27,12 +26,14 @@ enhanced capabilities through a well-defined interface.
 
 ## Features
 
-- **Full MCP Protocol Support**: Implements the latest MCP specification (2025-03-26)
+- **Full MCP Protocol Support**: Implements the latest MCP specification (2025-03-26) with optional support for the previous version
 - **Client & Server**: Build both MCP clients and servers with ergonomic APIs
 - **Multiple Transports**: TCP/IP and stdio transport layers
 - **Async/Await**: Built on Tokio for high-performance async operations
 - **Type-Safe**: Leverages Rust's type system with comprehensive schema definitions
 - **Extensible**: Easy to add custom handlers for tools, resources, and prompts
+
+**Note**: Batch operations are not supported.
 
 ---
 
