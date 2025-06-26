@@ -2048,19 +2048,6 @@ pub struct ResourceLink {
     pub meta: Option<HashMap<String, Value>>,
 }
 
-/// ContentBlock union type for various content types
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum ContentBlock {
-    Text(TextContent),
-    Image(ImageContent),
-    Audio(AudioContent),
-    ResourceLink(ResourceLink),
-    Resource(EmbeddedResource),
-}
-
-// Standalone request types for better modularity
-
 /// This request is sent from the client to the server when it first connects, asking it to begin initialization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitializeRequest {
