@@ -46,6 +46,12 @@ impl InitializeResult {
         self
     }
 
+    /// Set the MCP protocol version
+    pub fn with_mcp_version(mut self, version: impl Into<String>) -> Self {
+        self.protocol_version = version.into();
+        self
+    }
+
     /// Set the instructions for the server
     pub fn with_instructions(mut self, instructions: impl Into<String>) -> Self {
         self.instructions = Some(instructions.into());
