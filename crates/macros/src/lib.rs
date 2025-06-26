@@ -693,7 +693,7 @@ mod tests {
         assert!(result_str.contains("async fn call_tool"));
 
         // Check that snake_case conversion is applied
-        assert!(result_str.contains(r#"Implementation :: new ("test_server" , "0.1.0")"#));
+        assert!(result_str.contains(r#"InitializeResult :: new ("test_server")"#));
     }
 
     #[test]
@@ -739,8 +739,7 @@ mod tests {
             let result = inner_mcp_server(TokenStream::new(), input).unwrap();
             let result_str = result.to_string();
 
-            let expected_pattern =
-                format!(r#"Implementation :: new ("{expected_snake_case}" , "0.1.0")"#);
+            let expected_pattern = format!(r#"InitializeResult :: new ("{expected_snake_case}")"#);
             assert!(
                 result_str.contains(&expected_pattern),
                 "Expected server name '{expected_snake_case}' for struct '{struct_name}', but got: {result_str}"

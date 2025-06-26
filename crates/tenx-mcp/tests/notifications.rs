@@ -77,7 +77,7 @@ async fn test_server_to_client_notifications() {
     let sent_notification = std::sync::Arc::new(std::sync::Mutex::new(false));
 
     // Create connected client and server
-    let (client, server_handle) = connected_client_and_server_with_conn(
+    let (mut client, server_handle) = connected_client_and_server_with_conn(
         {
             let sent_notification = sent_notification.clone();
             move || {
@@ -92,6 +92,9 @@ async fn test_server_to_client_notifications() {
     )
     .await
     .expect("Failed to connect client and server");
+
+    // Initialize the connection to trigger on_connect
+    client.init().await.expect("Failed to initialize");
 
     // Wait for the notification
     let result = tokio::time::timeout(tokio::time::Duration::from_secs(3), rx_notif).await;

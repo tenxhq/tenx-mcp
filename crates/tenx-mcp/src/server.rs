@@ -207,14 +207,12 @@ impl ServerHandle {
         // Create a single ServerCtx instance that will be used throughout the connection
         let server_ctx = ServerCtx::new(notification_tx.clone(), Some(sink_tx.clone()));
 
-        // Initialize connection if present
-        if let Some(conn) = &connection {
-            conn.on_connect(&server_ctx).await?;
-        }
-
         // Create shutdown token for coordinating shutdown
         let shutdown_token = CancellationToken::new();
         let shutdown_token_task = shutdown_token.clone();
+
+        // Track whether we've called on_connect yet
+        let mut connected = false;
 
         // Start the main server loop in a background task
         let handle = tokio::spawn(async move {
@@ -230,6 +228,15 @@ impl ServerHandle {
                         match result {
                             Some(Ok(message)) => {
                                 if let Some(conn) = &connection {
+                                    // Call on_connect when we receive the first message from client
+                                    if !connected {
+                                        if let Err(e) = conn.on_connect(&server_ctx).await {
+                                            error!("Error during on_connect: {}", e);
+                                            break;
+                                        }
+                                        connected = true;
+                                    }
+
                                     // Handle responses and errors from client specially
                                     match &message {
                                         JSONRPCMessage::Response(response) => {
