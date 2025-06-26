@@ -153,18 +153,10 @@ impl CustomInitServer {
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
     ) -> Result<InitializeResult> {
-        Ok(InitializeResult {
-            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-            capabilities: ServerCapabilities {
-                tools: Some(ToolsCapability {
-                    list_changed: Some(true),
-                }),
-                ..Default::default()
-            },
-            server_info: Implementation::new("custom_init_server", "2.0.0"),
-            instructions: Some("Custom initialized server".to_string()),
-            meta: None,
-        })
+        Ok(InitializeResult::new("custom_init_server")
+            .with_version("2.0.0")
+            .with_tools(true)
+            .with_instructions("Custom initialized server"))
     }
 
     #[tool]

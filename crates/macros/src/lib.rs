@@ -364,18 +364,10 @@ fn generate_default_initialize(info: &ServerInfo) -> TokenStream {
             _capabilities: tenx_mcp::schema::ClientCapabilities,
             _client_info: tenx_mcp::schema::Implementation,
         ) -> tenx_mcp::Result<tenx_mcp::schema::InitializeResult> {
-            Ok(tenx_mcp::schema::InitializeResult {
-                protocol_version: tenx_mcp::schema::LATEST_PROTOCOL_VERSION.to_string(),
-                capabilities: tenx_mcp::schema::ServerCapabilities {
-                    tools: Some(tenx_mcp::schema::ToolsCapability {
-                        list_changed: Some(false),
-                    }),
-                    ..Default::default()
-                },
-                server_info: tenx_mcp::schema::Implementation::new(#snake_case_name, "0.1.0"),
-                instructions: Some(#description.to_string()),
-                meta: None,
-            })
+            Ok(tenx_mcp::schema::InitializeResult::new(#snake_case_name)
+                .with_version("0.1.0")
+                .with_tools(false)
+                .with_instructions(#description))
         }
     }
 }

@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use super::*;
+use crate::request_handler::RequestMethod;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::request_handler::RequestMethod;
+use std::collections::HashMap;
 
 // Messages sent from the client to the server
 #[derive(Debug, Clone, Serialize, Deserialize)]

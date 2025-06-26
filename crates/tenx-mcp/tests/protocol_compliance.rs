@@ -85,18 +85,9 @@ impl ServerConn for TestConnection {
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
     ) -> Result<InitializeResult> {
-        Ok(InitializeResult {
-            protocol_version: LATEST_PROTOCOL_VERSION.to_string(),
-            capabilities: ServerCapabilities {
-                tools: Some(ToolsCapability {
-                    list_changed: Some(true),
-                }),
-                ..Default::default()
-            },
-            server_info: Implementation::new("test-server", "1.0.0"),
-            instructions: None,
-            meta: None,
-        })
+        Ok(InitializeResult::new("test-server")
+            .with_version("1.0.0")
+            .with_tools(true))
     }
 
     async fn list_tools(

@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
             let url = if url.starts_with("http://") || url.starts_with("https://") {
                 url
             } else {
-                format!("http://{}", url)
+                format!("http://{url}")
             };
             info!("Connecting to MCP server at {} (HTTP)", url);
             let server_info = client.connect_http(&url).await?;
@@ -85,7 +85,7 @@ async fn main() -> Result<()> {
     // Call the echo tool
     info!("\nCalling echo tool...");
     let params = EchoParams {
-        message: format!("Hello from tenx-mcp {} client!", mode),
+        message: format!("Hello from tenx-mcp {mode} client!"),
     };
     // If "echo" took no arguments, you would pass `()` like so:
     // let result = client.call_tool("echo_no_args", ()).await?;

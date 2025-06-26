@@ -18,7 +18,8 @@ impl ServerConn for EchoConnection {
         _capabilities: ClientCapabilities,
         _client_info: Implementation,
     ) -> Result<InitializeResult> {
-        Ok(InitializeResult::new("http-echo-server", "0.1.0")
+        Ok(InitializeResult::new("http-echo-server")
+            .with_version("0.1.0")
             .with_capabilities(ServerCapabilities::default().with_tools(None)))
     }
 

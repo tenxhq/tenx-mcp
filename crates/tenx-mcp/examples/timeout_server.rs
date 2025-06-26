@@ -49,10 +49,9 @@ impl ServerConn for TimeoutTestConnection {
         _capabilities: schema::ClientCapabilities,
         _client_info: schema::Implementation,
     ) -> Result<schema::InitializeResult> {
-        Ok(
-            schema::InitializeResult::new(&self.server_info.name, &self.server_info.version)
-                .with_capabilities(self.capabilities.clone()),
-        )
+        Ok(schema::InitializeResult::new(&self.server_info.name)
+            .with_version(&self.server_info.version)
+            .with_capabilities(self.capabilities.clone()))
     }
 
     async fn list_tools(

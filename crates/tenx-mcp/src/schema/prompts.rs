@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use super::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListPromptsResult {
@@ -12,7 +12,10 @@ pub struct ListPromptsResult {
 
 impl ListPromptsResult {
     pub fn new() -> Self {
-        Self { prompts: Vec::new(), next_cursor: None }
+        Self {
+            prompts: Vec::new(),
+            next_cursor: None,
+        }
     }
 
     pub fn with_prompt(mut self, prompt: Prompt) -> Self {

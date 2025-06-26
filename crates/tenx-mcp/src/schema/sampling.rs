@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use super::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateMessageParams {
@@ -73,7 +73,10 @@ pub struct ModelPreferences {
     pub cost_priority: Option<f64>,
     #[serde(rename = "speedPriority", skip_serializing_if = "Option::is_none")]
     pub speed_priority: Option<f64>,
-    #[serde(rename = "intelligencePriority", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "intelligencePriority",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub intelligence_priority: Option<f64>,
 }
 

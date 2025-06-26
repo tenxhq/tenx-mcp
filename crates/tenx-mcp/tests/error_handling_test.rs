@@ -26,13 +26,7 @@ async fn test_method_not_found() {
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
         ) -> Result<schema::InitializeResult> {
-            Ok(schema::InitializeResult {
-                protocol_version: schema::LATEST_PROTOCOL_VERSION.to_string(),
-                capabilities: schema::ServerCapabilities::default(),
-                server_info: schema::Implementation::new("test-server", "1.0.0"),
-                instructions: None,
-                meta: None,
-            })
+            Ok(schema::InitializeResult::new("test-server").with_version("1.0.0"))
         }
     }
 
@@ -70,16 +64,9 @@ async fn test_invalid_params() {
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
         ) -> Result<schema::InitializeResult> {
-            Ok(schema::InitializeResult {
-                protocol_version: schema::LATEST_PROTOCOL_VERSION.to_string(),
-                capabilities: schema::ServerCapabilities {
-                    tools: Some(schema::ToolsCapability { list_changed: None }),
-                    ..Default::default()
-                },
-                server_info: schema::Implementation::new("test-server", "1.0.0"),
-                instructions: None,
-                meta: None,
-            })
+            Ok(schema::InitializeResult::new("test-server")
+                .with_version("1.0.0")
+                .with_tools(false))
         }
 
         async fn list_tools(
@@ -179,20 +166,10 @@ async fn test_successful_response() {
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
         ) -> Result<schema::InitializeResult> {
-            Ok(schema::InitializeResult {
-                protocol_version: schema::LATEST_PROTOCOL_VERSION.to_string(),
-                capabilities: schema::ServerCapabilities {
-                    tools: Some(schema::ToolsCapability { list_changed: None }),
-                    resources: Some(schema::ResourcesCapability {
-                        subscribe: Some(true),
-                        list_changed: None,
-                    }),
-                    ..Default::default()
-                },
-                server_info: schema::Implementation::new("test-server", "1.0.0"),
-                instructions: None,
-                meta: None,
-            })
+            Ok(schema::InitializeResult::new("test-server")
+                .with_version("1.0.0")
+                .with_tools(false)
+                .with_resources(true, false))
         }
 
         async fn list_tools(

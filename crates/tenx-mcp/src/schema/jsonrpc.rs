@@ -3,8 +3,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::request_handler::RequestMethod;
-
 pub const PREVIOUS_PROTOCOL_VERSION: &str = "2025-03-26";
 pub const LATEST_PROTOCOL_VERSION: &str = "2025-06-18";
 pub(crate) const JSONRPC_VERSION: &str = "2.0";

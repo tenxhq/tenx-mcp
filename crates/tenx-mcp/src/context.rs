@@ -4,7 +4,7 @@ use crate::{
     api::{ClientAPI, ServerAPI},
     error::{Error, Result},
     request_handler::{RequestHandler, TransportSink},
-    schema::{self, ElicitParams, ElicitResult},
+    schema::{self},
 };
 
 use async_trait::async_trait;

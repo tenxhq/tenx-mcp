@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use super::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListResourcesResult {
@@ -51,7 +51,10 @@ pub struct ReadResourceResult {
 
 impl ReadResourceResult {
     pub fn new() -> Self {
-        Self { contents: Vec::new(), meta: None }
+        Self {
+            contents: Vec::new(),
+            meta: None,
+        }
     }
 
     pub fn with_content(mut self, content: ResourceContents) -> Self {
@@ -70,7 +73,9 @@ impl ReadResourceResult {
     }
 
     pub fn with_meta_entry(mut self, key: impl Into<String>, value: Value) -> Self {
-        self.meta.get_or_insert_with(HashMap::new).insert(key.into(), value);
+        self.meta
+            .get_or_insert_with(HashMap::new)
+            .insert(key.into(), value);
         self
     }
 }

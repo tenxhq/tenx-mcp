@@ -69,7 +69,7 @@ async fn test_server_to_client_notifications() {
             _capabilities: schema::ClientCapabilities,
             _client_info: schema::Implementation,
         ) -> Result<schema::InitializeResult> {
-            Ok(schema::InitializeResult::new("notifying-server", "0.1.0"))
+            Ok(schema::InitializeResult::new("notifying-server").with_version("0.1.0"))
         }
     }
 

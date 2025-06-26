@@ -687,7 +687,7 @@ mod tests {
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
             ) -> Result<InitializeResult> {
-                Ok(InitializeResult::new("test-server", "1.0.0"))
+                Ok(InitializeResult::new("test-server").with_version("1.0.0"))
             }
         }
 
@@ -759,7 +759,7 @@ mod tests {
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
             ) -> Result<InitializeResult> {
-                Ok(InitializeResult::new("test-server", "1.0.0"))
+                Ok(InitializeResult::new("test-server").with_version("1.0.0"))
             }
         }
 
@@ -825,7 +825,7 @@ mod tests {
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
             ) -> Result<InitializeResult> {
-                Ok(InitializeResult::new("test-server", "1.0.0"))
+                Ok(InitializeResult::new("test-server").with_version("1.0.0"))
             }
 
             async fn notification(
@@ -956,7 +956,7 @@ mod tests {
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
             ) -> Result<InitializeResult> {
-                Ok(InitializeResult::new("test-server", "1.0.0"))
+                Ok(InitializeResult::new("test-server").with_version("1.0.0"))
             }
         }
 
@@ -1029,7 +1029,7 @@ mod tests {
                 _capabilities: ClientCapabilities,
                 _client_info: Implementation,
             ) -> Result<InitializeResult> {
-                Ok(InitializeResult::new("test-server", "1.0.0"))
+                Ok(InitializeResult::new("test-server").with_version("1.0.0"))
             }
         }
 
