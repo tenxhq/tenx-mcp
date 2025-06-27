@@ -51,11 +51,11 @@ async fn test_authorization_url_generation() {
 #[tokio::test]
 async fn test_callback_server() {
     let server = OAuth2CallbackServer::new(8765);
-    
+
     // Spawn a task to simulate a client making the callback request
     let client_task = tokio::spawn(async move {
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
+
         let client = reqwest::Client::new();
         let _ = client
             .get("http://127.0.0.1:8765/callback?code=test_code&state=test_state")
@@ -65,7 +65,7 @@ async fn test_callback_server() {
 
     // Wait for callback with timeout
     let result = timeout(Duration::from_secs(5), server.wait_for_callback()).await;
-    
+
     match result {
         Ok(Ok((code, state))) => {
             assert_eq!(code, "test_code");
@@ -92,7 +92,7 @@ async fn test_http_transport_with_oauth() {
     };
 
     let oauth_client = OAuth2Client::new(config).unwrap();
-    
+
     // Set a pre-configured token to avoid the OAuth flow
     let token = OAuth2Token {
         access_token: "test_access_token".to_string(),
@@ -102,11 +102,11 @@ async fn test_http_transport_with_oauth() {
     oauth_client.set_token(token).await;
 
     let oauth_client_arc = Arc::new(oauth_client);
-    
+
     // Verify the token is retrievable
     let retrieved_token = oauth_client_arc.get_valid_token().await.unwrap();
     assert_eq!(retrieved_token, "test_access_token");
-    
+
     // The actual HTTP transport integration is tested in the examples
     // This test focuses on the OAuth client functionality
 }
@@ -124,7 +124,7 @@ async fn test_token_refresh() {
     };
 
     let oauth_client = OAuth2Client::new(config).unwrap();
-    
+
     // Set an expired token
     let token = OAuth2Token {
         access_token: "expired_token".to_string(),
@@ -137,7 +137,7 @@ async fn test_token_refresh() {
     // In a real scenario, this would make an HTTP request to the token endpoint
     // For testing, we'll just verify the logic works
     let result = oauth_client.get_valid_token().await;
-    
+
     // This will fail because we don't have a real OAuth server, but the logic is tested
     assert!(result.is_err());
 }

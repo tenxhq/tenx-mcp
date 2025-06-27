@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use url::Url;
 
+use super::dynamic_registration::{ClientMetadata, DynamicRegistrationClient};
 use crate::error::Error;
 
 #[derive(Debug, Clone)]
@@ -52,6 +53,64 @@ pub struct OAuth2Client {
 }
 
 impl OAuth2Client {
+    /// Perform dynamic client registration and create an OAuth2Client
+    pub async fn register_dynamic(
+        auth_url: String,
+        token_url: String,
+        resource: String,
+        client_name: String,
+        redirect_url: String,
+        scopes: Vec<String>,
+        registration_endpoint: Option<String>,
+    ) -> Result<Self, Error> {
+        let registration_client = DynamicRegistrationClient::new();
+
+        // Try to discover registration endpoint if not provided
+        let reg_endpoint = if let Some(endpoint) = registration_endpoint {
+            endpoint
+        } else {
+            // Extract issuer from auth URL
+            let auth_url_parsed = Url::parse(&auth_url)
+                .map_err(|e| Error::InvalidConfiguration(format!("Invalid auth URL: {e}")))?;
+            let issuer = format!(
+                "{}://{}",
+                auth_url_parsed.scheme(),
+                auth_url_parsed.host_str().unwrap_or("")
+            );
+
+            // Try to discover registration endpoint
+            match registration_client
+                .discover_registration_endpoint(&issuer)
+                .await
+            {
+                Ok(Some(endpoint)) => endpoint,
+                Ok(None) => {
+                    return Err(Error::InvalidConfiguration(
+                        "No registration endpoint found in OAuth metadata".to_string(),
+                    ));
+                }
+                Err(e) => return Err(e),
+            }
+        };
+
+        // Create client metadata
+        let metadata = ClientMetadata::new(&client_name, &redirect_url)
+            .with_resource(&resource)
+            .with_scopes(scopes.clone())
+            .with_software_info("tenx-mcp", env!("CARGO_PKG_VERSION"));
+
+        // Register the client
+        let registration = registration_client
+            .register(&reg_endpoint, metadata, None)
+            .await?;
+
+        // Create OAuth2Config from registration response
+        let config = OAuth2Config::from_registration(registration, auth_url, token_url, resource);
+
+        // Create the OAuth2Client
+        Self::new(config)
+    }
+
     pub fn new(config: OAuth2Config) -> Result<Self, Error> {
         let mut client = BasicClient::new(ClientId::new(config.client_id.clone()))
             .set_auth_uri(
@@ -59,13 +118,14 @@ impl OAuth2Client {
                     .map_err(|e| Error::InvalidConfiguration(format!("Invalid auth URL: {e}")))?,
             )
             .set_token_uri(
-                TokenUrl::new(config.token_url.clone()).map_err(|e| {
-                    Error::InvalidConfiguration(format!("Invalid token URL: {e}"))
-                })?,
+                TokenUrl::new(config.token_url.clone())
+                    .map_err(|e| Error::InvalidConfiguration(format!("Invalid token URL: {e}")))?,
             )
-            .set_redirect_uri(RedirectUrl::new(config.redirect_url.clone()).map_err(|e| {
-                Error::InvalidConfiguration(format!("Invalid redirect URL: {e}"))
-            })?);
+            .set_redirect_uri(
+                RedirectUrl::new(config.redirect_url.clone()).map_err(|e| {
+                    Error::InvalidConfiguration(format!("Invalid redirect URL: {e}"))
+                })?,
+            );
 
         if let Some(client_secret) = config.client_secret.as_ref() {
             client = client.set_client_secret(ClientSecret::new(client_secret.clone()));
