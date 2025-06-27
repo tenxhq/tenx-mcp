@@ -1,6 +1,5 @@
+use crate::macros::with_meta;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArgumentInfo {
@@ -35,11 +34,10 @@ pub struct PromptReference {
     pub title: Option<String>,
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompleteResult {
     pub completion: CompletionInfo,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

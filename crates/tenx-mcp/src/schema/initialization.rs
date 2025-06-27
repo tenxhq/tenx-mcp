@@ -1,9 +1,9 @@
 use super::*;
+use crate::macros::with_meta;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::HashMap;
 
 /// After receiving an initialize request from the client, the server sends this response.
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitializeResult {
     /// The version of the Model Context Protocol that the server wants to use.
@@ -17,10 +17,6 @@ pub struct InitializeResult {
     /// Instructions describing how to use the server and its features.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
-    /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
-    /// to their responses.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 impl InitializeResult {

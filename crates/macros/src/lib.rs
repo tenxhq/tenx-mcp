@@ -495,6 +495,122 @@ pub fn tool(
     input
 }
 
+/// Adds a _meta field to a struct with proper serde attributes.
+///
+/// This macro adds the following field to the struct:
+/// ```ignore
+/// #[serde(skip_serializing_if = "Option::is_none")]
+/// pub _meta: Option<HashMap<String, Value>>,
+/// ```
+#[proc_macro_attribute]
+pub fn with_meta(
+    _attr: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let mut input = syn::parse_macro_input!(input as syn::DeriveInput);
+
+    // Only process structs
+    let syn::Data::Struct(ref mut data_struct) = &mut input.data else {
+        return syn::Error::new(
+            input.ident.span(),
+            "with_meta can only be applied to structs",
+        )
+        .to_compile_error()
+        .into();
+    };
+
+    let syn::Fields::Named(ref mut fields) = &mut data_struct.fields else {
+        return syn::Error::new(
+            input.ident.span(),
+            "with_meta can only be applied to structs with named fields",
+        )
+        .to_compile_error()
+        .into();
+    };
+
+    // Create the _meta field
+    let meta_field: syn::Field = syn::parse_quote! {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub _meta: Option<std::collections::HashMap<String, serde_json::Value>>
+    };
+
+    // Add the field
+    fields.named.push(meta_field);
+
+    // Return the modified struct
+    quote! {
+        #input
+    }
+    .into()
+}
+
+/// Adds name and title fields to a struct with proper serde attributes and documentation.
+///
+/// This macro adds the following fields to the struct:
+/// ```ignore
+/// /// Intended for programmatic or logical use, but used as a display name in past specs or fallback (if title isn't present).
+/// pub name: String,
+///
+/// /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+/// /// even by those unfamiliar with domain-specific terminology.
+/// ///
+/// /// If not provided, the name should be used for display.
+/// #[serde(skip_serializing_if = "Option::is_none")]
+/// pub title: Option<String>,
+/// ```
+#[proc_macro_attribute]
+pub fn with_basename(
+    _attr: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let mut input = syn::parse_macro_input!(input as syn::DeriveInput);
+
+    // Only process structs
+    let syn::Data::Struct(ref mut data_struct) = &mut input.data else {
+        return syn::Error::new(
+            input.ident.span(),
+            "with_basename can only be applied to structs",
+        )
+        .to_compile_error()
+        .into();
+    };
+
+    let syn::Fields::Named(ref mut fields) = &mut data_struct.fields else {
+        return syn::Error::new(
+            input.ident.span(),
+            "with_basename can only be applied to structs with named fields",
+        )
+        .to_compile_error()
+        .into();
+    };
+
+    // Create the name field
+    let name_field: syn::Field = syn::parse_quote! {
+        /// Intended for programmatic or logical use, but used as a display name in past specs or fallback (if title isn't present).
+        pub name: String
+    };
+
+    // Create the title field
+    let title_field: syn::Field = syn::parse_quote! {
+        /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+        /// even by those unfamiliar with domain-specific terminology.
+        ///
+        /// If not provided, the name should be used for display.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub title: Option<String>
+    };
+
+    // Add the fields
+    fields.named.push(name_field);
+    fields.named.push(title_field);
+
+    // Return the modified struct
+    quote! {
+        #input
+    }
+    .into()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

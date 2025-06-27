@@ -1,4 +1,5 @@
 use super::*;
+use crate::macros::with_meta;
 use crate::request_handler::RequestMethod;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -483,6 +484,7 @@ mod tests {
 ///
 /// Note: resource links returned by tools are not guaranteed to appear in the results of `resources/list` requests.
 // Extends Resource (which extends BaseMetadata)
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceLink {
     #[serde(rename = "type")]
@@ -516,10 +518,6 @@ pub struct ResourceLink {
     /// If not provided, the name should be used for display.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-
-    /// See [specification/2025-06-18/basic/index#general-fields] for notes on _meta usage.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// This request is sent from the client to the server when it first connects, asking it to begin initialization.
@@ -617,14 +615,12 @@ pub struct PaginatedParams {
 }
 
 /// Base interface for paginated results
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaginatedResult {
     /// An opaque token representing the pagination position after the last returned result.
     #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 // Resource-related request types
@@ -708,13 +704,11 @@ pub struct ResourceUpdatedNotification {
     pub params: ResourceUpdatedParams,
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceUpdatedParams {
     /// The URI of the resource that has been updated.
     pub uri: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 // Prompt-related request types
@@ -816,6 +810,7 @@ pub struct LoggingMessageNotification {
     pub params: LoggingMessageParams,
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggingMessageParams {
     /// The severity of this log message.
@@ -827,9 +822,6 @@ pub struct LoggingMessageParams {
 
     /// The data to be logged, such as a string message or an object.
     pub data: Value,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 // Sampling-related types
@@ -958,6 +950,7 @@ pub struct ElicitSchema {
 }
 
 /// The client's response to an elicitation request.
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ElicitResult {
     /// The user action in response to the elicitation.
@@ -966,9 +959,6 @@ pub struct ElicitResult {
     /// The submitted form data, only present when action is "accept".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<HashMap<String, ElicitValue>>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

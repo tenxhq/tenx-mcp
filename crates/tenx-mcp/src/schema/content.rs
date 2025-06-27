@@ -1,7 +1,6 @@
 use super::*;
+use crate::macros::with_meta;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -21,13 +20,12 @@ pub enum Content {
     ResourceLink(ResourceLink),
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddedResource {
     pub resource: ResourceContents,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,15 +38,15 @@ pub struct Annotations {
     pub last_modified: Option<String>,
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextContent {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageContent {
     pub data: String,
@@ -56,10 +54,9 @@ pub struct ImageContent {
     pub mime_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioContent {
     pub data: String,
@@ -67,6 +64,4 @@ pub struct AudioContent {
     pub mime_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }

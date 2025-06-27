@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::macros::with_meta;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -111,22 +112,20 @@ pub struct Notification {
     pub params: Option<NotificationParams>,
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NotificationParams {
     /// This parameter name is reserved by MCP to allow clients and servers to
     /// attach additional metadata to their notifications.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
     #[serde(flatten)]
     pub other: HashMap<String, Value>,
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Result {
     /// This result property is reserved by the protocol to allow clients and
     /// servers to attach additional metadata to their responses.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
     #[serde(flatten)]
     pub other: HashMap<String, Value>,
 }

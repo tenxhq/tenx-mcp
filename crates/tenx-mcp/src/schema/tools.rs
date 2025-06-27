@@ -1,4 +1,5 @@
 use super::*;
+use crate::macros::{with_basename, with_meta};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -34,6 +35,7 @@ impl ListToolsResult {
     }
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallToolResult {
     pub content: Vec<Content>,
@@ -41,8 +43,6 @@ pub struct CallToolResult {
     pub is_error: Option<bool>,
     #[serde(rename = "structuredContent", skip_serializing_if = "Option::is_none")]
     pub structured_content: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 impl CallToolResult {
@@ -113,6 +113,8 @@ pub struct ToolAnnotations {
 }
 
 /// Definition for a tool the client can call.
+#[with_meta]
+#[with_basename]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tool {
     #[serde(rename = "inputSchema")]
@@ -123,20 +125,6 @@ pub struct Tool {
     pub output_schema: Option<ToolOutputSchema>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<ToolAnnotations>,
-    /// Intended for programmatic or logical use, but used as a display name in past specs or fallback (if title isn't present).
-    pub name: String,
-
-    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
-    /// even by those unfamiliar with domain-specific terminology.
-    ///
-    /// If not provided, the name should be used for display (except for Tool,
-    /// where `annotations.title` should be given precedence over using `name`,
-    /// if present).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 impl Tool {

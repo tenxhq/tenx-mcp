@@ -1,4 +1,5 @@
 use super::*;
+use crate::macros::{with_basename, with_meta};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -42,11 +43,10 @@ pub struct ListResourceTemplatesResult {
     pub next_cursor: Option<Cursor>,
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ReadResourceResult {
     pub contents: Vec<ResourceContents>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 impl ReadResourceResult {
@@ -81,6 +81,8 @@ impl ReadResourceResult {
 }
 
 /// A known resource that the server is capable of reading.
+#[with_meta]
+#[with_basename]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resource {
     pub uri: String,
@@ -92,19 +94,11 @@ pub struct Resource {
     pub annotations: Option<Annotations>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<i64>,
-    /// Intended for programmatic or logical use, but used as a display name in past specs or fallback (if title isn't present).
-    pub name: String,
-    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
-    /// even by those unfamiliar with domain-specific terminology.
-    ///
-    /// If not provided, the name should be used for display.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// A template description for resources available on the server.
+#[with_meta]
+#[with_basename]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceTemplate {
     #[serde(rename = "uriTemplate")]
@@ -115,16 +109,6 @@ pub struct ResourceTemplate {
     pub mime_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
-    /// Intended for programmatic or logical use, but used as a display name in past specs or fallback (if title isn't present).
-    pub name: String,
-    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
-    /// even by those unfamiliar with domain-specific terminology.
-    ///
-    /// If not provided, the name should be used for display.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,22 +118,20 @@ pub enum ResourceContents {
     Blob(BlobResourceContents),
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextResourceContents {
     pub uri: String,
     #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
     pub mime_type: Option<String>,
     pub text: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlobResourceContents {
     pub uri: String,
     #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
     pub mime_type: Option<String>,
     pub blob: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }

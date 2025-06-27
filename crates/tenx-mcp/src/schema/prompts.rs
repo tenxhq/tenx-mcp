@@ -1,7 +1,6 @@
 use super::*;
+use crate::macros::{with_basename, with_meta};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListPromptsResult {
@@ -34,52 +33,33 @@ impl ListPromptsResult {
     }
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetPromptResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub messages: Vec<PromptMessage>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// A prompt or prompt template that the server offers.
+#[with_meta]
+#[with_basename]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Prompt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arguments: Option<Vec<PromptArgument>>,
-
-    /// Intended for programmatic or logical use, but used as a display name in past specs or fallback (if title isn't present).
-    pub name: String,
-    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
-    /// even by those unfamiliar with domain-specific terminology.
-    ///
-    /// If not provided, the name should be used for display.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// Describes an argument that a prompt can accept.
+#[with_basename]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptArgument {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub required: Option<bool>,
-
-    /// Intended for programmatic or logical use, but used as a display name in past specs or fallback (if title isn't present).
-    pub name: String,
-    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
-    /// even by those unfamiliar with domain-specific terminology.
-    ///
-    /// If not provided, the name should be used for display.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

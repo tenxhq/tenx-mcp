@@ -1,7 +1,7 @@
 use super::*;
+use crate::macros::with_meta;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateMessageParams {
@@ -30,6 +30,7 @@ pub enum IncludeContext {
     AllServers,
 }
 
+#[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateMessageResult {
     pub role: Role,
@@ -37,8 +38,6 @@ pub struct CreateMessageResult {
     pub model: String,
     #[serde(rename = "stopReason", skip_serializing_if = "Option::is_none")]
     pub stop_reason: Option<StopReason>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
