@@ -18,7 +18,7 @@ impl ClientConn for MyClientConnection {
         Ok(())
     }
 
-    async fn on_disconnect(&self, _context: &ClientCtx) -> Result<()> {
+    async fn on_shutdown(&self, _context: &ClientCtx) -> Result<()> {
         println!("Client connection closed for: {}", self.name);
         Ok(())
     }

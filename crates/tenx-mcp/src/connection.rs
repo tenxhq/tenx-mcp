@@ -27,7 +27,7 @@ pub trait ClientConn: Send + Sync + Clone {
     }
 
     /// Called when the connection is being closed
-    async fn on_disconnect(&self, _context: &ClientCtx) -> Result<()> {
+    async fn on_shutdown(&self, _context: &ClientCtx) -> Result<()> {
         Ok(())
     }
 
@@ -85,11 +85,11 @@ pub trait ServerConn: Send + Sync {
         Ok(())
     }
 
-    /// Called when the connection is being closed
+    /// Called when the server is shutting down
     ///
     /// # Arguments
     /// * `remote_addr` - The remote address ("stdio" for stdio connections)
-    async fn on_disconnect(&self, _remote_addr: &str) -> Result<()> {
+    async fn on_shutdown(&self, _remote_addr: &str) -> Result<()> {
         Ok(())
     }
 

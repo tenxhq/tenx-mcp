@@ -20,8 +20,8 @@ impl ClientConn for TestClientConnection {
         Ok(())
     }
 
-    async fn on_disconnect(&self, _ctx: &ClientCtx) -> Result<()> {
-        self.calls.lock().unwrap().push("on_disconnect".into());
+    async fn on_shutdown(&self, _ctx: &ClientCtx) -> Result<()> {
+        self.calls.lock().unwrap().push("on_shutdown".into());
         Ok(())
     }
 

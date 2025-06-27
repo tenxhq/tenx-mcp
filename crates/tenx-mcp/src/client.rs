@@ -327,8 +327,8 @@ where
             }
 
             // Clean up connection
-            if let Err(e) = connection.on_disconnect(&context).await {
-                error!("Error during connection disconnect: {}", e);
+            if let Err(e) = connection.on_shutdown(&context).await {
+                error!("Error during client shutdown: {}", e);
             }
 
             info!("Message handler stopped");

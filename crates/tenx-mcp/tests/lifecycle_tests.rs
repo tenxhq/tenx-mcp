@@ -10,18 +10,18 @@ use tokio::sync::Mutex;
 #[derive(Debug, Clone)]
 struct LifecycleTestServer {
     connect_count: Arc<AtomicU32>,
-    disconnect_count: Arc<AtomicU32>,
+    shutdown_count: Arc<AtomicU32>,
     connect_addrs: Arc<Mutex<Vec<String>>>,
-    disconnect_addrs: Arc<Mutex<Vec<String>>>,
+    shutdown_addrs: Arc<Mutex<Vec<String>>>,
 }
 
 impl Default for LifecycleTestServer {
     fn default() -> Self {
         Self {
             connect_count: Arc::new(AtomicU32::new(0)),
-            disconnect_count: Arc::new(AtomicU32::new(0)),
+            shutdown_count: Arc::new(AtomicU32::new(0)),
             connect_addrs: Arc::new(Mutex::new(Vec::new())),
-            disconnect_addrs: Arc::new(Mutex::new(Vec::new())),
+            shutdown_addrs: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
@@ -35,9 +35,9 @@ impl ServerConn for LifecycleTestServer {
         Ok(())
     }
 
-    async fn on_disconnect(&self, remote_addr: &str) -> Result<()> {
-        self.disconnect_count.fetch_add(1, Ordering::SeqCst);
-        let mut addrs = self.disconnect_addrs.lock().await;
+    async fn on_shutdown(&self, remote_addr: &str) -> Result<()> {
+        self.shutdown_count.fetch_add(1, Ordering::SeqCst);
+        let mut addrs = self.shutdown_addrs.lock().await;
         addrs.push(remote_addr.to_string());
         Ok(())
     }
@@ -86,9 +86,9 @@ async fn test_stdio_lifecycle() {
     server_handle.stop().await.unwrap();
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    // Verify on_disconnect was called
-    assert_eq!(server_impl.disconnect_count.load(Ordering::SeqCst), 1);
-    let addrs = server_impl.disconnect_addrs.lock().await;
+    // Verify on_shutdown was called
+    assert_eq!(server_impl.shutdown_count.load(Ordering::SeqCst), 1);
+    let addrs = server_impl.shutdown_addrs.lock().await;
     assert_eq!(addrs.len(), 1);
     assert_eq!(addrs[0], "unknown");
 }
@@ -177,11 +177,13 @@ async fn test_http_lifecycle() {
     // Clean up
     drop(client1);
     drop(client2);
+
+    // Stop the HTTP server
     http_server.stop().await.unwrap();
     tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
-    // Verify on_disconnect
-    assert_eq!(server_impl.disconnect_count.load(Ordering::SeqCst), 1);
+    // Verify on_shutdown - HTTP server calls on_shutdown when the server stops
+    assert_eq!(server_impl.shutdown_count.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]
@@ -214,14 +216,14 @@ async fn test_multiple_connections() {
     handle1.stop().await.unwrap();
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    assert_eq!(server_impl.disconnect_count.load(Ordering::SeqCst), 1);
+    assert_eq!(server_impl.shutdown_count.load(Ordering::SeqCst), 1);
 
     // Disconnect second client
     drop(client2);
     handle2.stop().await.unwrap();
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    assert_eq!(server_impl.disconnect_count.load(Ordering::SeqCst), 2);
+    assert_eq!(server_impl.shutdown_count.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test]
