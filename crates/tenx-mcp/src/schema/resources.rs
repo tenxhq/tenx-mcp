@@ -1,8 +1,6 @@
 use super::*;
 use crate::macros::{with_basename, with_meta};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListResourcesResult {
@@ -64,18 +62,6 @@ impl ReadResourceResult {
 
     pub fn with_contents(mut self, contents: impl IntoIterator<Item = ResourceContents>) -> Self {
         self.contents.extend(contents);
-        self
-    }
-
-    pub fn with_meta(mut self, meta: HashMap<String, Value>) -> Self {
-        self._meta = Some(meta);
-        self
-    }
-
-    pub fn with_meta_entry(mut self, key: impl Into<String>, value: Value) -> Self {
-        self._meta
-            .get_or_insert_with(HashMap::new)
-            .insert(key.into(), value);
         self
     }
 }

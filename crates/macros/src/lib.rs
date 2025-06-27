@@ -495,13 +495,17 @@ pub fn tool(
     input
 }
 
-/// Adds a _meta field to a struct with proper serde attributes.
+/// Adds a _meta field to a struct with proper serde attributes and builder methods.
 ///
 /// This macro adds the following field to the struct:
 /// ```ignore
 /// #[serde(skip_serializing_if = "Option::is_none")]
 /// pub _meta: Option<HashMap<String, Value>>,
 /// ```
+///
+/// And generates these builder methods:
+/// - `with_meta(mut self, meta: HashMap<String, Value>) -> Self`
+/// - `with_meta_entry(mut self, key: impl Into<String>, value: Value) -> Self`
 #[proc_macro_attribute]
 pub fn with_meta(
     _attr: proc_macro::TokenStream,
@@ -537,14 +541,35 @@ pub fn with_meta(
     // Add the field
     fields.named.push(meta_field);
 
-    // Return the modified struct
-    quote! {
+    // Generate the struct name and generics
+    let struct_name = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    // Generate the output with builder methods
+    let output = quote! {
         #input
-    }
-    .into()
+
+        impl #impl_generics #struct_name #ty_generics #where_clause {
+            /// Set the metadata map
+            pub fn with_meta(mut self, meta: std::collections::HashMap<String, serde_json::Value>) -> Self {
+                self._meta = Some(meta);
+                self
+            }
+
+            /// Add a single metadata entry
+            pub fn with_meta_entry(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+                self._meta
+                    .get_or_insert_with(std::collections::HashMap::new)
+                    .insert(key.into(), value);
+                self
+            }
+        }
+    };
+
+    output.into()
 }
 
-/// Adds name and title fields to a struct with proper serde attributes and documentation.
+/// Adds name and title fields to a struct with proper serde attributes, documentation, and builder methods.
 ///
 /// This macro adds the following fields to the struct:
 /// ```ignore
@@ -558,6 +583,10 @@ pub fn with_meta(
 /// #[serde(skip_serializing_if = "Option::is_none")]
 /// pub title: Option<String>,
 /// ```
+///
+/// And generates these builder methods:
+/// - `with_name(mut self, name: impl Into<String>) -> Self`
+/// - `with_title(mut self, title: impl Into<String>) -> Self`
 #[proc_macro_attribute]
 pub fn with_basename(
     _attr: proc_macro::TokenStream,
@@ -604,11 +633,30 @@ pub fn with_basename(
     fields.named.push(name_field);
     fields.named.push(title_field);
 
-    // Return the modified struct
-    quote! {
+    // Generate the struct name and generics
+    let struct_name = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    // Generate the output with builder methods
+    let output = quote! {
         #input
-    }
-    .into()
+
+        impl #impl_generics #struct_name #ty_generics #where_clause {
+            /// Set the name field
+            pub fn with_name(mut self, name: impl Into<String>) -> Self {
+                self.name = name.into();
+                self
+            }
+
+            /// Set the title field
+            pub fn with_title(mut self, title: impl Into<String>) -> Self {
+                self.title = Some(title.into());
+                self
+            }
+        }
+    };
+
+    output.into()
 }
 
 #[cfg(test)]

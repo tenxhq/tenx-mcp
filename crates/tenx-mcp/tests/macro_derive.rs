@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tenx_mcp::{
-    macros::*, schema::*, schemars, testutils::TestServerContext, Error, Result, ServerConn,
+    mcp_server, schema::*, schemars, testutils::TestServerContext, tool, Error, Result, ServerConn,
     ServerCtx,
 };
 

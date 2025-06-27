@@ -78,18 +78,6 @@ impl CallToolResult {
         self.structured_content = Some(content);
         self
     }
-
-    pub fn with_meta(mut self, meta: HashMap<String, Value>) -> Self {
-        self._meta = Some(meta);
-        self
-    }
-
-    pub fn with_meta_entry(mut self, key: impl Into<String>, value: Value) -> Self {
-        self._meta
-            .get_or_insert_with(HashMap::new)
-            .insert(key.into(), value);
-        self
-    }
 }
 
 impl Default for CallToolResult {
@@ -142,11 +130,6 @@ impl Tool {
 
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
-        self
-    }
-
-    pub fn with_title(mut self, title: impl Into<String>) -> Self {
-        self.title = Some(title.into());
         self
     }
 

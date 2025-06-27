@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tenx_mcp::{macros::*, schema::*, schemars, Result, Server, ServerCtx};
+use tenx_mcp::{mcp_server, schema::*, schemars, tool, Result, Server, ServerCtx};
 
 #[derive(Default)]
 struct WeatherServer;

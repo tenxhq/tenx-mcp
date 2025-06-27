@@ -20,7 +20,7 @@
 //!
 //! ```rust,no_run
 //! use serde::{Deserialize, Serialize};
-//! use tenx_mcp::{macros::*, schema::*, schemars, Result, Server, ServerCtx};
+//! use tenx_mcp::{mcp_server, tool, schema::*, schemars, Result, Server, ServerCtx};
 //!
 //! #[derive(Default)]
 //! struct WeatherServer;
@@ -89,7 +89,13 @@ pub use context::{ClientCtx, ServerCtx};
 pub use error::{Error, Result};
 pub use server::{Server, ServerHandle};
 
-pub use macros;
+// Export user-facing macros directly from the crate root
+pub use macros::{mcp_server, tool};
+
+// Keep the full macros module available for internal use
+pub mod macros {
+    pub use ::macros::*;
+}
 
 // Re-export schemars for users
 pub use schemars;
