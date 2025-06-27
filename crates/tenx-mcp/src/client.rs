@@ -6,6 +6,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::api::ServerAPI;
 use crate::{
+    auth::OAuth2Client,
     connection::ClientConn,
     context::ClientCtx,
     error::{Error, Result},
@@ -19,6 +20,7 @@ use crate::{
     },
 };
 use async_trait::async_trait;
+use std::sync::Arc;
 
 /// Default no-op implementation of ClientConn for unit type
 #[async_trait]
@@ -137,6 +139,25 @@ where
     /// * `endpoint` - Server URL including protocol and path (e.g., "http://localhost:3000", "https://api.example.com/mcp")
     pub async fn connect_http(&mut self, endpoint: impl Into<String>) -> Result<InitializeResult> {
         let transport = Box::new(HttpClientTransport::new(endpoint));
+        self.connect(transport).await?;
+        self.init().await
+    }
+
+    /// Connect via HTTP/HTTPS with OAuth authentication and initialize the connection
+    ///
+    /// This method creates an HTTP transport with OAuth authentication support.
+    /// The OAuth client should be pre-configured with valid tokens or ready to
+    /// perform the OAuth flow.
+    ///
+    /// # Arguments
+    /// * `endpoint` - Server URL including protocol and path
+    /// * `oauth_client` - Pre-configured OAuth2Client instance
+    pub async fn connect_http_with_oauth(
+        &mut self,
+        endpoint: impl Into<String>,
+        oauth_client: Arc<OAuth2Client>,
+    ) -> Result<InitializeResult> {
+        let transport = Box::new(HttpClientTransport::new(endpoint).with_oauth(oauth_client));
         self.connect(transport).await?;
         self.init().await
     }

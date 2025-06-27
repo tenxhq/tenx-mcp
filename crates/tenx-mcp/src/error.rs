@@ -53,6 +53,15 @@ pub enum Error {
 
     #[error("Tool not found: {0}")]
     ToolNotFound(String),
+
+    #[error("Invalid configuration: {0}")]
+    InvalidConfiguration(String),
+
+    #[error("Authorization failed: {0}")]
+    AuthorizationFailed(String),
+
+    #[error("Transport error: {0}")]
+    TransportError(String),
 }
 
 impl Error {

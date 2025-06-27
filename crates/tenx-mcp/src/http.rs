@@ -30,6 +30,7 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::{
+    auth::OAuth2Client,
     error::{Error, Result},
     schema::{JSONRPCMessage, RequestId},
     transport::{Transport, TransportStream},
@@ -63,6 +64,7 @@ pub struct HttpClientTransport {
     sender: Option<mpsc::UnboundedSender<JSONRPCMessage>>,
     receiver: Option<mpsc::UnboundedReceiver<JSONRPCMessage>>,
     sse_handle: Option<JoinHandle<()>>,
+    oauth_client: Option<Arc<OAuth2Client>>,
 }
 
 /// HTTP server transport
@@ -102,7 +104,13 @@ impl HttpClientTransport {
             sender: None,
             receiver: None,
             sse_handle: None,
+            oauth_client: None,
         }
+    }
+
+    pub fn with_oauth(mut self, oauth_client: Arc<OAuth2Client>) -> Self {
+        self.oauth_client = Some(oauth_client);
+        self
     }
 }
 
@@ -133,6 +141,16 @@ impl HttpClientTransport {
                 "Mcp-Session-Id",
                 HeaderValue::from_str(session_id)
                     .map_err(|_| Error::Transport("Invalid session ID".into()))?,
+            );
+        }
+
+        // Add OAuth authorization header if available
+        if let Some(oauth_client) = &self.oauth_client {
+            let token = oauth_client.get_valid_token().await?;
+            headers.insert(
+                header::AUTHORIZATION,
+                HeaderValue::from_str(&format!("Bearer {token}"))
+                    .map_err(|_| Error::Transport("Invalid authorization token".into()))?,
             );
         }
 
@@ -210,6 +228,7 @@ impl Transport for HttpClientTransport {
         let endpoint = self.endpoint.clone();
         let client = self.client.clone();
         let mut session_id = self.session_id.clone();
+        let oauth_client = self.oauth_client.clone();
 
         let (http_tx, mut http_rx) = mpsc::unbounded::<JSONRPCMessage>();
         let sender_clone = sender.clone();
@@ -231,6 +250,22 @@ impl Transport for HttpClientTransport {
 
                 if let Some(ref sid) = session_id {
                     headers.insert("Mcp-Session-Id", HeaderValue::from_str(sid).unwrap());
+                }
+
+                // Add OAuth authorization header if available
+                if let Some(oauth_client) = &oauth_client {
+                    match oauth_client.get_valid_token().await {
+                        Ok(token) => {
+                            headers.insert(
+                                header::AUTHORIZATION,
+                                HeaderValue::from_str(&format!("Bearer {token}")).unwrap(),
+                            );
+                        }
+                        Err(e) => {
+                            error!("Failed to get OAuth token: {}", e);
+                            continue;
+                        }
+                    }
                 }
 
                 // Check if this is an initialize request to capture session ID
