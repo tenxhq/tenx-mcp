@@ -12,7 +12,6 @@ struct LifecycleTestServer {
     connect_count: Arc<AtomicU32>,
     shutdown_count: Arc<AtomicU32>,
     connect_addrs: Arc<Mutex<Vec<String>>>,
-    shutdown_addrs: Arc<Mutex<Vec<String>>>,
 }
 
 impl Default for LifecycleTestServer {
@@ -21,7 +20,6 @@ impl Default for LifecycleTestServer {
             connect_count: Arc::new(AtomicU32::new(0)),
             shutdown_count: Arc::new(AtomicU32::new(0)),
             connect_addrs: Arc::new(Mutex::new(Vec::new())),
-            shutdown_addrs: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
@@ -35,10 +33,8 @@ impl ServerConn for LifecycleTestServer {
         Ok(())
     }
 
-    async fn on_shutdown(&self, remote_addr: &str) -> Result<()> {
+    async fn on_shutdown(&self) -> Result<()> {
         self.shutdown_count.fetch_add(1, Ordering::SeqCst);
-        let mut addrs = self.shutdown_addrs.lock().await;
-        addrs.push(remote_addr.to_string());
         Ok(())
     }
 
@@ -88,9 +84,6 @@ async fn test_stdio_lifecycle() {
 
     // Verify on_shutdown was called
     assert_eq!(server_impl.shutdown_count.load(Ordering::SeqCst), 1);
-    let addrs = server_impl.shutdown_addrs.lock().await;
-    assert_eq!(addrs.len(), 1);
-    assert_eq!(addrs[0], "unknown");
 }
 
 #[tokio::test]

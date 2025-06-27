@@ -86,10 +86,7 @@ pub trait ServerConn: Send + Sync {
     }
 
     /// Called when the server is shutting down
-    ///
-    /// # Arguments
-    /// * `remote_addr` - The remote address ("stdio" for stdio connections)
-    async fn on_shutdown(&self, _remote_addr: &str) -> Result<()> {
+    async fn on_shutdown(&self) -> Result<()> {
         Ok(())
     }
 

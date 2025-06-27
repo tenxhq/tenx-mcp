@@ -303,7 +303,7 @@ impl ServerHandle {
 
             // Clean up connection
             if let Some(conn) = connection {
-                if let Err(e) = conn.on_shutdown(&remote_addr).await {
+                if let Err(e) = conn.on_shutdown().await {
                     error!("Error during server shutdown: {}", e);
                 }
             }
