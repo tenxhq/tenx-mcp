@@ -491,14 +491,6 @@ pub struct ResourceLink {
     /// The URI of this resource.
     pub uri: String,
 
-    /// A human-readable name for this resource.
-    pub name: String,
-
-    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
-    /// even by those unfamiliar with domain-specific terminology.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-
     /// A description of what this resource represents.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -515,9 +507,19 @@ pub struct ResourceLink {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<i64>,
 
+    /// Intended for programmatic or logical use, but used as a display name in past specs or fallback (if title isn't present).
+    pub name: String,
+
+    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+    /// even by those unfamiliar with domain-specific terminology.
+    ///
+    /// If not provided, the name should be used for display.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
     /// See [specification/2025-06-18/basic/index#general-fields] for notes on _meta usage.
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 /// This request is sent from the client to the server when it first connects, asking it to begin initialization.
@@ -610,8 +612,8 @@ pub struct PaginatedParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cursor: Option<Cursor>,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<RequestMeta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<RequestMeta>,
 }
 
 /// Base interface for paginated results
@@ -621,8 +623,8 @@ pub struct PaginatedResult {
     #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 // Resource-related request types
@@ -655,8 +657,8 @@ pub struct ReadResourceParams {
     /// The URI of the resource to read.
     pub uri: String,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<RequestMeta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<RequestMeta>,
 }
 
 /// Sent from the client to request resources/updated notifications from the server.
@@ -671,8 +673,8 @@ pub struct SubscribeParams {
     /// The URI of the resource to subscribe to.
     pub uri: String,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<RequestMeta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<RequestMeta>,
 }
 
 /// Sent from the client to request cancellation of resources/updated notifications.
@@ -687,8 +689,8 @@ pub struct UnsubscribeParams {
     /// The URI of the resource to unsubscribe from.
     pub uri: String,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<RequestMeta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<RequestMeta>,
 }
 
 /// An optional notification from the server to the client about resource list changes.
@@ -711,8 +713,8 @@ pub struct ResourceUpdatedParams {
     /// The URI of the resource that has been updated.
     pub uri: String,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 // Prompt-related request types
@@ -741,8 +743,8 @@ pub struct GetPromptParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arguments: Option<HashMap<String, String>>,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<RequestMeta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<RequestMeta>,
 }
 
 /// An optional notification from the server about prompt list changes.
@@ -777,8 +779,8 @@ pub struct CallToolParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arguments: Option<HashMap<String, Value>>,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<RequestMeta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<RequestMeta>,
 }
 
 /// An optional notification from the server about tool list changes.
@@ -803,8 +805,8 @@ pub struct SetLevelParams {
     /// The level of logging that the client wants to receive from the server.
     pub level: LoggingLevel,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<RequestMeta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<RequestMeta>,
 }
 
 /// Notification of a log message passed from server to client.
@@ -826,8 +828,8 @@ pub struct LoggingMessageParams {
     /// The data to be logged, such as a string message or an object.
     pub data: Value,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 // Sampling-related types
@@ -860,8 +862,8 @@ pub struct CompleteParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<CompleteContext>,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<RequestMeta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<RequestMeta>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -940,8 +942,8 @@ pub struct ElicitParams {
     #[serde(rename = "requestedSchema")]
     pub requested_schema: ElicitSchema,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<RequestMeta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<RequestMeta>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -965,8 +967,8 @@ pub struct ElicitResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<HashMap<String, ElicitValue>>,
 
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

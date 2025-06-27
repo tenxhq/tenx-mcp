@@ -59,7 +59,7 @@ impl ClientConn for MyClientConnection {
             }),
             model: "example-model".to_string(),
             stop_reason: None,
-            meta: None,
+            _meta: None,
         })
     }
 
@@ -72,7 +72,7 @@ impl ClientConn for MyClientConnection {
                 name: Some("My Project".to_string()),
                 _meta: None,
             }],
-            meta: None,
+            _meta: None,
         })
     }
 }

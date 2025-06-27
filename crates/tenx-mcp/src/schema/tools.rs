@@ -41,8 +41,8 @@ pub struct CallToolResult {
     pub is_error: Option<bool>,
     #[serde(rename = "structuredContent", skip_serializing_if = "Option::is_none")]
     pub structured_content: Option<Value>,
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 impl CallToolResult {
@@ -51,7 +51,7 @@ impl CallToolResult {
             content: Vec::new(),
             is_error: None,
             structured_content: None,
-            meta: None,
+            _meta: None,
         }
     }
 
@@ -80,12 +80,12 @@ impl CallToolResult {
     }
 
     pub fn with_meta(mut self, meta: HashMap<String, Value>) -> Self {
-        self.meta = Some(meta);
+        self._meta = Some(meta);
         self
     }
 
     pub fn with_meta_entry(mut self, key: impl Into<String>, value: Value) -> Self {
-        self.meta
+        self._meta
             .get_or_insert_with(HashMap::new)
             .insert(key.into(), value);
         self
@@ -112,32 +112,42 @@ pub struct ToolAnnotations {
     pub open_world_hint: Option<bool>,
 }
 
+/// Definition for a tool the client can call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tool {
-    pub name: String,
     #[serde(rename = "inputSchema")]
     pub input_schema: ToolInputSchema,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
     #[serde(rename = "outputSchema", skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<ToolOutputSchema>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<ToolAnnotations>,
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    /// Intended for programmatic or logical use, but used as a display name in past specs or fallback (if title isn't present).
+    pub name: String,
+
+    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+    /// even by those unfamiliar with domain-specific terminology.
+    ///
+    /// If not provided, the name should be used for display (except for Tool,
+    /// where `annotations.title` should be given precedence over using `name`,
+    /// if present).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub _meta: Option<HashMap<String, Value>>,
 }
 
 impl Tool {
     pub fn new(name: impl Into<String>, input_schema: ToolInputSchema) -> Self {
         Self {
-            name: name.into(),
             input_schema,
             description: None,
-            title: None,
             output_schema: None,
             annotations: None,
+            name: name.into(),
+            title: None,
             _meta: None,
         }
     }

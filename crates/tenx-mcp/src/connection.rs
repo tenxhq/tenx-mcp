@@ -197,7 +197,7 @@ pub trait ServerConn: Send + Sync {
                 total: None,
                 has_more: None,
             },
-            meta: None,
+            _meta: None,
         })
     }
 
@@ -210,7 +210,7 @@ pub trait ServerConn: Send + Sync {
     async fn list_roots(&self, _context: &ServerCtx) -> Result<ListRootsResult> {
         Ok(ListRootsResult {
             roots: vec![],
-            meta: None,
+            _meta: None,
         })
     }
 

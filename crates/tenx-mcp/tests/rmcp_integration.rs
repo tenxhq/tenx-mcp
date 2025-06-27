@@ -84,7 +84,7 @@ impl ServerConn for EchoConnection {
             })],
             is_error: Some(false),
             structured_content: None,
-            meta: None,
+            _meta: None,
         })
     }
 }

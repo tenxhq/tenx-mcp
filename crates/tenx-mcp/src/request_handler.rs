@@ -79,7 +79,7 @@ impl RequestHandler {
             request: Request {
                 method: request.method().to_string(),
                 params: Some(RequestParams {
-                    meta: None,
+                    _meta: None,
                     other: serde_json::to_value(&request)?
                         .as_object()
                         .unwrap_or(&serde_json::Map::new())
@@ -107,7 +107,7 @@ impl RequestHandler {
                         let mut result_value = serde_json::Map::new();
 
                         // Add metadata if present
-                        if let Some(meta) = response.result.meta {
+                        if let Some(meta) = response.result._meta {
                             result_value.insert("_meta".to_string(), serde_json::to_value(meta)?);
                         }
 
@@ -165,7 +165,7 @@ impl RequestHandler {
         params: Option<serde_json::Value>,
     ) -> Result<()> {
         let notification_params = params.map(|v| NotificationParams {
-            meta: None,
+            _meta: None,
             other: if let Some(obj) = v.as_object() {
                 obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
             } else {

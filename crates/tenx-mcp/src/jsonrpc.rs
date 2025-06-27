@@ -15,7 +15,7 @@ where
         .ok()
         .and_then(|v| v.as_object().cloned())
         .map(|obj| NotificationParams {
-            meta: None,
+            _meta: None,
             other: obj.into_iter().collect(),
         });
 
@@ -93,7 +93,7 @@ where
                 jsonrpc: JSONRPC_VERSION.to_string(),
                 id,
                 result: schema::Result {
-                    meta: None,
+                    _meta: None,
                     other: if let Some(obj) = json_value.as_object() {
                         obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
                     } else {

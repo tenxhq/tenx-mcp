@@ -19,8 +19,8 @@ pub struct InitializeResult {
     pub instructions: Option<String>,
     /// meta is reserved by the protocol to allow clients and servers to attach additional metadata
     /// to their responses.
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 impl InitializeResult {
@@ -33,7 +33,7 @@ impl InitializeResult {
             capabilities: ServerCapabilities::default(),
             server_info: Implementation::new(name, "0.0.1"),
             instructions: None,
-            meta: None,
+            _meta: None,
         }
     }
 

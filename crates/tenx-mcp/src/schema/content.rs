@@ -26,7 +26,7 @@ pub struct EmbeddedResource {
     pub resource: ResourceContents,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub _meta: Option<HashMap<String, Value>>,
 }
 
@@ -45,7 +45,7 @@ pub struct TextContent {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub _meta: Option<HashMap<String, Value>>,
 }
 
@@ -56,7 +56,7 @@ pub struct ImageContent {
     pub mime_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub _meta: Option<HashMap<String, Value>>,
 }
 
@@ -67,6 +67,6 @@ pub struct AudioContent {
     pub mime_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub _meta: Option<HashMap<String, Value>>,
 }

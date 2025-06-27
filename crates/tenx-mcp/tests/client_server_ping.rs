@@ -46,7 +46,7 @@ impl ClientConn for TestClientConnection {
             }),
             model: "test-model".into(),
             stop_reason: None,
-            meta: None,
+            _meta: None,
         })
     }
 
@@ -58,7 +58,7 @@ impl ClientConn for TestClientConnection {
                 name: Some("Test Root".into()),
                 _meta: None,
             }],
-            meta: None,
+            _meta: None,
         })
     }
 }

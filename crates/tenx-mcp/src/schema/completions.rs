@@ -22,9 +22,15 @@ pub struct ResourceReference {
     pub uri: String,
 }
 
+/// Identifies a prompt.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptReference {
+    /// Intended for programmatic or logical use, but used as a display name in past specs or fallback (if title isn't present).
     pub name: String,
+    /// Intended for UI and end-user contexts — optimized to be human-readable and easily understood,
+    /// even by those unfamiliar with domain-specific terminology.
+    ///
+    /// If not provided, the name should be used for display.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
 }
@@ -32,8 +38,8 @@ pub struct PromptReference {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompleteResult {
     pub completion: CompletionInfo,
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

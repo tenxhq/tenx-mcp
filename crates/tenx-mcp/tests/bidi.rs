@@ -52,7 +52,7 @@ impl ClientConn for TestClient {
                 name: Some("Test Root".to_string()),
                 _meta: None,
             }],
-            meta: None,
+            _meta: None,
         })
     }
 
@@ -81,7 +81,7 @@ impl ClientConn for TestClient {
             }),
             model: "test-model".to_string(),
             stop_reason: None,
-            meta: None,
+            _meta: None,
         })
     }
 }

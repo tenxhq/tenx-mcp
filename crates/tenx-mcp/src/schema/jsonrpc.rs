@@ -87,8 +87,8 @@ pub struct Request {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestParams {
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<RequestMeta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<RequestMeta>,
     #[serde(flatten)]
     pub other: HashMap<String, Value>,
 }
@@ -115,8 +115,8 @@ pub struct Notification {
 pub struct NotificationParams {
     /// This parameter name is reserved by MCP to allow clients and servers to
     /// attach additional metadata to their notifications.
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
     #[serde(flatten)]
     pub other: HashMap<String, Value>,
 }
@@ -125,8 +125,8 @@ pub struct NotificationParams {
 pub struct Result {
     /// This result property is reserved by the protocol to allow clients and
     /// servers to attach additional metadata to their responses.
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
     #[serde(flatten)]
     pub other: HashMap<String, Value>,
 }

@@ -37,8 +37,8 @@ pub struct CreateMessageResult {
     pub model: String,
     #[serde(rename = "stopReason", skip_serializing_if = "Option::is_none")]
     pub stop_reason: Option<StopReason>,
-    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
