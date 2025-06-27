@@ -42,7 +42,7 @@ async fn test_server_to_client_notifications() {
 
     #[async_trait]
     impl ServerConn for NotifyingServer {
-        async fn on_connect(&self, context: &ServerCtx) -> Result<()> {
+        async fn on_connect(&self, context: &ServerCtx, _remote_addr: &str) -> Result<()> {
             // Send a notification after connection
             let sent_notification = self.sent_notification.clone();
             let context = context.clone();

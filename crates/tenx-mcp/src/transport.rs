@@ -21,6 +21,12 @@ pub trait Transport: Send + Sync {
 
     /// Get a framed stream for reading/writing JSON-RPC messages
     fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>>;
+
+    /// Get the remote address for this transport
+    /// Returns "stdio" for stdio connections, or the actual address for network connections
+    fn remote_addr(&self) -> String {
+        "unknown".to_string()
+    }
 }
 
 /// Trait for a bidirectional stream of JSON-RPC messages
@@ -170,6 +176,10 @@ impl Transport for StdioTransport {
         let framed = Framed::new(duplex, JsonRpcCodec::new());
         Ok(Box::new(framed))
     }
+
+    fn remote_addr(&self) -> String {
+        "stdio".to_string()
+    }
 }
 
 /// TCP client transport for outgoing network connections
@@ -215,6 +225,10 @@ impl Transport for TcpClientTransport {
         let framed = Framed::new(stream, JsonRpcCodec::new());
         Ok(Box::new(framed))
     }
+
+    fn remote_addr(&self) -> String {
+        self.addr.clone()
+    }
 }
 
 #[async_trait]
@@ -245,6 +259,12 @@ impl Transport for TcpStream {
     fn framed(self: Box<Self>) -> Result<Box<dyn TransportStream>> {
         let framed = Framed::new(*self, JsonRpcCodec::new());
         Ok(Box::new(framed))
+    }
+
+    fn remote_addr(&self) -> String {
+        self.peer_addr()
+            .map(|addr| addr.to_string())
+            .unwrap_or_else(|_| "unknown".to_string())
     }
 }
 

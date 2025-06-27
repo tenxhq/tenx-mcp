@@ -77,12 +77,19 @@ pub trait ClientConn: Send + Sync + Clone {
 #[async_trait]
 pub trait ServerConn: Send + Sync {
     /// Called when a new connection is established
-    async fn on_connect(&self, _context: &ServerCtx) -> Result<()> {
+    ///
+    /// # Arguments
+    /// * `context` - The server context
+    /// * `remote_addr` - The remote address ("stdio" for stdio connections)
+    async fn on_connect(&self, _context: &ServerCtx, _remote_addr: &str) -> Result<()> {
         Ok(())
     }
 
     /// Called when the connection is being closed
-    async fn on_disconnect(&self) -> Result<()> {
+    ///
+    /// # Arguments
+    /// * `remote_addr` - The remote address ("stdio" for stdio connections)
+    async fn on_disconnect(&self, _remote_addr: &str) -> Result<()> {
         Ok(())
     }
 

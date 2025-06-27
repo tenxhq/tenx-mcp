@@ -180,6 +180,7 @@ impl ServerHandle {
         F: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
     {
         transport.connect().await?;
+        let remote_addr = transport.remote_addr();
         let stream = transport.framed()?;
         let (sink_tx, mut stream_rx) = stream.split();
 
@@ -230,7 +231,7 @@ impl ServerHandle {
                                 if let Some(conn) = &connection {
                                     // Call on_connect when we receive the first message from client
                                     if !connected {
-                                        if let Err(e) = conn.on_connect(&server_ctx).await {
+                                        if let Err(e) = conn.on_connect(&server_ctx, &remote_addr).await {
                                             error!("Error during on_connect: {}", e);
                                             break;
                                         }
@@ -302,7 +303,7 @@ impl ServerHandle {
 
             // Clean up connection
             if let Some(conn) = connection {
-                if let Err(e) = conn.on_disconnect().await {
+                if let Err(e) = conn.on_disconnect(&remote_addr).await {
                     error!("Error during connection disconnect: {}", e);
                 }
             }

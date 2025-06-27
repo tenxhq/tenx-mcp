@@ -309,6 +309,10 @@ impl Transport for HttpClientTransport {
             _http_task: http_task,
         }))
     }
+
+    fn remote_addr(&self) -> String {
+        self.endpoint.clone()
+    }
 }
 
 impl HttpServerTransport {
@@ -439,6 +443,10 @@ impl Transport for HttpServerTransport {
         };
 
         Ok(Box::new(stream))
+    }
+
+    fn remote_addr(&self) -> String {
+        self.bind_addr.clone()
     }
 }
 
