@@ -8,7 +8,7 @@ use oauth2::{
     TokenResponse, TokenUrl,
 };
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use url::Url;
 
 use super::dynamic_registration::{ClientMetadata, DynamicRegistrationClient};
@@ -49,6 +49,7 @@ pub struct OAuth2Client {
     client: ConfiguredClient,
     config: OAuth2Config,
     token: Arc<RwLock<Option<OAuth2Token>>>,
+    refresh_lock: Arc<Mutex<()>>,
     pkce_verifier: Option<PkceCodeVerifier>,
     csrf_token: Option<CsrfToken>,
 }
@@ -139,6 +140,7 @@ impl OAuth2Client {
             client,
             config,
             token: Arc::new(RwLock::new(None)),
+            refresh_lock: Arc::new(Mutex::new(())),
             pkce_verifier: None,
             csrf_token: None,
         })
@@ -204,30 +206,48 @@ impl OAuth2Client {
     }
 
     pub async fn get_valid_token(&self) -> Result<String, Error> {
-        let token_guard = self.token.read().await;
-        if let Some(token) = &*token_guard {
-            if let Some(expires_at) = token.expires_at {
-                if expires_at > std::time::Instant::now() {
+        let now = std::time::Instant::now();
+        {
+            let token_guard = self.token.read().await;
+            if let Some(token) = &*token_guard {
+                if token
+                    .expires_at
+                    .map(|exp| exp > now)
+                    .unwrap_or(true)
+                {
                     return Ok(token.access_token.clone());
                 }
+            }
+        }
+
+        let _refresh_guard = self.refresh_lock.lock().await;
+
+        // Check again after obtaining the lock in case another task refreshed
+        let refresh_token_opt = {
+            let token_guard = self.token.read().await;
+            if let Some(token) = &*token_guard {
+                if token
+                    .expires_at
+                    .map(|exp| exp > now)
+                    .unwrap_or(true)
+                {
+                    return Ok(token.access_token.clone());
+                }
+                token.refresh_token.clone()
             } else {
-                return Ok(token.access_token.clone());
+                None
             }
-        }
-        drop(token_guard);
+        };
 
-        if let Some(token) = &*self.token.read().await {
-            if let Some(refresh_token) = &token.refresh_token {
-                return self.refresh_token(refresh_token).await;
-            }
+        if let Some(refresh_token) = refresh_token_opt {
+            self.refresh_token_inner(&refresh_token).await
+        } else {
+            Err(Error::AuthorizationFailed(
+                "No valid token available".to_string(),
+            ))
         }
-
-        Err(Error::AuthorizationFailed(
-            "No valid token available".to_string(),
-        ))
     }
-
-    async fn refresh_token(&self, refresh_token: &str) -> Result<String, Error> {
+    async fn refresh_token_inner(&self, refresh_token: &str) -> Result<String, Error> {
         let token_result = self
             .client
             .exchange_refresh_token(&RefreshToken::new(refresh_token.to_string()))

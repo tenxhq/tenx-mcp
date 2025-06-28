@@ -141,3 +141,73 @@ async fn test_token_refresh() {
     // This will fail because we don't have a real OAuth server, but the logic is tested
     assert!(result.is_err());
 }
+
+#[tokio::test]
+async fn test_concurrent_refresh_single_request() {
+    use axum::{extract::State, routing::post, Json, Router};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::net::TcpListener;
+    use tokio::sync::oneshot;
+
+    let counter = Arc::new(AtomicUsize::new(0));
+
+    #[derive(Clone)]
+    struct Ctx { counter: Arc<AtomicUsize> }
+
+    async fn token_handler(State(ctx): State<Ctx>) -> Json<serde_json::Value> {
+        ctx.counter.fetch_add(1, Ordering::SeqCst);
+        Json(serde_json::json!({
+            "access_token": "new_access_token",
+            "token_type": "Bearer",
+            "refresh_token": "new_refresh_token",
+            "expires_in": 3600
+        }))
+    }
+
+    let state = Ctx { counter: counter.clone() };
+    let router = Router::new().route("/token", post(token_handler)).with_state(state);
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (tx, rx) = oneshot::channel();
+    tokio::spawn(async move {
+        axum::serve(listener, router)
+            .with_graceful_shutdown(async { rx.await.ok(); })
+            .await
+            .unwrap();
+    });
+
+    let config = OAuth2Config {
+        client_id: "client".to_string(),
+        client_secret: Some("secret".to_string()),
+        auth_url: format!("http://{addr}/auth"),
+        token_url: format!("http://{addr}/token"),
+        redirect_url: "http://localhost:1/callback".to_string(),
+        resource: "http://resource".to_string(),
+        scopes: vec![],
+    };
+
+    let oauth_client = OAuth2Client::new(config).unwrap();
+    oauth_client
+        .set_token(OAuth2Token {
+            access_token: "expired".to_string(),
+            refresh_token: Some("rt".to_string()),
+            expires_at: Some(std::time::Instant::now() - Duration::from_secs(1)),
+        })
+        .await;
+
+    let client_arc = Arc::new(oauth_client);
+    let mut handles = Vec::new();
+    for _ in 0..5 {
+        let c = client_arc.clone();
+        handles.push(tokio::spawn(async move { c.get_valid_token().await.unwrap() }));
+    }
+
+    for handle in handles {
+        assert_eq!(handle.await.unwrap(), "new_access_token");
+    }
+
+    assert_eq!(counter.load(Ordering::SeqCst), 1);
+
+    let _ = tx.send(());
+}
