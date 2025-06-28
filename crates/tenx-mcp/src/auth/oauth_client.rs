@@ -50,6 +50,7 @@ pub struct OAuth2Client {
     config: OAuth2Config,
     token: Arc<RwLock<Option<OAuth2Token>>>,
     pkce_verifier: Option<PkceCodeVerifier>,
+    csrf_token: Option<CsrfToken>,
 }
 
 impl OAuth2Client {
@@ -139,6 +140,7 @@ impl OAuth2Client {
             config,
             token: Arc::new(RwLock::new(None)),
             pkce_verifier: None,
+            csrf_token: None,
         })
     }
 
@@ -156,14 +158,25 @@ impl OAuth2Client {
             auth_request = auth_request.add_scope(Scope::new(scope.clone()));
         }
 
-        auth_request.url()
+        let (url, csrf_token) = auth_request.url();
+        self.csrf_token = Some(csrf_token.clone());
+        (url, csrf_token)
     }
 
     pub async fn exchange_code(
         &mut self,
         code: String,
-        _state: String,
+        state: String,
     ) -> Result<OAuth2Token, Error> {
+        let stored_token = self
+            .csrf_token
+            .take()
+            .ok_or_else(|| Error::InvalidConfiguration("Missing CSRF token".to_string()))?;
+
+        if state != *stored_token.secret() {
+            return Err(Error::AuthorizationFailed("CSRF token mismatch".into()));
+        }
+
         let pkce_verifier = self
             .pkce_verifier
             .take()

@@ -169,7 +169,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting OAuth authorization flow...");
 
     // Get authorization URL
-    let (auth_url, csrf_token) = oauth_client.get_authorization_url();
+    let (auth_url, _csrf_token) = oauth_client.get_authorization_url();
 
     info!("Opening browser for authorization...");
     info!("If the browser doesn't open, visit: {}", auth_url);
@@ -185,11 +185,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Waiting for OAuth callback on port {}...", args.port);
 
     let (code, state) = callback_server.wait_for_callback().await?;
-
-    // Verify CSRF token
-    if state != *csrf_token.secret() {
-        return Err("CSRF token mismatch".into());
-    }
 
     info!("Received authorization code, exchanging for token...");
 

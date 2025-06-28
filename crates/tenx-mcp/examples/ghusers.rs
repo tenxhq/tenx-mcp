@@ -129,7 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut oauth_client = OAuth2Client::new(config)?;
 
         // Get authorization URL
-        let (auth_url, csrf_token) = oauth_client.get_authorization_url();
+        let (auth_url, _csrf_token) = oauth_client.get_authorization_url();
 
         println!("Opening browser for GitHub authorization...");
         println!("If the browser doesn't open, visit: {auth_url}");
@@ -145,11 +145,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         debug!("Waiting for OAuth callback on port {}...", args.port);
 
         let (code, state) = callback_server.wait_for_callback().await?;
-
-        // Verify CSRF token
-        if state != *csrf_token.secret() {
-            return Err("CSRF token mismatch".into());
-        }
 
         debug!("Received authorization code, exchanging for token...");
 
