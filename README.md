@@ -5,7 +5,7 @@
 
 # tenx-mcp
 
-A Rust implementation of the Model Context Protocol (MCP) for building AI-integrated applications.
+A Rust implementation of the Model Context Protocol for building AI-integrated applications.
 
 --- 
 
@@ -18,11 +18,9 @@ Want to contribute? Have ideas or feature requests? Come tell us about it on
 
 ## Overview
 
-tenx-mcp provides both client and server capabilities for the Model Context
-Protocol, enabling seamless communication between AI language models and
-external tools/services. MCP is a standardized protocol that allows AI
-assistants to interact with various tools, access resources, and provide
-enhanced capabilities through a well-defined interface.
+A Rust implementation of the Model Context Protocol (MCP) - a JSON-RPC 2.0 based
+protocol for AI models to interact with external tools and services. Supports
+both client and server roles with async/await APIs.
 
 ---
 
@@ -39,11 +37,10 @@ enhanced capabilities through a well-defined interface.
   - MCP-specific `resource` parameter support
   - Built-in callback server for browser flows
 - **Async/Await**: Built on Tokio for high-performance async operations
-- **Type-Safe**: Leverages Rust's type system with comprehensive schema
-  definitions
-- **Extensible**: Easy to add custom handlers for tools, resources, and prompts
 
 **Note**: Batch operations in the previous protocol version are not supported.
+
+---
 
 ## Example 
 
