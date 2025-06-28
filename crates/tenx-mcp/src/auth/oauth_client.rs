@@ -83,15 +83,14 @@ impl OAuth2Client {
             // Try to discover registration endpoint
             match registration_client
                 .discover_registration_endpoint(&issuer)
-                .await
+                .await?
             {
-                Ok(Some(endpoint)) => endpoint,
-                Ok(None) => {
+                Some(endpoint) => endpoint,
+                None => {
                     return Err(Error::InvalidConfiguration(
                         "No registration endpoint found in OAuth metadata".to_string(),
                     ));
                 }
-                Err(e) => return Err(e),
             }
         };
 
