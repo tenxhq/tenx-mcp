@@ -793,8 +793,10 @@ mod tests {
         // Create transport pair
         let (client_transport, server_transport) = TestTransport::create_pair();
 
-        // Start server
-        let server = Server::default().with_connection(DummyServerConnection::default);
+        // Start server with tools/listChanged capability so notification is forwarded
+        let server = Server::default()
+            .with_connection(DummyServerConnection::default)
+            .with_capabilities(ServerCapabilities::default().with_tools(Some(true)));
         let server_handle = ServerHandle::new(server, server_transport)
             .await
             .expect("Failed to start server");
@@ -824,6 +826,85 @@ mod tests {
             .await
             .expect("Notification not received")
             .expect("Receiver dropped");
+    }
+
+    /// Ensure notifications are not forwarded when the server lacks the corresponding capability.
+    #[tokio::test]
+    async fn test_server_notification_filtered_without_capability() {
+        use tokio::sync::oneshot;
+
+        let (tx_notif, rx_notif) = oneshot::channel::<()>();
+
+        struct NotifClientConnection {
+            tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+        }
+
+        impl Clone for NotifClientConnection {
+            fn clone(&self) -> Self {
+                Self {
+                    tx: self.tx.clone(),
+                }
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl ClientConnTrait for NotifClientConnection {
+            async fn notification(
+                &self,
+                _context: &ClientCtxType,
+                _notification: ServerNotification,
+            ) -> Result<()> {
+                let mut tx_guard = self.tx.lock().await;
+                if let Some(tx) = tx_guard.take() {
+                    let _ = tx.send(());
+                }
+                Ok(())
+            }
+        }
+
+        #[derive(Debug, Default)]
+        struct DummyServerConnection;
+
+        #[async_trait::async_trait]
+        impl ServerConnTrait for DummyServerConnection {
+            async fn initialize(
+                &self,
+                _context: &ServerCtx,
+                _protocol_version: String,
+                _capabilities: ClientCapabilities,
+                _client_info: Implementation,
+            ) -> Result<InitializeResult> {
+                Ok(InitializeResult::new("test-server"))
+            }
+        }
+
+        let (client_transport, server_transport) = TestTransport::create_pair();
+
+        // Start server without tools capability
+        let server = Server::default().with_connection(DummyServerConnection::default);
+        let server_handle = ServerHandle::new(server, server_transport)
+            .await
+            .expect("Failed to start server");
+
+        let mut client = Client::new_with_connection(
+            "test-client",
+            "1.0.0",
+            NotifClientConnection {
+                tx: Arc::new(Mutex::new(Some(tx_notif))),
+            },
+        );
+
+        client
+            .connect(client_transport)
+            .await
+            .expect("Failed to connect");
+
+        client.init().await.expect("Failed to initialize");
+
+        server_handle.send_server_notification(ServerNotification::ToolListChanged);
+
+        let res = tokio::time::timeout(std::time::Duration::from_millis(200), rx_notif).await;
+        assert!(res.is_err(), "Notification should be filtered");
     }
 
     // Test that a ServerConnection implementation receives notifications sent
