@@ -1,4 +1,6 @@
-use tenx_mcp::{ClientMetadata, DynamicRegistrationClient, OAuth2Config};
+use tenx_mcp::auth::{
+    ClientMetadata, ClientRegistrationResponse, DynamicRegistrationClient, OAuth2Config,
+};
 
 #[test]
 fn test_imports() {
@@ -9,7 +11,7 @@ fn test_imports() {
     let _client = DynamicRegistrationClient::new();
 
     // Test OAuth2Config::from_registration
-    let registration = tenx_mcp::ClientRegistrationResponse {
+    let registration = ClientRegistrationResponse {
         client_id: "test_id".to_string(),
         client_secret: Some("test_secret".to_string()),
         client_id_issued_at: None,

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use tenx_mcp::{OAuth2CallbackServer, OAuth2Client, OAuth2Config, OAuth2Token};
+use tenx_mcp::auth::{OAuth2CallbackServer, OAuth2Client, OAuth2Config, OAuth2Token};
 use tokio::time::{timeout, Duration};
 
 #[tokio::test]
@@ -15,7 +15,8 @@ async fn test_oauth_client_creation() {
     };
 
     let oauth_client = OAuth2Client::new(config).unwrap();
-    assert!(Arc::new(oauth_client).as_ref() as *const _ != std::ptr::null());
+    // Simply verify that we can create an OAuth client successfully
+    let _arc_client = Arc::new(oauth_client);
 }
 
 #[tokio::test]
@@ -71,7 +72,7 @@ async fn test_callback_server() {
             assert_eq!(code, "test_code");
             assert_eq!(state, "test_state");
         }
-        Ok(Err(e)) => panic!("Callback server error: {}", e),
+        Ok(Err(e)) => panic!("Callback server error: {e}"),
         Err(_) => panic!("Callback server timed out"),
     }
 

@@ -9,8 +9,8 @@ use crate::schema::{
     ListRootsResult, ListToolsResult, LoggingLevel, ReadResourceResult, Reference,
 };
 
-/// Server API trait defining all methods that an MCP server must implement.
-/// These methods are called by the client.
+/// ServerAPI holds all server methods defined by the MCP specification. These methods are exposed
+/// by the server and called by the client.
 #[async_trait]
 pub trait ServerAPI: Send + Sync {
     /// Initialize the connection with protocol version and capabilities
@@ -83,8 +83,8 @@ pub trait ServerAPI: Send + Sync {
     async fn set_level(&mut self, level: LoggingLevel) -> Result<()>;
 }
 
-/// Client API trait defining all methods that an MCP client must implement.
-/// These methods are called by the server.
+/// ClientAPI holds all client methods defined by the MCP specification. These methods are exposed
+/// by the client and called by the server.
 #[async_trait]
 pub trait ClientAPI: Send + Sync {
     /// Respond to ping requests from the server

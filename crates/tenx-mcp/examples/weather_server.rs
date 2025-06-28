@@ -18,12 +18,10 @@ impl WeatherServer {
         let temperature = 22.5;
         let conditions = "Partly cloudy";
 
-        Ok(CallToolResult::new()
-            .with_text_content(format!(
-                "Weather in {}: {}°C, {}",
-                params.city, temperature, conditions
-            ))
-            .is_error(false))
+        Ok(CallToolResult::new().with_text_content(format!(
+            "Weather in {}: {}°C, {}",
+            params.city, temperature, conditions
+        )))
     }
 }
 

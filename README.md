@@ -45,3 +45,48 @@ enhanced capabilities through a well-defined interface.
 
 **Note**: Batch operations in the previous protocol version are not supported.
 
+## Example 
+
+From `./crates/tenx-mcp/examples/weather_server.rs` 
+
+```rust
+use serde::{Deserialize, Serialize};
+use tenx_mcp::{mcp_server, schema::*, schemars, tool, Result, Server, ServerCtx};
+
+#[derive(Default)]
+struct WeatherServer;
+
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
+struct WeatherParams {
+    city: String,
+}
+
+#[mcp_server]
+impl WeatherServer {
+    #[tool]
+    /// Get current weather for a city
+    async fn get_weather(&self, _ctx: &ServerCtx, params: WeatherParams) -> Result<CallToolResult> {
+        // Simulate weather API call
+        let temperature = 22.5;
+        let conditions = "Partly cloudy";
+
+        Ok(CallToolResult::new()
+            .with_text_content(format!(
+                "Weather in {}: {}°C, {}",
+                params.city, temperature, conditions
+            )))
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let server = Server::default().with_connection(WeatherServer::default);
+
+    // Start server on HTTP port 3000
+    let handle = server.serve_http("127.0.0.1:3000").await?;
+
+    // Server runs until handle is dropped or explicitly aborted
+    handle.handle.await.unwrap();
+    Ok(())
+}
+```

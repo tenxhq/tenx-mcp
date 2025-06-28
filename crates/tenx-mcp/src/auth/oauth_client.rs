@@ -208,7 +208,10 @@ impl OAuth2Client {
                             error_description
                         ));
                     } else {
-                        return Error::AuthorizationFailed(format!("OAuth error: {}", resp.error()));
+                        return Error::AuthorizationFailed(format!(
+                            "OAuth error: {}",
+                            resp.error()
+                        ));
                     }
                 }
                 Error::AuthorizationFailed(format!("Token exchange failed: {e}"))
@@ -262,9 +265,7 @@ impl OAuth2Client {
     }
     async fn refresh_token_inner(&self, refresh_token: &str) -> Result<String, Error> {
         let refresh_token_obj = RefreshToken::new(refresh_token.to_string());
-        let mut refresh_request = self
-            .client
-            .exchange_refresh_token(&refresh_token_obj);
+        let mut refresh_request = self.client.exchange_refresh_token(&refresh_token_obj);
 
         // Only add resource parameter if it's not empty (some providers don't support it)
         if !self.config.resource.is_empty() {

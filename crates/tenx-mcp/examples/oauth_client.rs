@@ -1,6 +1,9 @@
 use clap::Parser;
 use std::sync::Arc;
-use tenx_mcp::{Client, OAuth2CallbackServer, OAuth2Client, OAuth2Config, ServerAPI};
+use tenx_mcp::{
+    auth::{OAuth2CallbackServer, OAuth2Client, OAuth2Config},
+    Client, ServerAPI,
+};
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 

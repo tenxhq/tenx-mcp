@@ -7,11 +7,11 @@ ergonomic APIs through procedural macros.
 
 ## Model guidance
 
-- Always run `cargo fmt` before submitting code to ensure consistent formatting.
-- Always run `cargo clippy --tests --examples` to catch common mistakes and improve code quality.
-    - You may run `cargo clippy --fix --tests --examples --allow-dirty` to automatically fix some issues.
 - Prefer to write durable integration tests over running examples or creating disposable test scripts.
     - Integration tests go in ./crates/tenx-mcp/tests.
+- In docstrings, never include code examples, doc tests or section headings.
+  Doc strings should be short and concise.
+
 
 ## Development Commands
 
@@ -32,22 +32,10 @@ cargo test test_name
 # Check code without building
 cargo check
 
-# Format code
+# Format code - always do this before submitting code
 cargo fmt
 
-# Run linter
+# Run linter - always do this before submitting code
 cargo clippy --examples --tests
-```
-
-### Running Examples
-```bash
-# Run server examples (default is TCP mode)
-cargo run --example basic_server
-cargo run --example basic_server stdio    # stdio transport
-cargo run --example basic_server http     # HTTP transport
-
-# Run client examples
-cargo run --example basic_client
-cargo run --example basic_client_stdio
 ```
 

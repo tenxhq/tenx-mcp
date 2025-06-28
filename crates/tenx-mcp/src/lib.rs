@@ -43,8 +43,7 @@
 //!             .with_text_content(format!(
 //!                 "Weather in {}: {}°C, {}",
 //!                 params.city, temperature, conditions
-//!             ))
-//!             .is_error(false))
+//!             )))
 //!     }
 //! }
 //!
@@ -68,7 +67,6 @@
 //! - **Stdio**: `server.listen_stdio()` for subprocess integration
 
 mod api;
-pub mod auth;
 mod client;
 mod codec;
 mod connection;
@@ -80,14 +78,11 @@ mod request_handler;
 mod server;
 mod transport;
 
+pub mod auth;
 pub mod schema;
 pub mod testutils;
 
 pub use api::*;
-pub use auth::{
-    ClientMetadata, ClientRegistrationResponse, DynamicRegistrationClient, OAuth2CallbackServer,
-    OAuth2Client, OAuth2Config, OAuth2Token, RegistrationError,
-};
 pub use client::Client;
 pub use connection::{ClientConn, ServerConn};
 pub use context::{ClientCtx, ServerCtx};
@@ -98,7 +93,7 @@ pub use server::{Server, ServerHandle};
 pub use macros::{mcp_server, tool};
 
 // Keep the full macros module available for internal use
-pub mod macros {
+mod macros {
     pub use ::macros::*;
 }
 

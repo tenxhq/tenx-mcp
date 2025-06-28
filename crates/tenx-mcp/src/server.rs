@@ -165,6 +165,7 @@ where
     }
 }
 
+/// Handle for controlling a running MCP server instance
 pub struct ServerHandle {
     pub handle: JoinHandle<()>,
     notification_tx: broadcast::Sender<ServerNotification>,
