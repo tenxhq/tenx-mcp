@@ -26,20 +26,20 @@ enhanced capabilities through a well-defined interface.
 
 ## Features
 
-- **Full MCP Protocol Support**: Implements the latest MCP specification (2025-03-26) with optional support for the previous version
+- **Full MCP Protocol Support**: Implements the latest MCP specification
+  (2025-03-26) with optional support for the previous version
 - **Client & Server**: Build both MCP clients and servers with ergonomic APIs
 - **Multiple Transports**: TCP/IP and stdio transport layers
+- **OAuth 2.0 Authentication**: Complete OAuth 2.0 support including:
+  - Authorization Code Flow with PKCE
+  - Dynamic client registration (RFC7591)
+  - Automatic token refresh
+  - MCP-specific `resource` parameter support
+  - Built-in callback server for browser flows
 - **Async/Await**: Built on Tokio for high-performance async operations
-- **Type-Safe**: Leverages Rust's type system with comprehensive schema definitions
+- **Type-Safe**: Leverages Rust's type system with comprehensive schema
+  definitions
 - **Extensible**: Easy to add custom handlers for tools, resources, and prompts
 
-**Note**: Batch operations are not supported.
-
----
-
-## Community
-
-Want to contribute? Have ideas or feature requests? Come tell us about it on
-[Discord](https://discord.gg/fHmRmuBDxF). 
-
+**Note**: Batch operations in the previous protocol version are not supported.
 
