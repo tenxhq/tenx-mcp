@@ -172,6 +172,7 @@ pub struct ServerHandle {
     shutdown_token: CancellationToken,
     /// The actual bound address (for servers that bind to a network port)
     pub bound_addr: Option<String>,
+    capabilities: ServerCapabilities,
 }
 
 impl ServerHandle {
@@ -181,6 +182,7 @@ impl ServerHandle {
         F: Fn() -> Box<dyn ServerConn> + Send + Sync + 'static,
     {
         transport.connect().await?;
+        let capabilities = server.capabilities.clone();
         let remote_addr = transport.remote_addr();
         let stream = transport.framed()?;
         let (sink_tx, mut stream_rx) = stream.split();
@@ -317,6 +319,7 @@ impl ServerHandle {
             notification_tx: notification_tx_handle,
             shutdown_token,
             bound_addr: None,
+            capabilities,
         })
     }
 
@@ -355,12 +358,49 @@ impl ServerHandle {
 
     /// Send a server notification
     pub fn send_server_notification(&self, notification: ServerNotification) {
-        // TODO Skip sending notifications if specific server capabilities are not enabled
+        if !self.can_forward_notification(&notification) {
+            debug!(
+                "Skipping server notification {:?} due to missing capability",
+                notification
+            );
+            return;
+        }
         if let Err(e) = self.notification_tx.send(notification.clone()) {
             error!(
                 "Failed to send server notification {:?}: {}",
                 notification, e
             );
+        }
+    }
+
+    fn can_forward_notification(&self, notification: &ServerNotification) -> bool {
+        match notification {
+            ServerNotification::LoggingMessage { .. } => self.capabilities.logging.is_some(),
+            ServerNotification::ResourceUpdated { .. } => self
+                .capabilities
+                .resources
+                .as_ref()
+                .and_then(|c| c.subscribe)
+                .unwrap_or(false),
+            ServerNotification::ResourceListChanged => self
+                .capabilities
+                .resources
+                .as_ref()
+                .and_then(|c| c.list_changed)
+                .unwrap_or(false),
+            ServerNotification::ToolListChanged => self
+                .capabilities
+                .tools
+                .as_ref()
+                .and_then(|c| c.list_changed)
+                .unwrap_or(false),
+            ServerNotification::PromptListChanged => self
+                .capabilities
+                .prompts
+                .as_ref()
+                .and_then(|c| c.list_changed)
+                .unwrap_or(false),
+            ServerNotification::Progress { .. } | ServerNotification::Cancelled { .. } => true,
         }
     }
 }
