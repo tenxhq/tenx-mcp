@@ -1,4 +1,6 @@
 ![Discord](https://img.shields.io/discord/1381424110831145070?style=flat-square&logo=rust&link=https%3A%2F%2Fdiscord.gg%2FfHmRmuBDxF)
+[![Crates.io](https://img.shields.io/crates/v/tenx-mcp)](https://crates.io/crates/tenx-mcp)
+[![docs.rs](https://img.shields.io/docsrs/tenx-mcp)](https://docs.rs/tenx-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # tenx-mcp
