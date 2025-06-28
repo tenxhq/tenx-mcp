@@ -1,18 +1,63 @@
+//! GitHub MCP client example demonstrating OAuth authentication.
+//!
+//! This example connects to GitHub's MCP server using OAuth authentication.
+//! To use this example, you need to create a GitHub OAuth App:
+//!
+//! 1. Go to https://github.com/settings/developers
+//! 2. Click "New OAuth App"
+//! 3. Fill in the application details:
+//!    - Application name: Choose any name
+//!    - Homepage URL: Can be any valid URL
+//!    - Authorization callback URL: http://localhost:8080/callback
+//!      (or use a different port with the -p flag)
+//! 4. After creating the app, you'll get a Client ID and Client Secret
+//! 5. Run this example with:
+//!    cargo run --example ghusers -- -c YOUR_CLIENT_ID -s YOUR_CLIENT_SECRET
+
 use clap::Parser;
 use std::sync::Arc;
 use tenx_mcp::{Client, OAuth2CallbackServer, OAuth2Client, OAuth2Config, OAuth2Token, ServerAPI};
-use tracing::{info, Level};
+use tracing::{debug, Level};
 use tracing_subscriber::FmtSubscriber;
+
+const GITHUB_MCP_ENDPOINT: &str = "https://api.githubcopilot.com/mcp/";
+const GITHUB_AUTH_URL: &str = "https://github.com/login/oauth/authorize";
+const GITHUB_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
+
+/// Wrap text to fit within the specified width, with an optional indent for continuation lines
+fn wrap_text(text: &str, width: usize, indent: &str) -> String {
+    let words = text.split_whitespace();
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+
+    for word in words {
+        if current_line.is_empty() {
+            current_line = word.to_string();
+        } else if current_line.len() + word.len() < width {
+            current_line.push(' ');
+            current_line.push_str(word);
+        } else {
+            lines.push(current_line);
+            current_line = format!("{indent}{word}");
+        }
+    }
+
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    lines.join("\n")
+}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Connect to GitHub MCP server with OAuth", long_about = None)]
 struct Args {
     /// GitHub OAuth App Client ID
-    #[arg(short, long, default_value = "")]
+    #[arg(short, long)]
     client_id: String,
 
     /// GitHub OAuth App Client Secret
-    #[arg(short = 's', long, default_value = "")]
+    #[arg(short = 's', long)]
     client_secret: String,
 
     /// OAuth callback port (default: 8080)
@@ -22,54 +67,29 @@ struct Args {
     /// Use existing access token (skip OAuth flow)
     #[arg(short = 't', long)]
     access_token: Option<String>,
-}
 
-const GITHUB_MCP_ENDPOINT: &str = "https://api.githubcopilot.com/mcp/x/users/readonly";
-const GITHUB_AUTH_URL: &str = "https://github.com/login/oauth/authorize";
-const GITHUB_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
+    /// Enable verbose logging
+    #[arg(short = 'v', long)]
+    verbose: bool,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Set up logging
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
-        .finish();
+    let args = Args::parse();
+
+    // Set up logging based on verbose flag
+    let log_level = if args.verbose {
+        Level::DEBUG
+    } else {
+        Level::WARN
+    };
+    let subscriber = FmtSubscriber::builder().with_max_level(log_level).finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-
-    let mut args = Args::parse();
-
-    // Try to load from environment variables if not provided via CLI
-    if args.client_id.is_empty() {
-        if let Ok(client_id) = std::env::var("GITHUB_CLIENT_ID") {
-            args.client_id = client_id;
-        }
-    }
-
-    if args.client_secret.is_empty() {
-        if let Ok(client_secret) = std::env::var("GITHUB_CLIENT_SECRET") {
-            args.client_secret = client_secret;
-        }
-    }
-
-    if args.access_token.is_none() {
-        if let Ok(access_token) = std::env::var("GITHUB_ACCESS_TOKEN") {
-            args.access_token = Some(access_token);
-        }
-    }
-
-    // Validate required arguments
-    if args.client_id.is_empty() || args.client_secret.is_empty() {
-        eprintln!("Error: GitHub Client ID and Client Secret are required");
-        eprintln!("Provide them via command line arguments or environment variables:");
-        eprintln!("  export GITHUB_CLIENT_ID=your_client_id");
-        eprintln!("  export GITHUB_CLIENT_SECRET=your_client_secret");
-        std::process::exit(1);
-    }
 
     // Create OAuth client
     let oauth_client = if let Some(access_token) = args.access_token {
         // Use provided access token
-        info!("Using provided access token");
+        debug!("Using provided access token");
 
         let config = OAuth2Config {
             client_id: args.client_id,
@@ -94,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         oauth_client
     } else {
         // Perform full OAuth flow
-        info!("Starting OAuth flow...");
+        debug!("Starting OAuth flow...");
 
         let config = OAuth2Config {
             client_id: args.client_id,
@@ -111,8 +131,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Get authorization URL
         let (auth_url, csrf_token) = oauth_client.get_authorization_url();
 
-        info!("Opening browser for GitHub authorization...");
-        info!("If the browser doesn't open, visit: {}", auth_url);
+        println!("Opening browser for GitHub authorization...");
+        println!("If the browser doesn't open, visit: {auth_url}");
 
         // Try to open the browser
         if let Err(e) = webbrowser::open(auth_url.as_str()) {
@@ -122,7 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Start callback server
         let callback_server = OAuth2CallbackServer::new(args.port);
-        info!("Waiting for OAuth callback on port {}...", args.port);
+        debug!("Waiting for OAuth callback on port {}...", args.port);
 
         let (code, state) = callback_server.wait_for_callback().await?;
 
@@ -131,11 +151,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err("CSRF token mismatch".into());
         }
 
-        info!("Received authorization code, exchanging for token...");
+        debug!("Received authorization code, exchanging for token...");
 
         // Exchange code for token
         let token = oauth_client.exchange_code(code, state).await?;
-        info!("Successfully obtained access token: {}", token.access_token);
+        debug!("Successfully obtained access token: {}", token.access_token);
 
         oauth_client
     };
@@ -144,7 +164,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let oauth_client_arc = Arc::new(oauth_client);
     let mut client = Client::new("ghusers-example", "1.0.0");
 
-    info!(
+    debug!(
         "Connecting to GitHub MCP server at {}...",
         GITHUB_MCP_ENDPOINT
     );
@@ -153,77 +173,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect_http_with_oauth(GITHUB_MCP_ENDPOINT, oauth_client_arc.clone())
         .await?;
 
-    info!("Connected successfully!");
-    info!(
-        "Server info: {} v{}",
+    println!(
+        "Connected to {} v{}",
         init_result.server_info.name, init_result.server_info.version
     );
 
     // List available tools
-    info!("\n=== Available Tools ===");
+    println!("\nAvailable tools:");
     let tools = client.list_tools(None).await?;
 
     if tools.tools.is_empty() {
-        info!("No tools available");
+        println!("No tools available");
     } else {
         for tool in &tools.tools {
-            info!("\nTool: {}", tool.name);
+            println!("\n{}", tool.name);
             if let Some(desc) = &tool.description {
-                info!("  Description: {}", desc);
+                let wrapped = wrap_text(desc, 72, "  ");
+                println!("  {wrapped}");
             }
-            info!(
-                "  Input schema: {}",
-                serde_json::to_string_pretty(&tool.input_schema)?
-            );
-            if let Some(output_schema) = &tool.output_schema {
-                info!(
-                    "  Output schema: {}",
-                    serde_json::to_string_pretty(output_schema)?
-                );
-            }
-        }
-    }
 
-    // List available resources
-    info!("\n=== Available Resources ===");
-    let resources = client.list_resources(None).await?;
+            // Parse and display input parameters
+            if let Some(properties) = &tool.input_schema.properties {
+                if !properties.is_empty() {
+                    println!("  Parameters:");
 
-    if resources.resources.is_empty() {
-        info!("No resources available");
-    } else {
-        for resource in &resources.resources {
-            info!("\nResource: {}", resource.uri);
-            if let Some(desc) = &resource.description {
-                info!("  Description: {}", desc);
-            }
-            if let Some(mime_type) = &resource.mime_type {
-                info!("  MIME type: {}", mime_type);
-            }
-        }
-    }
+                    let required = tool.input_schema.required.as_deref().unwrap_or(&[]);
 
-    // List available prompts
-    info!("\n=== Available Prompts ===");
-    let prompts = client.list_prompts(None).await?;
+                    for (name, schema) in properties {
+                        let param_type = schema
+                            .get("type")
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("unknown");
+                        let description = schema
+                            .get("description")
+                            .and_then(|d| d.as_str())
+                            .unwrap_or("");
+                        let is_required = required.contains(name);
 
-    if prompts.prompts.is_empty() {
-        info!("No prompts available");
-    } else {
-        for prompt in &prompts.prompts {
-            info!("\nPrompt: {}", prompt.name);
-            if let Some(desc) = &prompt.description {
-                info!("  Description: {}", desc);
-            }
-            if let Some(arguments) = &prompt.arguments {
-                if !arguments.is_empty() {
-                    info!("  Arguments:");
-                    for arg in arguments {
-                        info!(
-                            "    - {}: {} (required: {})",
-                            arg.name,
-                            arg.description.as_ref().unwrap_or(&"".to_string()),
-                            arg.required.unwrap_or(false)
+                        let param_header = format!(
+                            "    - {} ({}){}: ",
+                            name,
+                            param_type,
+                            if is_required { ", required" } else { "" }
                         );
+
+                        if description.is_empty() {
+                            println!("{}", param_header.trim_end_matches(": "));
+                        } else {
+                            let wrapped_desc =
+                                wrap_text(description, 72 - param_header.len(), "      ");
+                            println!("{param_header}{wrapped_desc}");
+                        }
                     }
                 }
             }
@@ -232,12 +232,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Get the access token for future use
     if let Ok(token) = oauth_client_arc.get_valid_token().await {
-        info!("\n=== Authentication Info ===");
-        info!("Access token (save for future use): {}", token);
-        info!(
-            "You can skip the OAuth flow next time by using: --access-token {}",
-            token
-        );
+        if args.verbose {
+            println!("\nAccess token (save for future use): {token}");
+            println!("You can skip the OAuth flow next time by using: --access-token {token}");
+        }
     }
 
     Ok(())
