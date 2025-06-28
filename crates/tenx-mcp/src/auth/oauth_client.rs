@@ -185,14 +185,34 @@ impl OAuth2Client {
             .take()
             .ok_or_else(|| Error::InvalidConfiguration("Missing PKCE verifier".to_string()))?;
 
-        let token_result = self
+        let mut token_request = self
             .client
             .exchange_code(AuthorizationCode::new(code))
-            .set_pkce_verifier(pkce_verifier)
-            .add_extra_param("resource", &self.config.resource)
+            .set_pkce_verifier(pkce_verifier);
+
+        // Only add resource parameter if it's not empty (some providers don't support it)
+        if !self.config.resource.is_empty() {
+            token_request = token_request.add_extra_param("resource", &self.config.resource);
+        }
+
+        let token_result = token_request
             .request_async(&reqwest::Client::new())
             .await
-            .map_err(|e| Error::AuthorizationFailed(format!("Token exchange failed: {e}")))?;
+            .map_err(|e| {
+                // Try to extract OAuth error details from the response
+                if let oauth2::RequestTokenError::ServerResponse(resp) = &e {
+                    if let Some(error_description) = resp.error_description() {
+                        return Error::AuthorizationFailed(format!(
+                            "OAuth error ({}): {}",
+                            resp.error(),
+                            error_description
+                        ));
+                    } else {
+                        return Error::AuthorizationFailed(format!("OAuth error: {}", resp.error()));
+                    }
+                }
+                Error::AuthorizationFailed(format!("Token exchange failed: {e}"))
+            })?;
 
         let oauth_token = OAuth2Token {
             access_token: token_result.access_token().secret().clone(),
@@ -241,10 +261,17 @@ impl OAuth2Client {
         }
     }
     async fn refresh_token_inner(&self, refresh_token: &str) -> Result<String, Error> {
-        let token_result = self
+        let refresh_token_obj = RefreshToken::new(refresh_token.to_string());
+        let mut refresh_request = self
             .client
-            .exchange_refresh_token(&RefreshToken::new(refresh_token.to_string()))
-            .add_extra_param("resource", &self.config.resource)
+            .exchange_refresh_token(&refresh_token_obj);
+
+        // Only add resource parameter if it's not empty (some providers don't support it)
+        if !self.config.resource.is_empty() {
+            refresh_request = refresh_request.add_extra_param("resource", &self.config.resource);
+        }
+
+        let token_result = refresh_request
             .request_async(&reqwest::Client::new())
             .await
             .map_err(|e| Error::AuthorizationFailed(format!("Token refresh failed: {e}")))?;
