@@ -253,8 +253,11 @@ impl DynamicRegistrationClient {
             .await
             .map_err(|e| Error::TransportError(format!("Failed to fetch OAuth metadata: {e}")))?;
 
-        if !response.status().is_success() {
-            return Ok(None);
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Error::AuthorizationFailed(format!(
+                "Metadata request failed with status: {status}"
+            )));
         }
 
         let metadata: serde_json::Value = response.json().await.map_err(|e| {
