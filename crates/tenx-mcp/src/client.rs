@@ -309,9 +309,8 @@ where
                                         warn!("Received unexpected batch request from server");
                                     }
                                     JSONRPCMessage::BatchResponse(_batch) => {
-                                        // TODO: Handle batch responses if we implement batch requests
                                         warn!(
-                                            "Received batch response - batch requests not yet implemented"
+                                            "Received batch response - batch requests not supported"
                                         );
                                     }
                                 }

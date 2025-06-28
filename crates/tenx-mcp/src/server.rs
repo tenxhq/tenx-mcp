@@ -401,8 +401,7 @@ async fn handle_message_with_connection(
             debug!("Error handling delegated to main loop");
         }
         JSONRPCMessage::BatchRequest(_) => {
-            // TODO: Implement batch request handling
-            error!("Batch requests not yet implemented");
+            error!("Batch requests not supported");
         }
         JSONRPCMessage::BatchResponse(_) => {
             warn!("Server received unexpected batch response");

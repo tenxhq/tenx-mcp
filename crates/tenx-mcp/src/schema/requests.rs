@@ -176,15 +176,6 @@ pub enum ClientNotification {
     RootsListChanged,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub(crate) enum ClientResult {
-    Empty(EmptyResult),
-    CreateMessage(CreateMessageResult),
-    ListRoots(ListRootsResult),
-    Elicit(ElicitResult),
-}
-
 /// Requests sent from the server to the client
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method")]
@@ -304,21 +295,6 @@ pub enum ServerNotification {
     /// without any previous subscription from the client.
     #[serde(rename = "notifications/prompts/list_changed")]
     PromptListChanged,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub(crate) enum ServerResult {
-    Empty(EmptyResult),
-    Initialize(InitializeResult),
-    Complete(CompleteResult),
-    GetPrompt(GetPromptResult),
-    ListPrompts(ListPromptsResult),
-    ListResourceTemplates(ListResourceTemplatesResult),
-    ListResources(ListResourcesResult),
-    ReadResource(ReadResourceResult),
-    CallTool(CallToolResult),
-    ListTools(ListToolsResult),
 }
 
 #[cfg(test)]

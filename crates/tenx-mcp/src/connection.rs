@@ -13,7 +13,7 @@ use crate::{
     Error, Result,
 };
 
-/// Connection trait that client implementers must implement
+/// Connection trait that client implementers must implement.
 /// Each client connection will have its own instance of the implementation
 ///
 /// All methods take &self to allow concurrent request handling.
@@ -31,7 +31,7 @@ pub trait ClientConn: Send + Sync + Clone {
         Ok(())
     }
 
-    /// Responde to a ping request from the server
+    /// Respond to a ping request from the server
     async fn pong(&self, _context: &ClientCtx) -> Result<()> {
         Ok(())
     }
