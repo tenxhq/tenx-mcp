@@ -20,7 +20,7 @@ axum = { version = "0.7", features = ["http2"] }
 hyper = { version = "1.0", features = ["full"] }
 hyper-util = { version = "0.1", features = ["full"] }
 tower = { version = "0.5", features = ["full"] }
-tower-http = { version = "0.6", features = ["cors"] }
+tower-http = { version = "0.6", features = ["cors", "limit"] }
 reqwest = { version = "0.12", features = ["json", "stream"] }
 eventsource-stream = "0.2"
 http = "1.0"

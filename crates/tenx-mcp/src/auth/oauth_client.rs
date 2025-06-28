@@ -1,3 +1,4 @@
+use axum::{extract::Query, response::Html, routing::get, Router};
 use oauth2::{
     basic::{
         BasicClient, BasicErrorResponse, BasicRevocationErrorResponse,
@@ -7,8 +8,9 @@ use oauth2::{
     PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope, StandardRevocableToken,
     TokenResponse, TokenUrl,
 };
+use serde::Deserialize;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{oneshot, Mutex, RwLock};
 use url::Url;
 
 use super::dynamic_registration::{ClientMetadata, DynamicRegistrationClient};
@@ -269,6 +271,12 @@ impl OAuth2Client {
     }
 }
 
+#[derive(Debug, Deserialize)]
+struct CallbackQuery {
+    code: String,
+    state: String,
+}
+
 pub struct OAuth2CallbackServer {
     port: u16,
 }
@@ -279,115 +287,42 @@ impl OAuth2CallbackServer {
     }
 
     pub async fn wait_for_callback(&self) -> Result<(String, String), Error> {
-        use tokio::net::TcpListener;
+        let (tx, rx) = oneshot::channel::<(String, String)>();
+        let tx = Arc::new(Mutex::new(Some(tx)));
+
+        let callback_handler = {
+            let tx = tx.clone();
+            move |Query(params): Query<CallbackQuery>| {
+                let tx = tx.clone();
+                async move {
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send((params.code, params.state));
+                    }
+                    Html(SUCCESS_HTML)
+                }
+            }
+        };
+
+        let app = Router::new().route("/callback", get(callback_handler));
 
         let addr = format!("127.0.0.1:{}", self.port);
-        let listener = TcpListener::bind(&addr)
+        let listener = tokio::net::TcpListener::bind(&addr)
             .await
             .map_err(|e| Error::TransportError(format!("Failed to bind to {addr}: {e}")))?;
 
-        let (stream, _) = listener
-            .accept()
-            .await
-            .map_err(|e| Error::TransportError(format!("Failed to accept connection: {e}")))?;
+        let server = axum::serve(listener, app);
 
-        const MAX_REQUEST_SIZE: usize = 8 * 1024; // 8 KiB
-        const MAX_LINE_LENGTH: usize = 1024;
+        let server_handle = tokio::spawn(async move {
+            let _ = server.await;
+        });
 
-        let mut request = String::new();
-        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-        let (reader, mut writer) = stream.into_split();
-        let mut reader = BufReader::new(reader);
-
-        let mut total_read = 0usize;
-        loop {
-            let mut line = String::new();
-            let bytes = reader
-                .read_line(&mut line)
-                .await
-                .map_err(|e| Error::TransportError(format!("Failed to read from socket: {e}")))?;
-
-            if bytes == 0 {
-                break;
-            }
-
-            if line.len() > MAX_LINE_LENGTH || total_read + line.len() > MAX_REQUEST_SIZE {
-                return Err(Error::AuthorizationFailed("HTTP request too large".into()));
-            }
-
-            total_read += line.len();
-
-            if line.trim().is_empty() {
-                break;
-            }
-            request.push_str(&line);
-        }
-
-        let (code, state) = Self::extract_code_and_state(&request)?;
-
-        let response = format!(
-            "HTTP/1.1 200 OK\r\n\
-             Content-Type: text/html\r\n\
-             Content-Length: {}\r\n\
-             Connection: close\r\n\
-             \r\n\
-             {}",
-            SUCCESS_HTML.len(),
-            SUCCESS_HTML
-        );
-
-        writer
-            .write_all(response.as_bytes())
-            .await
-            .map_err(|e| Error::TransportError(format!("Failed to send response: {e}")))?;
-
-        Ok((code, state))
-    }
-
-    fn extract_code_and_state(request: &str) -> Result<(String, String), Error> {
-        let lines: Vec<&str> = request.lines().collect();
-        if lines.is_empty() {
-            return Err(Error::AuthorizationFailed(
-                "Empty request received".to_string(),
-            ));
-        }
-
-        let request_line = lines[0];
-        let parts: Vec<&str> = request_line.split_whitespace().collect();
-        if parts.len() < 3 {
-            return Err(Error::AuthorizationFailed(
-                "Invalid HTTP request line".to_string(),
-            ));
-        }
-
-        let method = parts[0];
-        if method != "GET" {
-            return Err(Error::AuthorizationFailed(format!(
-                "Unsupported HTTP method: {method}"
-            )));
-        }
-
-        let path = parts[1];
-        if !path.starts_with("/callback") {
-            return Err(Error::AuthorizationFailed("Invalid callback path".into()));
-        }
-        let url = Url::parse(&format!("http://localhost{path}")).map_err(|e| {
-            Error::AuthorizationFailed(format!("Failed to parse callback URL: {e}"))
+        let result = rx.await.map_err(|_| {
+            Error::AuthorizationFailed("Callback server closed unexpectedly".into())
         })?;
 
-        let query_pairs: std::collections::HashMap<_, _> = url.query_pairs().collect();
+        server_handle.abort();
 
-        let code = query_pairs
-            .get("code")
-            .ok_or_else(|| Error::AuthorizationFailed("Missing authorization code".to_string()))?
-            .to_string();
-
-        let state = query_pairs
-            .get("state")
-            .ok_or_else(|| Error::AuthorizationFailed("Missing state parameter".to_string()))?
-            .to_string();
-
-        Ok((code, state))
+        Ok(result)
     }
 }
 
