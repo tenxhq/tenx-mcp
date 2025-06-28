@@ -1,16 +1,16 @@
-use axum::{extract::Query, response::Html, routing::get, Router};
+use axum::{Router, extract::Query, response::Html, routing::get};
 use oauth2::{
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet,
+    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope, StandardRevocableToken,
+    TokenResponse, TokenUrl,
     basic::{
         BasicClient, BasicErrorResponse, BasicRevocationErrorResponse,
         BasicTokenIntrospectionResponse, BasicTokenResponse,
     },
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet,
-    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope, StandardRevocableToken,
-    TokenResponse, TokenUrl,
 };
 use serde::Deserialize;
 use std::sync::Arc;
-use tokio::sync::{oneshot, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, oneshot};
 use url::Url;
 
 use super::dynamic_registration::{ClientMetadata, DynamicRegistrationClient};

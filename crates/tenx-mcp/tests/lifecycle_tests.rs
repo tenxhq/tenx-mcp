@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use std::sync::{
-    atomic::{AtomicU32, Ordering},
     Arc,
+    atomic::{AtomicU32, Ordering},
 };
-use tenx_mcp::{schema::*, testutils::*, Client, Result, Server, ServerAPI, ServerConn, ServerCtx};
+use tenx_mcp::{Client, Result, Server, ServerAPI, ServerConn, ServerCtx, schema::*, testutils::*};
 use tokio::sync::Mutex;
 
 /// Test server that tracks lifecycle events

@@ -1,6 +1,6 @@
 use clap::Parser;
 use tenx_mcp::auth::{ClientMetadata, DynamicRegistrationClient, OAuth2Config};
-use tracing::{info, Level};
+use tracing::{Level, info};
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]

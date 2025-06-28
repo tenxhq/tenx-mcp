@@ -8,7 +8,7 @@
 //!   cargo run --example basic_client_stdio
 
 use serde::{Deserialize, Serialize};
-use tenx_mcp::{schemars, Client, Result, ServerAPI};
+use tenx_mcp::{Client, Result, ServerAPI, schemars};
 use tokio::process::Command;
 use tracing::info;
 

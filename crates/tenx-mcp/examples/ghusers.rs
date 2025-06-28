@@ -17,10 +17,10 @@
 use clap::Parser;
 use std::sync::Arc;
 use tenx_mcp::{
-    auth::{OAuth2CallbackServer, OAuth2Client, OAuth2Config, OAuth2Token},
     Client, ServerAPI,
+    auth::{OAuth2CallbackServer, OAuth2Client, OAuth2Config, OAuth2Token},
 };
-use tracing::{debug, Level};
+use tracing::{Level, debug};
 use tracing_subscriber::FmtSubscriber;
 
 const GITHUB_MCP_ENDPOINT: &str = "https://api.githubcopilot.com/mcp/";

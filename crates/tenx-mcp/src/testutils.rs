@@ -18,9 +18,9 @@ use tokio::io::{self, AsyncRead, AsyncWrite};
 use tokio::sync::broadcast;
 
 use crate::{
+    Client, ClientConn, ClientCtx, Server, ServerConn, ServerCtx, ServerHandle,
     error::Result,
     schema::{ClientNotification, ServerNotification},
-    Client, ClientConn, ClientCtx, Server, ServerConn, ServerCtx, ServerHandle,
 };
 
 /// Conveniently create **two** independent in-memory duplex pipes that together
@@ -110,7 +110,7 @@ pub async fn shutdown_client_and_server<C>(client: Client<C>, server: ServerHand
 where
     C: ClientConn + 'static,
 {
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
     // Explicitly drop so that the transport is closed *before* we await the
     // server shutdown.
@@ -158,7 +158,7 @@ impl TestServerContext {
 
     /// Try to receive a notification, returning None if no notification is available
     pub async fn try_recv_notification(&mut self) -> Option<ServerNotification> {
-        use tokio::time::{timeout, Duration};
+        use tokio::time::{Duration, timeout};
         timeout(Duration::from_millis(10), self.notification_rx.recv())
             .await
             .ok()
@@ -199,7 +199,7 @@ impl TestClientContext {
 
     /// Try to receive a notification, returning None if no notification is available
     pub async fn try_recv_notification(&mut self) -> Option<ClientNotification> {
-        use tokio::time::{timeout, Duration};
+        use tokio::time::{Duration, timeout};
         timeout(Duration::from_millis(10), self.notification_rx.recv())
             .await
             .ok()

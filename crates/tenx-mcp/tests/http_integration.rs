@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use serde_json::json;
 use std::collections::HashMap;
 use tenx_mcp::{
-    schema::{self, *},
     Client, Result, Server, ServerAPI, ServerConn, ServerCtx,
+    schema::{self, *},
 };
 
 #[derive(Default)]

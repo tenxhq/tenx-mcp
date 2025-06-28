@@ -1,12 +1,12 @@
 use clap::Parser;
 use std::sync::Arc;
 use tenx_mcp::{
+    Client, ServerAPI,
     auth::{
         ClientMetadata, DynamicRegistrationClient, OAuth2CallbackServer, OAuth2Client, OAuth2Config,
     },
-    Client, ServerAPI,
 };
-use tracing::{info, Level};
+use tracing::{Level, info};
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]

@@ -7,18 +7,18 @@ use std::{
 
 use async_trait::async_trait;
 use axum::{
+    Json, Router,
     extract::State,
-    http::{header, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{
-        sse::{Event, KeepAlive, Sse},
         IntoResponse, Response,
+        sse::{Event, KeepAlive, Sse},
     },
     routing::post,
-    Json, Router,
 };
 use dashmap::DashMap;
 use eventsource_stream::Eventsource;
-use futures::{channel::mpsc, Sink, Stream, StreamExt};
+use futures::{Sink, Stream, StreamExt, channel::mpsc};
 use reqwest::Client as HttpClient;
 use tokio::{
     sync::{Mutex, RwLock},

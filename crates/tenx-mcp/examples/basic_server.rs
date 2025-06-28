@@ -15,7 +15,7 @@
 
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use tenx_mcp::{mcp_server, schema::*, schemars, tool, Result, Server, ServerCtx};
+use tenx_mcp::{Result, Server, ServerCtx, mcp_server, schema::*, schemars, tool};
 use tracing::info;
 
 /// Echo tool input parameters

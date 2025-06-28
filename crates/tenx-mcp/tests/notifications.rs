@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tenx_mcp::{schema, ClientConn, ClientCtx, Result, ServerConn, ServerCtx};
+use tenx_mcp::{ClientConn, ClientCtx, Result, ServerConn, ServerCtx, schema};
 
 #[tokio::test]
 async fn test_server_to_client_notifications() {

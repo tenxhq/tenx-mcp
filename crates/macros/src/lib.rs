@@ -86,7 +86,7 @@
 use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{spanned::Spanned, Expr, ExprLit, ImplItem, ItemImpl, Lit, Meta};
+use syn::{Expr, ExprLit, ImplItem, ItemImpl, Lit, Meta, spanned::Spanned};
 
 type Result<T> = std::result::Result<T, syn::Error>;
 
@@ -244,7 +244,7 @@ fn parse_impl_block(input: &TokenStream) -> Result<(ItemImpl, ServerInfo)> {
             return Err(syn::Error::new(
                 impl_block.self_ty.span(),
                 "Expected a struct or type name",
-            ))
+            ));
         }
     };
 
@@ -514,7 +514,7 @@ pub fn with_meta(
     let mut input = syn::parse_macro_input!(input as syn::DeriveInput);
 
     // Only process structs
-    let syn::Data::Struct(ref mut data_struct) = &mut input.data else {
+    let syn::Data::Struct(data_struct) = &mut input.data else {
         return syn::Error::new(
             input.ident.span(),
             "with_meta can only be applied to structs",
@@ -523,7 +523,7 @@ pub fn with_meta(
         .into();
     };
 
-    let syn::Fields::Named(ref mut fields) = &mut data_struct.fields else {
+    let syn::Fields::Named(fields) = &mut data_struct.fields else {
         return syn::Error::new(
             input.ident.span(),
             "with_meta can only be applied to structs with named fields",
@@ -595,7 +595,7 @@ pub fn with_basename(
     let mut input = syn::parse_macro_input!(input as syn::DeriveInput);
 
     // Only process structs
-    let syn::Data::Struct(ref mut data_struct) = &mut input.data else {
+    let syn::Data::Struct(data_struct) = &mut input.data else {
         return syn::Error::new(
             input.ident.span(),
             "with_basename can only be applied to structs",
@@ -604,7 +604,7 @@ pub fn with_basename(
         .into();
     };
 
-    let syn::Fields::Named(ref mut fields) = &mut data_struct.fields else {
+    let syn::Fields::Named(fields) = &mut data_struct.fields else {
         return syn::Error::new(
             input.ident.span(),
             "with_basename can only be applied to structs with named fields",
@@ -720,10 +720,12 @@ mod tests {
 
         let result = parse_tool_method(&method);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("exactly 3 parameters"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("exactly 3 parameters")
+        );
     }
 
     #[test]
@@ -872,10 +874,12 @@ mod tests {
 
         let result = inner_mcp_server(TokenStream::new(), input);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("No tool methods found"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("No tool methods found")
+        );
     }
 
     #[test]

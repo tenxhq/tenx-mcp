@@ -7,7 +7,7 @@
 
 use tenx_mcp::{Client, Result, ServerAPI};
 use tokio::process::Command;
-use tracing::{error, info, Level};
+use tracing::{Level, error, info};
 
 #[tokio::main]
 async fn main() -> Result<()> {

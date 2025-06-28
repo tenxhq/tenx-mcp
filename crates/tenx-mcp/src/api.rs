@@ -51,7 +51,7 @@ pub trait ServerAPI: Send + Sync {
 
     /// Read a resource by URI
     async fn resources_read(&mut self, uri: impl Into<String> + Send)
-        -> Result<ReadResourceResult>;
+    -> Result<ReadResourceResult>;
 
     /// Subscribe to resource updates
     async fn resources_subscribe(&mut self, uri: impl Into<String> + Send) -> Result<()>;

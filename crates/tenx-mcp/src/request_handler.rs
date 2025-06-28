@@ -1,15 +1,15 @@
-use futures::stream::SplitSink;
 use futures::SinkExt;
+use futures::stream::SplitSink;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{Mutex, oneshot};
 
 use crate::{
     error::{Error, Result},
     schema::{
-        JSONRPCError, JSONRPCMessage, JSONRPCNotification, JSONRPCRequest, JSONRPCResponse,
-        Notification, NotificationParams, Request, RequestId, RequestParams, INVALID_PARAMS,
-        JSONRPC_VERSION, METHOD_NOT_FOUND,
+        INVALID_PARAMS, JSONRPC_VERSION, JSONRPCError, JSONRPCMessage, JSONRPCNotification,
+        JSONRPCRequest, JSONRPCResponse, METHOD_NOT_FOUND, Notification, NotificationParams,
+        Request, RequestId, RequestParams,
     },
     transport::TransportStream,
 };

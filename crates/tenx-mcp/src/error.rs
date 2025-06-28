@@ -1,6 +1,6 @@
 use crate::schema::{
-    ErrorObject, JSONRPCError, RequestId, INVALID_PARAMS, INVALID_REQUEST, JSONRPC_VERSION,
-    METHOD_NOT_FOUND, PARSE_ERROR,
+    ErrorObject, INVALID_PARAMS, INVALID_REQUEST, JSONRPC_VERSION, JSONRPCError, METHOD_NOT_FOUND,
+    PARSE_ERROR, RequestId,
 };
 use thiserror::Error;
 

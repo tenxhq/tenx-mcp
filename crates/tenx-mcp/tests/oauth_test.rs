@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use tenx_mcp::auth::{OAuth2CallbackServer, OAuth2Client, OAuth2Config, OAuth2Token};
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 #[tokio::test]
 async fn test_oauth_client_creation() {
@@ -190,7 +190,7 @@ async fn test_token_refresh() {
 
 #[tokio::test]
 async fn test_concurrent_refresh_single_request() {
-    use axum::{extract::State, routing::post, Json, Router};
+    use axum::{Json, Router, extract::State, routing::post};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tokio::net::TcpListener;
     use tokio::sync::oneshot;

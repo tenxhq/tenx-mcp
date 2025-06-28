@@ -4,8 +4,8 @@
 //! types of streams, not just process stdio.
 
 use tenx_mcp::{Client, Result};
-use tokio::io::{duplex, AsyncRead, AsyncWrite};
-use tracing::{info, Level};
+use tokio::io::{AsyncRead, AsyncWrite, duplex};
+use tracing::{Level, info};
 
 #[tokio::main]
 async fn main() -> Result<()> {

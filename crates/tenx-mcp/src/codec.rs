@@ -106,7 +106,7 @@ impl Encoder<JSONRPCNotification> for JsonRpcCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::{Request, RequestId, JSONRPC_VERSION};
+    use crate::schema::{JSONRPC_VERSION, Request, RequestId};
 
     #[test]
     fn test_encode_decode_request() {

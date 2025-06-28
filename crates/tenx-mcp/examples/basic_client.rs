@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use tenx_mcp::{schema, schemars, Client, Result, ServerAPI};
+use tenx_mcp::{Client, Result, ServerAPI, schema, schemars};
 use tracing::info;
 
 /// Echo tool input parameters - must match the server definition

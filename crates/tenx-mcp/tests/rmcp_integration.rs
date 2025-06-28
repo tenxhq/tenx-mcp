@@ -6,12 +6,12 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use rmcp::model::{CallToolRequestParam, PaginatedRequestParam};
 use rmcp::ServiceExt;
+use rmcp::model::{CallToolRequestParam, PaginatedRequestParam};
 use serde_json::json;
 use tenx_mcp::{
-    schema::*, testutils::make_duplex_pair, Client, Error, Result, Server, ServerAPI, ServerConn,
-    ServerCtx,
+    Client, Error, Result, Server, ServerAPI, ServerConn, ServerCtx, schema::*,
+    testutils::make_duplex_pair,
 };
 
 struct EchoConnection;

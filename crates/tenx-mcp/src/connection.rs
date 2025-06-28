@@ -4,13 +4,13 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::{
+    Error, Result,
     context::{ClientCtx, ServerCtx},
     schema::{
         self, Cursor, ElicitParams, ElicitResult, GetPromptResult, InitializeResult,
         ListPromptsResult, ListResourceTemplatesResult, ListResourcesResult, ListRootsResult,
         ListToolsResult, LoggingLevel, ReadResourceResult,
     },
-    Error, Result,
 };
 
 /// Connection trait that client implementers must implement.

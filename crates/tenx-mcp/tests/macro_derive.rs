@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tenx_mcp::{
-    mcp_server, schema::*, schemars, testutils::TestServerContext, tool, Error, Result, ServerConn,
-    ServerCtx,
+    Error, Result, ServerConn, ServerCtx, mcp_server, schema::*, schemars,
+    testutils::TestServerContext, tool,
 };
 
 #[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -65,14 +65,18 @@ async fn test_list_tools() {
     let result = server.list_tools(ctx.ctx(), None).await.unwrap();
 
     assert_eq!(result.tools.len(), 2);
-    assert!(result
-        .tools
-        .iter()
-        .any(|t| t.name == "echo" && t.description == Some("Echo the message".to_string())));
-    assert!(result
-        .tools
-        .iter()
-        .any(|t| t.name == "add" && t.description == Some("Add two numbers".to_string())));
+    assert!(
+        result
+            .tools
+            .iter()
+            .any(|t| t.name == "echo" && t.description == Some("Echo the message".to_string()))
+    );
+    assert!(
+        result
+            .tools
+            .iter()
+            .any(|t| t.name == "add" && t.description == Some("Add two numbers".to_string()))
+    );
 }
 
 #[tokio::test]

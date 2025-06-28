@@ -7,10 +7,10 @@
 
 use async_trait::async_trait;
 use std::env;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
-use tenx_mcp::{schema, Error, Result, Server, ServerConn, ServerCtx};
+use tenx_mcp::{Error, Result, Server, ServerConn, ServerCtx, schema};
 use tokio::time::sleep;
 use tracing::{info, warn};
 
