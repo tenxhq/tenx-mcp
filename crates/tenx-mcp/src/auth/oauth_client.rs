@@ -299,17 +299,31 @@ impl OAuth2CallbackServer {
             .await
             .map_err(|e| Error::TransportError(format!("Failed to accept connection: {e}")))?;
 
+        const MAX_REQUEST_SIZE: usize = 8 * 1024; // 8 KiB
+        const MAX_LINE_LENGTH: usize = 1024;
+
         let mut request = String::new();
         use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
         let (reader, mut writer) = stream.into_split();
         let mut reader = BufReader::new(reader);
 
+        let mut total_read = 0usize;
         loop {
             let mut line = String::new();
-            reader
+            let bytes = reader
                 .read_line(&mut line)
                 .await
                 .map_err(|e| Error::TransportError(format!("Failed to read from socket: {e}")))?;
+
+            if bytes == 0 {
+                break;
+            }
+
+            if line.len() > MAX_LINE_LENGTH || total_read + line.len() > MAX_REQUEST_SIZE {
+                return Err(Error::AuthorizationFailed("HTTP request too large".into()));
+            }
+
+            total_read += line.len();
 
             if line.trim().is_empty() {
                 break;
@@ -348,13 +362,21 @@ impl OAuth2CallbackServer {
 
         let request_line = lines[0];
         let parts: Vec<&str> = request_line.split_whitespace().collect();
-        if parts.len() < 2 {
+        if parts.len() < 3 {
             return Err(Error::AuthorizationFailed(
                 "Invalid HTTP request line".to_string(),
             ));
         }
 
+        let method = parts[0];
+        if method != "GET" {
+            return Err(Error::AuthorizationFailed(format!("Unsupported HTTP method: {method}")));
+        }
+
         let path = parts[1];
+        if !path.starts_with("/callback") {
+            return Err(Error::AuthorizationFailed("Invalid callback path".into()));
+        }
         let url = Url::parse(&format!("http://localhost{path}")).map_err(|e| {
             Error::AuthorizationFailed(format!("Failed to parse callback URL: {e}"))
         })?;

@@ -79,6 +79,49 @@ async fn test_callback_server() {
 }
 
 #[tokio::test]
+async fn test_callback_server_oversized_request() {
+    use tokio::net::TcpStream;
+    use tokio::io::AsyncWriteExt;
+
+    let server = OAuth2CallbackServer::new(8766);
+
+    let client_task = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let mut stream = TcpStream::connect("127.0.0.1:8766").await.unwrap();
+        let big_query = "a".repeat(9000);
+        let request = format!(
+            "GET /callback?code={big_query}&state=test HTTP/1.1\r\nHost: localhost\r\n\r\n"
+        );
+        let _ = stream.write_all(request.as_bytes()).await;
+    });
+
+    let result = timeout(Duration::from_secs(5), server.wait_for_callback()).await;
+    assert!(matches!(result, Ok(Err(_))));
+
+    let _ = client_task.await;
+}
+
+#[tokio::test]
+async fn test_callback_server_malformed_request() {
+    use tokio::net::TcpStream;
+    use tokio::io::AsyncWriteExt;
+
+    let server = OAuth2CallbackServer::new(8767);
+
+    let client_task = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let mut stream = TcpStream::connect("127.0.0.1:8767").await.unwrap();
+        let request = "POST /bad HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        let _ = stream.write_all(request.as_bytes()).await;
+    });
+
+    let result = timeout(Duration::from_secs(5), server.wait_for_callback()).await;
+    assert!(matches!(result, Ok(Err(_))));
+
+    let _ = client_task.await;
+}
+
+#[tokio::test]
 async fn test_http_transport_with_oauth() {
     // This test verifies that the OAuth client can be integrated with the HTTP transport
     let config = OAuth2Config {
