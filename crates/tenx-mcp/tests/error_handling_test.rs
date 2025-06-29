@@ -74,7 +74,7 @@ async fn test_invalid_params() {
             _context: &ServerCtx,
             _cursor: Option<schema::Cursor>,
         ) -> Result<schema::ListToolsResult> {
-            let schema = schema::ToolInputSchema {
+            let schema = schema::ToolSchema {
                 schema_type: "object".to_string(),
                 properties: Some({
                     let mut props = HashMap::new();
@@ -179,11 +179,11 @@ async fn test_successful_response() {
         ) -> Result<schema::ListToolsResult> {
             Ok(schema::ListToolsResult::new()
                 .with_tool(
-                    schema::Tool::new("echo", schema::ToolInputSchema::default())
+                    schema::Tool::new("echo", schema::ToolSchema::default())
                         .with_description("Echoes the input"),
                 )
                 .with_tool(
-                    schema::Tool::new("add", schema::ToolInputSchema::default())
+                    schema::Tool::new("add", schema::ToolSchema::default())
                         .with_description("Adds two numbers"),
                 ))
         }

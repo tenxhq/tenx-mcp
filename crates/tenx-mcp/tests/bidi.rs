@@ -190,15 +190,15 @@ impl ServerConn for TestServer {
     ) -> Result<ListToolsResult> {
         Ok(ListToolsResult::new()
             .with_tool(
-                Tool::new("ping_client", ToolInputSchema::default())
+                Tool::new("ping_client", ToolSchema::default())
                     .with_description("Ping the client during request handling"),
             )
             .with_tool(
-                Tool::new("query_client_roots", ToolInputSchema::default())
+                Tool::new("query_client_roots", ToolSchema::default())
                     .with_description("Query client's file roots during request handling"),
             )
             .with_tool(
-                Tool::new("ask_client_to_generate", ToolInputSchema::default())
+                Tool::new("ask_client_to_generate", ToolSchema::default())
                     .with_description("Ask client to generate a message during request handling"),
             ))
     }

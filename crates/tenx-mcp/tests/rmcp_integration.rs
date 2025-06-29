@@ -36,7 +36,7 @@ impl ServerConn for EchoConnection {
         _cursor: Option<Cursor>,
     ) -> Result<ListToolsResult> {
         tracing::info!("EchoConnection.tools_list called");
-        let schema = ToolInputSchema {
+        let schema = ToolSchema {
             schema_type: "object".to_string(),
             properties: Some({
                 let mut props = HashMap::new();

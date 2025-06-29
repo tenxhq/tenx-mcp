@@ -312,7 +312,7 @@ fn generate_list_tools(info: &ServerInfo) -> TokenStream {
 
         quote! {
             {
-                tenx_mcp::schema::Tool::new(#name, tenx_mcp::schema::ToolInputSchema::from_json_schema::<#params_type>())
+                tenx_mcp::schema::Tool::new(#name, tenx_mcp::schema::ToolSchema::from_json_schema::<#params_type>())
                     .with_description(#description)
             }
         }

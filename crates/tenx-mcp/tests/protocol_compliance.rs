@@ -22,7 +22,7 @@ impl TestConnection {
         let mut tools = HashMap::new();
 
         // Echo tool
-        let echo_schema = ToolInputSchema {
+        let echo_schema = ToolSchema {
             schema_type: "object".to_string(),
             properties: Some({
                 let mut props = HashMap::new();
@@ -44,7 +44,7 @@ impl TestConnection {
         );
 
         // Add tool
-        let add_schema = ToolInputSchema {
+        let add_schema = ToolSchema {
             schema_type: "object".to_string(),
             properties: Some({
                 let mut props = HashMap::new();

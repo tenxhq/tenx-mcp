@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_tool_input_schema_from_json_schema() {
-        let schema = ToolInputSchema::from_json_schema::<TestInput>();
+        let schema = ToolSchema::from_json_schema::<TestInput>();
 
         assert_eq!(schema.schema_type, "object");
 
@@ -336,7 +336,7 @@ mod tests {
 
     #[test]
     fn test_complex_schema_conversion() {
-        let schema = ToolInputSchema::from_json_schema::<ComplexInput>();
+        let schema = ToolSchema::from_json_schema::<ComplexInput>();
 
         assert_eq!(schema.schema_type, "object");
 
@@ -410,8 +410,8 @@ mod tests {
 
     #[test]
     fn test_tool_output_schema() {
-        let tool = Tool::new("test_tool", ToolInputSchema::default())
-            .with_output_schema(ToolOutputSchema::default());
+        let tool =
+            Tool::new("test_tool", ToolSchema::default()).with_output_schema(ToolSchema::default());
         let json = serde_json::to_value(&tool).unwrap();
         assert!(json["outputSchema"].is_object());
     }

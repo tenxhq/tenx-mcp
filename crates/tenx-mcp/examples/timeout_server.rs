@@ -59,7 +59,7 @@ impl ServerConn for TimeoutTestConnection {
         _context: &ServerCtx,
         _cursor: Option<schema::Cursor>,
     ) -> Result<schema::ListToolsResult> {
-        let object_schema = schema::ToolInputSchema {
+        let object_schema = schema::ToolSchema {
             schema_type: "object".to_string(),
             properties: None,
             required: None,

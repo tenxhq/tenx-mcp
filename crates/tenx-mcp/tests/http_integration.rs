@@ -28,7 +28,7 @@ impl ServerConn for EchoConnection {
         _context: &ServerCtx,
         _cursor: Option<Cursor>,
     ) -> Result<ListToolsResult> {
-        let schema = ToolInputSchema {
+        let schema = ToolSchema {
             schema_type: "object".to_string(),
             properties: Some({
                 let mut props = HashMap::new();

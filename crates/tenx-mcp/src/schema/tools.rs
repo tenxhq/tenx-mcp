@@ -116,17 +116,17 @@ pub struct ToolAnnotations {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tool {
     #[serde(rename = "inputSchema")]
-    pub input_schema: ToolInputSchema,
+    pub input_schema: ToolSchema,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(rename = "outputSchema", skip_serializing_if = "Option::is_none")]
-    pub output_schema: Option<ToolOutputSchema>,
+    pub output_schema: Option<ToolSchema>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<ToolAnnotations>,
 }
 
 impl Tool {
-    pub fn new(name: impl Into<String>, input_schema: ToolInputSchema) -> Self {
+    pub fn new(name: impl Into<String>, input_schema: ToolSchema) -> Self {
         Self {
             input_schema,
             description: None,
@@ -143,7 +143,7 @@ impl Tool {
         self
     }
 
-    pub fn with_output_schema(mut self, schema: ToolOutputSchema) -> Self {
+    pub fn with_output_schema(mut self, schema: ToolSchema) -> Self {
         self.output_schema = Some(schema);
         self
     }
@@ -187,9 +187,9 @@ impl Tool {
     }
 }
 
-/// A JSON Schema object defining the expected parameters for a tool.
+/// A JSON Schema object defining the input or output schema for a tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolInputSchema {
+pub struct ToolSchema {
     #[serde(rename = "type")]
     pub schema_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -198,7 +198,7 @@ pub struct ToolInputSchema {
     pub required: Option<Vec<String>>,
 }
 
-impl Default for ToolInputSchema {
+impl Default for ToolSchema {
     fn default() -> Self {
         Self {
             schema_type: "object".to_string(),
@@ -208,7 +208,7 @@ impl Default for ToolInputSchema {
     }
 }
 
-impl ToolInputSchema {
+impl ToolSchema {
     pub fn with_property(mut self, name: impl Into<String>, schema: Value) -> Self {
         self.properties
             .get_or_insert_with(HashMap::new)
@@ -276,7 +276,3 @@ impl ToolInputSchema {
             .unwrap_or(false)
     }
 }
-
-/// An optional JSON Schema object defining the structure of the tool's output
-/// returned in the structuredContent field of a CallToolResult.
-pub type ToolOutputSchema = ToolInputSchema;
