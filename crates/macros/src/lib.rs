@@ -356,6 +356,21 @@ fn generate_default_initialize(info: &ServerInfo) -> TokenStream {
     let snake_case_name = info.struct_name.to_snake_case();
     let description = &info.description;
 
+    let initialize_result = if description.is_empty() {
+        quote! {
+            tenx_mcp::schema::InitializeResult::new(#snake_case_name)
+                .with_version("0.1.0")
+                .with_tools(false)
+        }
+    } else {
+        quote! {
+            tenx_mcp::schema::InitializeResult::new(#snake_case_name)
+                .with_version("0.1.0")
+                .with_tools(false)
+                .with_instructions(#description)
+        }
+    };
+
     quote! {
         async fn initialize(
             &self,
@@ -364,10 +379,7 @@ fn generate_default_initialize(info: &ServerInfo) -> TokenStream {
             _capabilities: tenx_mcp::schema::ClientCapabilities,
             _client_info: tenx_mcp::schema::Implementation,
         ) -> tenx_mcp::Result<tenx_mcp::schema::InitializeResult> {
-            Ok(tenx_mcp::schema::InitializeResult::new(#snake_case_name)
-                .with_version("0.1.0")
-                .with_tools(false)
-                .with_instructions(#description))
+            Ok(#initialize_result)
         }
     }
 }
@@ -913,5 +925,26 @@ mod tests {
                 "Expected server name '{expected_snake_case}' for struct '{struct_name}', but got: {result_str}"
             );
         }
+    }
+
+    #[test]
+    fn test_empty_description_no_instructions() {
+        let input = quote! {
+            impl TestServer {
+                #[tool]
+                async fn echo(&self, context: &ServerCtx, params: EchoParams) -> Result<schema::CallToolResult> {
+                    Ok(schema::CallToolResult::new())
+                }
+            }
+        };
+
+        let result = inner_mcp_server(TokenStream::new(), input).unwrap();
+        let result_str = result.to_string();
+
+        // Check that with_instructions is NOT called when description is empty
+        assert!(!result_str.contains("with_instructions"));
+        assert!(result_str.contains("InitializeResult :: new"));
+        assert!(result_str.contains("with_version"));
+        assert!(result_str.contains("with_tools"));
     }
 }
