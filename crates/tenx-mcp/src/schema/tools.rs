@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+/// The server's response to a tools/list request from the client.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListToolsResult {
     pub tools: Vec<Tool>,
@@ -35,6 +36,7 @@ impl ListToolsResult {
     }
 }
 
+/// The server's response to a tool call.
 #[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallToolResult {
@@ -86,6 +88,14 @@ impl Default for CallToolResult {
     }
 }
 
+/// Additional properties describing a Tool to clients.
+///
+/// NOTE: all properties in ToolAnnotations are hints.
+/// They are not guaranteed to provide a faithful description of
+/// tool behavior (including descriptive properties like `title`).
+///
+/// Clients should never make tool use decisions based on ToolAnnotations
+/// received from untrusted servers.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolAnnotations {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -177,6 +187,7 @@ impl Tool {
     }
 }
 
+/// A JSON Schema object defining the expected parameters for a tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolInputSchema {
     #[serde(rename = "type")]
@@ -256,6 +267,16 @@ impl ToolInputSchema {
             required,
         }
     }
+
+    /// Checks if a given property name is required in this schema.
+    pub fn is_required(&self, name: &str) -> bool {
+        self.required
+            .as_ref()
+            .map(|req| req.iter().any(|r| r == name))
+            .unwrap_or(false)
+    }
 }
 
+/// An optional JSON Schema object defining the structure of the tool's output
+/// returned in the structuredContent field of a CallToolResult.
 pub type ToolOutputSchema = ToolInputSchema;
