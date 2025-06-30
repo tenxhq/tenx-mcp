@@ -7,7 +7,7 @@
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
 use tenx_mcp::{
-    ClientAPI, ClientConn, ClientCtx, Result, ServerAPI, ServerConn, ServerCtx,
+    Arguments, ClientAPI, ClientConn, ClientCtx, Result, ServerAPI, ServerConn, ServerCtx,
     schema::*,
     testutils::{connected_client_and_server_with_conn, shutdown_client_and_server},
 };
@@ -129,7 +129,7 @@ impl ServerConn for TestServer {
         &self,
         context: &ServerCtx,
         name: String,
-        _arguments: Option<std::collections::HashMap<String, serde_json::Value>>,
+        _arguments: Option<Arguments>,
     ) -> Result<CallToolResult> {
         self.track_call(&format!("tool_{name}"));
 
@@ -230,7 +230,7 @@ async fn test_server_calls_client_during_request() {
     // Test 1: Server pings client during tool execution
     client_calls.lock().unwrap().clear();
     client
-        .call_tool("ping_client", ())
+        .call_tool("ping_client", None)
         .await
         .expect("ping_client tool failed");
 
@@ -243,7 +243,7 @@ async fn test_server_calls_client_during_request() {
     // Test 2: Server queries client roots during tool execution
     client_calls.lock().unwrap().clear();
     let result = client
-        .call_tool("query_client_roots", ())
+        .call_tool("query_client_roots", None)
         .await
         .expect("query_client_roots tool failed");
 
@@ -260,7 +260,7 @@ async fn test_server_calls_client_during_request() {
     // Test 3: Server asks client to generate message during tool execution
     client_calls.lock().unwrap().clear();
     let result = client
-        .call_tool("ask_client_to_generate", ())
+        .call_tool("ask_client_to_generate", None)
         .await
         .expect("ask_client_to_generate tool failed");
 
@@ -325,7 +325,7 @@ async fn test_client_server_ping_pong() {
     // Server pings client (reverse direction via tool call)
     client_calls.lock().unwrap().clear();
     client
-        .call_tool("ping_client", ())
+        .call_tool("ping_client", None)
         .await
         .expect("Server->Client ping failed");
     assert!(

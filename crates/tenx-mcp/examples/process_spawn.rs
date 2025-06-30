@@ -5,7 +5,7 @@
 //! - Connect to it using the process's stdin/stdout
 //! - Manage the process lifecycle
 
-use tenx_mcp::{Client, Result, ServerAPI};
+use tenx_mcp::{Arguments, Client, Result, ServerAPI};
 use tokio::process::Command;
 use tracing::{Level, error, info};
 
@@ -75,13 +75,9 @@ async fn main() -> Result<()> {
     }
 
     // Call a tool if available
-    let mut args = std::collections::HashMap::new();
-    args.insert(
-        "message".to_string(),
-        serde_json::json!("Hello from spawned process!"),
-    );
+    let args = Arguments::new().set("message", "Hello from spawned process!")?;
 
-    match client.call_tool("echo", Some(args.into())).await {
+    match client.call_tool("echo", Some(args)).await {
         Ok(result) => {
             info!("Tool response: {:?}", result.content);
         }

@@ -87,8 +87,8 @@ async fn main() -> Result<()> {
     let params = EchoParams {
         message: format!("Hello from tenx-mcp {mode} client!"),
     };
-    // If "echo" took no arguments, you would pass `()` like so:
-    // let result = client.call_tool("echo_no_args", ()).await?;
+    // If "echo" took no arguments you could call it with `None`:
+    // let result = client.call_tool("echo_no_args", None).await?;
 
     let args = Arguments::from_struct(params)?;
     let result = client.call_tool("echo", Some(args)).await?;
