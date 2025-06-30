@@ -89,7 +89,7 @@ async fn test_call_tools() {
     args.insert("message".to_string(), serde_json::json!("hello"));
 
     let result = server
-        .call_tool(ctx.ctx(), "echo".to_string(), Some(args))
+        .call_tool(ctx.ctx(), "echo".to_string(), Some(args.into()))
         .await
         .unwrap();
     match &result.content[0] {
@@ -103,7 +103,7 @@ async fn test_call_tools() {
     args.insert("b".to_string(), serde_json::json!(2.5));
 
     let result = server
-        .call_tool(ctx.ctx(), "add".to_string(), Some(args))
+        .call_tool(ctx.ctx(), "add".to_string(), Some(args.into()))
         .await
         .unwrap();
     match &result.content[0] {
@@ -137,7 +137,7 @@ async fn test_error_handling() {
     args.insert("b".to_string(), serde_json::json!(2.0));
 
     let err = server
-        .call_tool(ctx.ctx(), "add".to_string(), Some(args))
+        .call_tool(ctx.ctx(), "add".to_string(), Some(args.into()))
         .await
         .unwrap_err();
     assert!(matches!(err, Error::InvalidParams(_)));
@@ -214,7 +214,7 @@ async fn test_custom_init_with_tools() {
     args.insert("message".to_string(), serde_json::json!("test"));
 
     let result = server
-        .call_tool(ctx.ctx(), "test_tool".to_string(), Some(args))
+        .call_tool(ctx.ctx(), "test_tool".to_string(), Some(args.into()))
         .await
         .unwrap();
 

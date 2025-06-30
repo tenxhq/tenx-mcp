@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use tenx_mcp::{Client, Result, ServerAPI, schema, schemars};
+use tenx_mcp::{Arguments, Client, Result, ServerAPI, schema, schemars};
 use tracing::info;
 
 /// Echo tool input parameters - must match the server definition
@@ -90,7 +90,8 @@ async fn main() -> Result<()> {
     // If "echo" took no arguments, you would pass `()` like so:
     // let result = client.call_tool("echo_no_args", ()).await?;
 
-    let result = client.call_tool("echo", params).await?;
+    let args = Arguments::from_struct(params)?;
+    let result = client.call_tool("echo", Some(args)).await?;
 
     // Assume text response
     if let Some(schema::Content::Text(text_content)) = result.content.first() {

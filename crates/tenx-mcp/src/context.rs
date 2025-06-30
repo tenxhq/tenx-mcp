@@ -107,27 +107,14 @@ impl ServerAPI for ClientCtx {
         .await
     }
 
-    async fn call_tool<T: serde::Serialize + Send>(
+    async fn call_tool(
         &mut self,
         name: impl Into<String> + Send,
-        arguments: T,
+        arguments: Option<crate::Arguments>,
     ) -> Result<schema::CallToolResult> {
-        let args_value = serde_json::to_value(arguments)
-            .map_err(|e| Error::InvalidParams(format!("Failed to serialize arguments: {e}")))?;
-
-        let args_map = if let serde_json::Value::Object(map) = args_value {
-            Some(map.into_iter().collect())
-        } else if args_value.is_null() {
-            None // Allow passing () or Option<T> as None
-        } else {
-            return Err(Error::InvalidParams(
-                "Arguments must be a struct or map".to_string(),
-            ));
-        };
-
         self.request(schema::ClientRequest::CallTool {
             name: name.into(),
-            arguments: args_map,
+            arguments,
         })
         .await
     }
@@ -187,7 +174,7 @@ impl ServerAPI for ClientCtx {
     async fn get_prompt(
         &mut self,
         name: impl Into<String> + Send,
-        arguments: Option<std::collections::HashMap<String, String>>,
+        arguments: Option<crate::Arguments>,
     ) -> Result<schema::GetPromptResult> {
         self.request(schema::ClientRequest::GetPrompt {
             name: name.into(),

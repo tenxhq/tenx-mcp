@@ -64,6 +64,7 @@
 //! - **Stdio**: `server.listen_stdio()` for subprocess integration
 
 mod api;
+mod arguments;
 mod client;
 mod codec;
 mod connection;
@@ -80,6 +81,7 @@ pub mod schema;
 pub mod testutils;
 
 pub use api::*;
+pub use arguments::Arguments;
 pub use client::Client;
 pub use connection::{ClientConn, ServerConn};
 pub use context::{ClientCtx, ServerCtx};

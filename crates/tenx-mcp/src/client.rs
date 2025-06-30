@@ -1,5 +1,4 @@
 use futures::{SinkExt, StreamExt};
-use std::collections::HashMap;
 use std::process::Stdio;
 use tokio::process::{Child, Command};
 use tracing::{debug, error, info, warn};
@@ -402,27 +401,14 @@ where
     }
 
     /// Call a tool with the given name and arguments
-    async fn call_tool<T: serde::Serialize + Send>(
+    async fn call_tool(
         &mut self,
         name: impl Into<String> + Send,
-        arguments: T,
+        arguments: Option<crate::Arguments>,
     ) -> Result<CallToolResult> {
-        let args_value = serde_json::to_value(arguments)
-            .map_err(|e| Error::InvalidParams(format!("Failed to serialize arguments: {e}")))?;
-
-        let args_map = if let serde_json::Value::Object(map) = args_value {
-            Some(map.into_iter().collect())
-        } else if args_value.is_null() {
-            None // Allow passing () or Option<T> as None
-        } else {
-            return Err(Error::InvalidParams(
-                "Arguments must be a struct or map".to_string(),
-            ));
-        };
-
         let request = ClientRequest::CallTool {
             name: name.into(),
-            arguments: args_map,
+            arguments,
         };
         self.request(request).await
     }
@@ -484,7 +470,7 @@ where
     async fn get_prompt(
         &mut self,
         name: impl Into<String> + Send,
-        arguments: Option<HashMap<String, String>>,
+        arguments: Option<crate::Arguments>,
     ) -> Result<GetPromptResult> {
         self.request(ClientRequest::GetPrompt {
             name: name.into(),
@@ -668,25 +654,31 @@ mod tests {
         // These should all compile cleanly
         std::mem::drop(async {
             // Call without arguments - passing ()
-            client.call_tool("my_tool", ()).await.unwrap();
+            client.call_tool("my_tool", None).await.unwrap();
 
             // Call with String for tool name
             let tool_name = "another_tool".to_string();
-            client.call_tool(tool_name, ()).await.unwrap();
+            client.call_tool(tool_name, None).await.unwrap();
 
             // Call with &String
             let tool_name = "third_tool".to_string();
-            client.call_tool(&tool_name, ()).await.unwrap();
+            client.call_tool(&tool_name, None).await.unwrap();
 
             // Call with HashMap arguments directly
             let mut args = std::collections::HashMap::new();
             args.insert("param".to_string(), serde_json::json!("value"));
-            client.call_tool("tool_with_args", args).await.unwrap();
+            client
+                .call_tool("tool_with_args", Some(args.into()))
+                .await
+                .unwrap();
 
             // Call with Some(HashMap)
             let mut args = std::collections::HashMap::new();
             args.insert("key".to_string(), serde_json::json!("value"));
-            client.call_tool("tool_with_map", Some(args)).await.unwrap();
+            client
+                .call_tool("tool_with_map", Some(args.into()))
+                .await
+                .unwrap();
         });
     }
 

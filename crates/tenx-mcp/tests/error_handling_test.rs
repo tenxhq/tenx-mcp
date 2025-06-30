@@ -4,7 +4,7 @@
 //! without the complexity of setting up full client-server communication.
 
 use std::collections::HashMap;
-use tenx_mcp::{Error, Result, ServerConn, ServerCtx, schema, testutils};
+use tenx_mcp::{Arguments, Error, Result, ServerConn, ServerCtx, schema, testutils};
 
 fn create_test_context() -> ServerCtx {
     let (notification_tx, _) = tokio::sync::broadcast::channel(100);
@@ -100,7 +100,7 @@ async fn test_invalid_params() {
             &self,
             _context: &ServerCtx,
             name: String,
-            arguments: Option<HashMap<String, serde_json::Value>>,
+            arguments: Option<Arguments>,
         ) -> Result<schema::CallToolResult> {
             if name != "test_tool" {
                 return Err(Error::ToolNotFound(name));
@@ -110,7 +110,7 @@ async fn test_invalid_params() {
             let args =
                 arguments.ok_or_else(|| Error::InvalidParams("Missing arguments".to_string()))?;
 
-            if !args.contains_key("required_param") {
+            if args.get_value("required_param").is_none() {
                 return Err(Error::InvalidParams("Missing required_param".to_string()));
             }
 
@@ -132,7 +132,11 @@ async fn test_invalid_params() {
     // Test 2: Call with empty object (missing required param)
     let context = create_test_context();
     let result = conn
-        .call_tool(&context, "test_tool".to_string(), Some(HashMap::new()))
+        .call_tool(
+            &context,
+            "test_tool".to_string(),
+            Some(HashMap::<String, serde_json::Value>::new().into()),
+        )
         .await;
     match result {
         Err(Error::InvalidParams(msg)) => {
@@ -146,7 +150,7 @@ async fn test_invalid_params() {
     let mut args = HashMap::new();
     args.insert("required_param".to_string(), serde_json::json!("test"));
     let result = conn
-        .call_tool(&context, "test_tool".to_string(), Some(args))
+        .call_tool(&context, "test_tool".to_string(), Some(args.into()))
         .await;
     assert!(result.is_ok());
 }
@@ -272,7 +276,7 @@ async fn test_error_propagation() {
             &self,
             _context: &ServerCtx,
             name: String,
-            _arguments: Option<HashMap<String, String>>,
+            _arguments: Option<Arguments>,
         ) -> Result<schema::GetPromptResult> {
             // Simulate prompt not found - using MethodNotFound as PromptNotFound doesn't exist
             Err(Error::MethodNotFound(format!("prompt/{name}")))

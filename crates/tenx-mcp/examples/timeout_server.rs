@@ -88,7 +88,7 @@ impl ServerConn for TimeoutTestConnection {
         &self,
         _context: &ServerCtx,
         name: String,
-        _arguments: Option<std::collections::HashMap<String, serde_json::Value>>,
+        _arguments: Option<tenx_mcp::Arguments>,
     ) -> Result<schema::CallToolResult> {
         match name.as_str() {
             "flakey_operation" => {

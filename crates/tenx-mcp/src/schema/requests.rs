@@ -1,4 +1,5 @@
 use super::*;
+use crate::Arguments;
 use crate::macros::with_meta;
 use crate::request_handler::RequestMethod;
 use serde::{Deserialize, Serialize};
@@ -43,7 +44,7 @@ pub(crate) enum ClientRequest {
         name: String,
         /// Arguments to use for templating the prompt.
         #[serde(skip_serializing_if = "Option::is_none")]
-        arguments: Option<HashMap<String, String>>,
+        arguments: Option<Arguments>,
     },
     #[serde(rename = "prompts/list")]
     ListPrompts {
@@ -85,7 +86,7 @@ pub(crate) enum ClientRequest {
     CallTool {
         name: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        arguments: Option<HashMap<String, Value>>,
+        arguments: Option<Arguments>,
     },
     #[serde(rename = "tools/list")]
     ListTools {
@@ -711,7 +712,7 @@ pub struct GetPromptParams {
 
     /// Arguments to use for templating the prompt.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub arguments: Option<HashMap<String, String>>,
+    pub arguments: Option<Arguments>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub _meta: Option<RequestMeta>,
@@ -747,7 +748,7 @@ pub struct CallToolParams {
     pub name: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub arguments: Option<HashMap<String, Value>>,
+    pub arguments: Option<Arguments>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub _meta: Option<RequestMeta>,

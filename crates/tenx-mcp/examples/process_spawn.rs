@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
         serde_json::json!("Hello from spawned process!"),
     );
 
-    match client.call_tool("echo", args).await {
+    match client.call_tool("echo", Some(args.into())).await {
         Ok(result) => {
             info!("Tool response: {:?}", result.content);
         }

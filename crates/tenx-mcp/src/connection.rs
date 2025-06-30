@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
 use async_trait::async_trait;
-use serde_json::Value;
 
 use crate::{
     Error, Result,
@@ -118,7 +115,7 @@ pub trait ServerConn: Send + Sync {
         &self,
         _context: &ServerCtx,
         name: String,
-        _arguments: Option<HashMap<String, Value>>,
+        _arguments: Option<crate::Arguments>,
     ) -> Result<schema::CallToolResult> {
         Err(Error::ToolExecutionFailed {
             tool: name,
@@ -176,7 +173,7 @@ pub trait ServerConn: Send + Sync {
         &self,
         _context: &ServerCtx,
         name: String,
-        _arguments: Option<std::collections::HashMap<String, String>>,
+        _arguments: Option<crate::Arguments>,
     ) -> Result<GetPromptResult> {
         Err(Error::handler_error(
             "prompt",

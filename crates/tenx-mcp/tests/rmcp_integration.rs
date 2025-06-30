@@ -10,7 +10,7 @@ use rmcp::ServiceExt;
 use rmcp::model::{CallToolRequestParam, PaginatedRequestParam};
 use serde_json::json;
 use tenx_mcp::{
-    Client, Error, Result, Server, ServerAPI, ServerConn, ServerCtx, schema::*,
+    Arguments, Client, Error, Result, Server, ServerAPI, ServerConn, ServerCtx, schema::*,
     testutils::make_duplex_pair,
 };
 
@@ -60,7 +60,7 @@ impl ServerConn for EchoConnection {
         &self,
         _context: &ServerCtx,
         name: String,
-        arguments: Option<HashMap<String, serde_json::Value>>,
+        arguments: Option<Arguments>,
     ) -> Result<CallToolResult> {
         if name != "echo" {
             return Err(Error::ToolExecutionFailed {
@@ -72,8 +72,7 @@ impl ServerConn for EchoConnection {
         let args =
             arguments.ok_or_else(|| Error::InvalidParams("echo: Missing arguments".to_string()))?;
         let message = args
-            .get("message")
-            .and_then(|v| v.as_str())
+            .get_string("message")
             .ok_or_else(|| Error::InvalidParams("echo: Missing message parameter".to_string()))?;
 
         Ok(CallToolResult {
@@ -295,7 +294,10 @@ async fn test_rmcp_server_with_tenx_client() {
     // Call reverse tool
     let mut args = HashMap::new();
     args.insert("text".to_string(), json!("hello"));
-    let result = client.call_tool("reverse", args).await.unwrap();
+    let result = client
+        .call_tool("reverse", Some(args.into()))
+        .await
+        .unwrap();
 
     // Verify reversed result
     assert_eq!(result.content.len(), 1);

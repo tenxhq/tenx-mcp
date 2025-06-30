@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use serde_json::json;
 use std::collections::HashMap;
 use tenx_mcp::{
-    Client, Result, Server, ServerAPI, ServerConn, ServerCtx,
+    Arguments, Client, Result, Server, ServerAPI, ServerConn, ServerCtx,
     schema::{self, *},
 };
 
@@ -45,7 +45,7 @@ impl ServerConn for EchoConnection {
         &self,
         _context: &ServerCtx,
         name: String,
-        arguments: Option<HashMap<String, serde_json::Value>>,
+        arguments: Option<Arguments>,
     ) -> Result<CallToolResult> {
         use tenx_mcp::Error;
         if name != "echo" {
@@ -53,8 +53,7 @@ impl ServerConn for EchoConnection {
         }
         let args = arguments.ok_or_else(|| Error::InvalidParams("Missing args".into()))?;
         let message = args
-            .get("message")
-            .and_then(|v| v.as_str())
+            .get_string("message")
             .ok_or_else(|| Error::InvalidParams("Missing message".into()))?;
         Ok(CallToolResult::new()
             .with_text_content(message.to_string())
@@ -86,7 +85,7 @@ async fn test_http_echo_tool_integration() {
     // Call echo tool
     let mut args = HashMap::new();
     args.insert("message".to_string(), json!("hello"));
-    let result = client.call_tool("echo", args).await.unwrap();
+    let result = client.call_tool("echo", Some(args.into())).await.unwrap();
     if let Some(schema::Content::Text(text)) = result.content.first() {
         assert_eq!(text.text, "hello");
     } else {

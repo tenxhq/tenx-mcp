@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use std::collections::HashMap;
 
 use crate::error::Result;
 use crate::schema::{
@@ -31,10 +30,10 @@ pub trait ServerAPI: Send + Sync {
     ) -> Result<ListToolsResult>;
 
     /// Call a tool with the given name and arguments
-    async fn call_tool<T: serde::Serialize + Send>(
+    async fn call_tool(
         &mut self,
         name: impl Into<String> + Send,
-        arguments: T,
+        arguments: Option<crate::Arguments>,
     ) -> Result<CallToolResult>;
 
     /// List available resources with optional pagination
@@ -69,7 +68,7 @@ pub trait ServerAPI: Send + Sync {
     async fn get_prompt(
         &mut self,
         name: impl Into<String> + Send,
-        arguments: Option<HashMap<String, String>>,
+        arguments: Option<crate::Arguments>,
     ) -> Result<GetPromptResult>;
 
     /// Handle completion requests

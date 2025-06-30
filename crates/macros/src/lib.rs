@@ -282,7 +282,7 @@ fn generate_call_tool(info: &ServerInfo) -> TokenStream {
                 let args = arguments.ok_or_else(||
                     tenx_mcp::Error::InvalidParams("Missing arguments".to_string())
                 )?;
-                let params: #params_type = serde_json::from_value(serde_json::Value::Object(args.into_iter().collect()))
+                let params: #params_type = args.deserialize()
                     .map_err(|e| tenx_mcp::Error::InvalidParams(e.to_string()))?;
                 self.#method(context, params).await
             }
@@ -294,7 +294,7 @@ fn generate_call_tool(info: &ServerInfo) -> TokenStream {
             &self,
             context: &tenx_mcp::ServerCtx,
             name: String,
-            arguments: Option<std::collections::HashMap<String, serde_json::Value>>,
+            arguments: Option<tenx_mcp::Arguments>,
         ) -> tenx_mcp::Result<tenx_mcp::schema::CallToolResult> {
             match name.as_str() {
                 #(#tool_matches)*

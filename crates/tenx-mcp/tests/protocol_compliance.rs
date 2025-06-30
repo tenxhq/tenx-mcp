@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use serde_json::json;
-use tenx_mcp::{Error, Result, ServerConn, ServerCtx, schema::*, testutils};
+use tenx_mcp::{Arguments, Error, Result, ServerConn, ServerCtx, schema::*, testutils};
 
 /// Test connection implementation with echo and add tools
 struct TestConnection {
@@ -106,18 +106,15 @@ impl ServerConn for TestConnection {
         &self,
         _context: &ServerCtx,
         name: String,
-        arguments: Option<HashMap<String, serde_json::Value>>,
+        arguments: Option<Arguments>,
     ) -> Result<CallToolResult> {
         match name.as_str() {
             "echo" => {
                 let args = arguments
                     .ok_or_else(|| Error::InvalidParams("echo: Missing arguments".to_string()))?;
-                let message = args
-                    .get("message")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        Error::InvalidParams("echo: Missing message parameter".to_string())
-                    })?;
+                let message = args.get_string("message").ok_or_else(|| {
+                    Error::InvalidParams("echo: Missing message parameter".to_string())
+                })?;
 
                 Ok(CallToolResult::new()
                     .with_text_content(message.to_string())
@@ -127,11 +124,10 @@ impl ServerConn for TestConnection {
                 let args = arguments
                     .ok_or_else(|| Error::InvalidParams("add: Missing arguments".to_string()))?;
 
-                let a = args.get("a").and_then(|v| v.as_f64()).ok_or_else(|| {
+                let a: f64 = args.get("a").ok_or_else(|| {
                     Error::InvalidParams("add: Missing or invalid 'a' parameter".to_string())
                 })?;
-
-                let b = args.get("b").and_then(|v| v.as_f64()).ok_or_else(|| {
+                let b: f64 = args.get("b").ok_or_else(|| {
                     Error::InvalidParams("add: Missing or invalid 'b' parameter".to_string())
                 })?;
 
@@ -178,7 +174,7 @@ mod tests {
         let mut args = HashMap::new();
         args.insert("message".to_string(), json!("Hello, World!"));
         let result = conn
-            .call_tool(&context, "echo".to_string(), Some(args))
+            .call_tool(&context, "echo".to_string(), Some(args.into()))
             .await
             .unwrap();
         assert_eq!(result.content.len(), 1);
@@ -203,7 +199,7 @@ mod tests {
         let mut args = HashMap::new();
         args.insert("wrong_field".to_string(), json!("value"));
         let error = conn
-            .call_tool(&context, "echo".to_string(), Some(args))
+            .call_tool(&context, "echo".to_string(), Some(args.into()))
             .await
             .unwrap_err();
         match error {
@@ -229,7 +225,7 @@ mod tests {
         args.insert("a".to_string(), json!(5));
         args.insert("b".to_string(), json!(3));
         let result = conn
-            .call_tool(&context, "add".to_string(), Some(args))
+            .call_tool(&context, "add".to_string(), Some(args.into()))
             .await
             .unwrap();
         assert_eq!(result.content.len(), 1);
@@ -244,7 +240,7 @@ mod tests {
         args.insert("a".to_string(), json!(1.5));
         args.insert("b".to_string(), json!(2.5));
         let result = conn
-            .call_tool(&context, "add".to_string(), Some(args))
+            .call_tool(&context, "add".to_string(), Some(args.into()))
             .await
             .unwrap();
         assert_eq!(result.content.len(), 1);
@@ -259,7 +255,7 @@ mod tests {
         args.insert("a".to_string(), json!(-5));
         args.insert("b".to_string(), json!(3));
         let result = conn
-            .call_tool(&context, "add".to_string(), Some(args))
+            .call_tool(&context, "add".to_string(), Some(args.into()))
             .await
             .unwrap();
         assert_eq!(result.content.len(), 1);
@@ -284,7 +280,7 @@ mod tests {
         let mut args = HashMap::new();
         args.insert("b".to_string(), json!(5));
         let error = conn
-            .call_tool(&context, "add".to_string(), Some(args))
+            .call_tool(&context, "add".to_string(), Some(args.into()))
             .await
             .unwrap_err();
         match error {
@@ -297,7 +293,7 @@ mod tests {
         let mut args = HashMap::new();
         args.insert("a".to_string(), json!(5));
         let error = conn
-            .call_tool(&context, "add".to_string(), Some(args))
+            .call_tool(&context, "add".to_string(), Some(args.into()))
             .await
             .unwrap_err();
         match error {
