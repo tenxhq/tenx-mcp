@@ -1,7 +1,10 @@
 use super::*;
 use crate::Result;
 use crate::macros::{with_basename, with_meta};
+use base64::Engine;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListResourcesResult {
@@ -103,6 +106,24 @@ impl ReadResourceResult {
         self.contents.push(content);
         Ok(self)
     }
+
+    pub fn with_file<P: AsRef<Path>>(mut self, path: P, uri: impl Into<String>) -> Result<Self> {
+        let content = ResourceContents::from_file(path, uri)?;
+        self.contents.push(content);
+        Ok(self)
+    }
+
+    pub fn with_files<P, U>(mut self, paths: impl IntoIterator<Item = (P, U)>) -> Result<Self>
+    where
+        P: AsRef<Path>,
+        U: Into<String>,
+    {
+        for (path, uri) in paths {
+            let content = ResourceContents::from_file(path, uri)?;
+            self.contents.push(content);
+        }
+        Ok(self)
+    }
 }
 
 /// A known resource that the server is capable of reading.
@@ -153,6 +174,22 @@ impl Resource {
     pub fn with_size(mut self, size: i64) -> Self {
         self.size = Some(size);
         self
+    }
+
+    pub fn from_file<P: AsRef<Path>>(
+        path: P,
+        name: impl Into<String>,
+        uri: impl Into<String>,
+    ) -> Result<Self> {
+        let path = path.as_ref();
+        let metadata = fs::metadata(path)?;
+        let mime_type = mime_guess::from_path(path)
+            .first_or_octet_stream()
+            .to_string();
+
+        Ok(Self::new(name, uri)
+            .with_mime_type(mime_type)
+            .with_size(metadata.len() as i64))
     }
 }
 
@@ -234,6 +271,67 @@ impl ResourceContents {
             text: json_text,
             _meta: None,
         }))
+    }
+
+    pub fn from_file<P: AsRef<Path>>(path: P, uri: impl Into<String>) -> Result<Self> {
+        let path = path.as_ref();
+        let contents = fs::read(path)?;
+        let mime_type = mime_guess::from_path(path).first_or_octet_stream();
+        let uri_string = uri.into();
+
+        // Determine if the content should be treated as text or binary
+        // Based on the MIME type's primary type
+        match mime_type.type_() {
+            mime_guess::mime::TEXT | mime_guess::mime::APPLICATION => {
+                // Try to read as UTF-8 text
+                match String::from_utf8(contents.clone()) {
+                    Ok(text) => {
+                        // Special handling for common text-based application types
+                        let is_text_app = mime_type.subtype() == "json"
+                            || mime_type.subtype() == "xml"
+                            || mime_type.subtype() == "javascript"
+                            || mime_type.subtype() == "x-yaml"
+                            || mime_type.subtype() == "yaml";
+
+                        if mime_type.type_() == mime_guess::mime::TEXT || is_text_app {
+                            Ok(Self::Text(TextResourceContents {
+                                uri: uri_string,
+                                mime_type: Some(mime_type.to_string()),
+                                text,
+                                _meta: None,
+                            }))
+                        } else {
+                            // Binary application type
+                            Ok(Self::Blob(BlobResourceContents {
+                                uri: uri_string,
+                                mime_type: Some(mime_type.to_string()),
+                                blob: base64::engine::general_purpose::STANDARD
+                                    .encode(text.as_bytes()),
+                                _meta: None,
+                            }))
+                        }
+                    }
+                    Err(_) => {
+                        // Not valid UTF-8, treat as binary
+                        Ok(Self::Blob(BlobResourceContents {
+                            uri: uri_string,
+                            mime_type: Some(mime_type.to_string()),
+                            blob: base64::engine::general_purpose::STANDARD.encode(&contents),
+                            _meta: None,
+                        }))
+                    }
+                }
+            }
+            _ => {
+                // All other types (IMAGE, AUDIO, VIDEO, etc.) are binary
+                Ok(Self::Blob(BlobResourceContents {
+                    uri: uri_string,
+                    mime_type: Some(mime_type.to_string()),
+                    blob: base64::engine::general_purpose::STANDARD.encode(&contents),
+                    _meta: None,
+                }))
+            }
+        }
     }
 }
 
