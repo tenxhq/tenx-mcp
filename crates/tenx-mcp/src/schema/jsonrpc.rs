@@ -123,7 +123,7 @@ pub struct NotificationParams {
 
 #[with_meta]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Result {
+pub struct JSONRpcResult {
     /// This result property is reserved by the protocol to allow clients and
     /// servers to attach additional metadata to their responses.
     #[serde(flatten)]
@@ -160,7 +160,7 @@ pub struct JSONRPCNotification {
 pub struct JSONRPCResponse {
     pub jsonrpc: String,
     pub id: RequestId,
-    pub result: Result,
+    pub result: JSONRpcResult,
 }
 
 // Standard JSON-RPC error codes
@@ -194,4 +194,4 @@ pub struct ErrorObject {
 
 // Empty result
 /// A response that indicates success but carries no data.
-pub(crate) type EmptyResult = Result;
+pub(crate) type EmptyResult = JSONRpcResult;

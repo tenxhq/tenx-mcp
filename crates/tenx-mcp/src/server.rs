@@ -471,7 +471,7 @@ async fn handle_request(
             JSONRPCMessage::Response(JSONRPCResponse {
                 jsonrpc: JSONRPC_VERSION.to_string(),
                 id: request.id,
-                result: schema::Result {
+                result: schema::JSONRpcResult {
                     _meta: None,
                     other: if let Some(obj) = value.as_object() {
                         obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect()

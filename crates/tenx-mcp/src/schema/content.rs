@@ -28,7 +28,7 @@ pub struct EmbeddedResource {
     pub annotations: Option<Annotations>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Annotations {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audience: Option<Vec<Role>>,
@@ -36,6 +36,31 @@ pub struct Annotations {
     pub priority: Option<f64>,
     #[serde(rename = "lastModified", skip_serializing_if = "Option::is_none")]
     pub last_modified: Option<String>,
+}
+
+impl Annotations {
+    pub fn new() -> Self {
+        Self {
+            audience: None,
+            priority: None,
+            last_modified: None,
+        }
+    }
+
+    pub fn with_audience(mut self, audience: Vec<Role>) -> Self {
+        self.audience = Some(audience);
+        self
+    }
+
+    pub fn with_priority(mut self, priority: f64) -> Self {
+        self.priority = Some(priority);
+        self
+    }
+
+    pub fn with_last_modified(mut self, last_modified: impl Into<String>) -> Self {
+        self.last_modified = Some(last_modified.into());
+        self
+    }
 }
 
 #[with_meta]
