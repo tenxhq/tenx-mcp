@@ -41,6 +41,37 @@ pub struct GetPromptResult {
     pub messages: Vec<PromptMessage>,
 }
 
+impl GetPromptResult {
+    pub fn new() -> Self {
+        Self {
+            description: None,
+            messages: Vec::new(),
+            _meta: None,
+        }
+    }
+
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    pub fn with_message(mut self, message: PromptMessage) -> Self {
+        self.messages.push(message);
+        self
+    }
+
+    pub fn with_messages(mut self, messages: impl IntoIterator<Item = PromptMessage>) -> Self {
+        self.messages.extend(messages);
+        self
+    }
+}
+
+impl Default for GetPromptResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A prompt or prompt template that the server offers.
 #[with_meta]
 #[with_basename]
@@ -50,6 +81,33 @@ pub struct Prompt {
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arguments: Option<Vec<PromptArgument>>,
+}
+
+impl Prompt {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            description: None,
+            arguments: None,
+            name: name.into(),
+            title: None,
+            _meta: None,
+        }
+    }
+
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    pub fn with_argument(mut self, argument: PromptArgument) -> Self {
+        self.arguments.get_or_insert_with(Vec::new).push(argument);
+        self
+    }
+
+    pub fn with_arguments(mut self, arguments: impl IntoIterator<Item = PromptArgument>) -> Self {
+        self.arguments = Some(arguments.into_iter().collect());
+        self
+    }
 }
 
 /// Describes an argument that a prompt can accept.
@@ -62,8 +120,71 @@ pub struct PromptArgument {
     pub required: Option<bool>,
 }
 
+impl PromptArgument {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            description: None,
+            required: None,
+            name: name.into(),
+            title: None,
+        }
+    }
+
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = Some(required);
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptMessage {
     pub role: Role,
     pub content: Content,
+}
+
+impl PromptMessage {
+    pub fn new(role: Role, content: Content) -> Self {
+        Self { role, content }
+    }
+
+    pub fn user(content: Content) -> Self {
+        Self {
+            role: Role::User,
+            content,
+        }
+    }
+
+    pub fn assistant(content: Content) -> Self {
+        Self {
+            role: Role::Assistant,
+            content,
+        }
+    }
+
+    pub fn user_text(text: impl Into<String>) -> Self {
+        Self {
+            role: Role::User,
+            content: Content::Text(TextContent {
+                text: text.into(),
+                annotations: None,
+                _meta: None,
+            }),
+        }
+    }
+
+    pub fn assistant_text(text: impl Into<String>) -> Self {
+        Self {
+            role: Role::Assistant,
+            content: Content::Text(TextContent {
+                text: text.into(),
+                annotations: None,
+                _meta: None,
+            }),
+        }
+    }
 }
