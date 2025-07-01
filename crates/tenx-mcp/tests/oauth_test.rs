@@ -7,10 +7,10 @@ async fn test_oauth_client_creation() {
     let config = OAuth2Config {
         client_id: "test_client_id".to_string(),
         client_secret: Some("test_client_secret".to_string()),
-        auth_url: "https://example.com/oauth/authorize".to_string(),
-        token_url: "https://example.com/oauth/token".to_string(),
+        auth_url: "http://localhost:9090/oauth/authorize".to_string(),
+        token_url: "http://localhost:9090/oauth/token".to_string(),
         redirect_url: "http://localhost:8080/callback".to_string(),
-        resource: "https://example.com/api".to_string(),
+        resource: "http://localhost:9090/api".to_string(),
         scopes: vec!["read".to_string(), "write".to_string()],
     };
 
@@ -24,10 +24,10 @@ async fn test_authorization_url_generation() {
     let config = OAuth2Config {
         client_id: "test_client_id".to_string(),
         client_secret: None,
-        auth_url: "https://example.com/oauth/authorize".to_string(),
-        token_url: "https://example.com/oauth/token".to_string(),
+        auth_url: "http://localhost:9090/oauth/authorize".to_string(),
+        token_url: "http://localhost:9090/oauth/token".to_string(),
         redirect_url: "http://localhost:8080/callback".to_string(),
-        resource: "https://example.com/api".to_string(),
+        resource: "http://localhost:9090/api".to_string(),
         scopes: vec!["read".to_string()],
     };
 
@@ -42,7 +42,7 @@ async fn test_authorization_url_generation() {
     assert!(url_str.contains("state="));
     assert!(url_str.contains("code_challenge="));
     assert!(url_str.contains("code_challenge_method=S256"));
-    assert!(url_str.contains("resource=https%3A%2F%2Fexample.com%2Fapi"));
+    assert!(url_str.contains("resource=http%3A%2F%2Flocalhost%3A9090%2Fapi"));
     assert!(url_str.contains("scope=read"));
 
     // CSRF token should not be empty
@@ -130,10 +130,10 @@ async fn test_http_transport_with_oauth() {
     let config = OAuth2Config {
         client_id: "test_client_id".to_string(),
         client_secret: Some("test_client_secret".to_string()),
-        auth_url: "https://example.com/oauth/authorize".to_string(),
-        token_url: "https://example.com/oauth/token".to_string(),
+        auth_url: "http://localhost:9090/oauth/authorize".to_string(),
+        token_url: "http://localhost:9090/oauth/token".to_string(),
         redirect_url: "http://localhost:8080/callback".to_string(),
-        resource: "https://example.com/api".to_string(),
+        resource: "http://localhost:9090/api".to_string(),
         scopes: vec!["read".to_string()],
     };
 
@@ -162,10 +162,10 @@ async fn test_token_refresh() {
     let config = OAuth2Config {
         client_id: "test_client_id".to_string(),
         client_secret: Some("test_client_secret".to_string()),
-        auth_url: "https://example.com/oauth/authorize".to_string(),
-        token_url: "https://example.com/oauth/token".to_string(),
+        auth_url: "http://localhost:9090/oauth/authorize".to_string(),
+        token_url: "http://localhost:9090/oauth/token".to_string(),
         redirect_url: "http://localhost:8080/callback".to_string(),
-        resource: "https://example.com/api".to_string(),
+        resource: "http://localhost:9090/api".to_string(),
         scopes: vec!["read".to_string()],
     };
 
