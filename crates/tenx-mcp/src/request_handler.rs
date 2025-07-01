@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{Mutex, oneshot};
+use dashmap::DashMap;
 
 use crate::{
     error::{Error, Result},
@@ -30,7 +31,7 @@ pub(crate) struct RequestHandler {
     /// Transport sink for sending messages
     transport_tx: Option<TransportSink>,
     /// Pending requests waiting for responses
-    pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<ResponseOrError>>>>,
+    pending_requests: Arc<DashMap<String, oneshot::Sender<ResponseOrError>>>,
     /// Next request ID counter
     next_request_id: Arc<AtomicU64>,
     /// Prefix for request IDs (e.g., "req" for client, "srv-req" for server)
@@ -42,7 +43,7 @@ impl RequestHandler {
     pub fn new(transport_tx: Option<TransportSink>, id_prefix: String) -> Self {
         Self {
             transport_tx,
-            pending_requests: Arc::new(Mutex::new(HashMap::new())),
+            pending_requests: Arc::new(DashMap::new()),
             next_request_id: Arc::new(AtomicU64::new(1)),
             id_prefix,
         }
@@ -63,15 +64,12 @@ impl RequestHandler {
         let (tx, rx) = oneshot::channel();
 
         // Store the response channel
-        {
-            let mut pending = self.pending_requests.lock().await;
-            pending.insert(id.clone(), tx);
-            tracing::debug!(
-                "Stored pending request with ID: {}, total pending: {}",
-                id,
-                pending.len()
-            );
-        }
+        self.pending_requests.insert(id.clone(), tx);
+        tracing::debug!(
+            "Stored pending request with ID: {}, total pending: {}",
+            id,
+            self.pending_requests.len()
+        );
 
         // Create the JSON-RPC request
         let jsonrpc_request = JSONRPCRequest {
@@ -142,7 +140,7 @@ impl RequestHandler {
             Err(e) => {
                 tracing::error!("Response channel closed for request {}: {}", id, e);
                 // Remove the pending request
-                self.pending_requests.lock().await.remove(&id);
+                self.pending_requests.remove(&id);
                 Err(Error::Protocol("Response channel closed".to_string()))
             }
         }
@@ -195,13 +193,12 @@ impl RequestHandler {
     /// Handle a response from the remote side
     pub async fn handle_response(&self, response: JSONRPCResponse) {
         if let RequestId::String(id) = &response.id {
-            let mut pending = self.pending_requests.lock().await;
             tracing::debug!(
                 "Handling response for ID: {}, pending requests: {:?}",
                 id,
-                pending.keys().collect::<Vec<_>>()
+                self.pending_requests.len()
             );
-            if let Some(tx) = pending.remove(id) {
+            if let Some((_, tx)) = self.pending_requests.remove(id) {
                 let _ = tx.send(ResponseOrError::Response(response));
             } else {
                 tracing::warn!("Received response for unknown request ID: {}", id);
@@ -212,8 +209,7 @@ impl RequestHandler {
     /// Handle an error response from the remote side
     pub async fn handle_error(&self, error: JSONRPCError) {
         if let RequestId::String(id) = &error.id {
-            let mut pending = self.pending_requests.lock().await;
-            if let Some(tx) = pending.remove(id) {
+            if let Some((_, tx)) = self.pending_requests.remove(id) {
                 let _ = tx.send(ResponseOrError::Error(error));
             } else {
                 tracing::warn!("Received error for unknown request ID: {}", id);
