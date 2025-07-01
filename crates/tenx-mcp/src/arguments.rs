@@ -26,7 +26,11 @@ impl Arguments {
     /// Insert a single key/value pair, returning the updated `Arguments`.
     ///
     /// This enables fluent construction without an intermediate `HashMap`.
-    pub fn set(mut self, key: impl Into<String>, value: impl Serialize) -> Result<Self, serde_json::Error> {
+    pub fn set(
+        mut self,
+        key: impl Into<String>,
+        value: impl Serialize,
+    ) -> Result<Self, serde_json::Error> {
         let v = serde_json::to_value(value)?;
         self.0.insert(key.into(), v);
         Ok(self)
