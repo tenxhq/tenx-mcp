@@ -2,6 +2,7 @@ use futures::SinkExt;
 use futures::stream::SplitSink;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{Mutex, oneshot};
 
 use crate::{
@@ -31,7 +32,7 @@ pub(crate) struct RequestHandler {
     /// Pending requests waiting for responses
     pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<ResponseOrError>>>>,
     /// Next request ID counter
-    next_request_id: Arc<Mutex<u64>>,
+    next_request_id: Arc<AtomicU64>,
     /// Prefix for request IDs (e.g., "req" for client, "srv-req" for server)
     id_prefix: String,
 }
@@ -42,7 +43,7 @@ impl RequestHandler {
         Self {
             transport_tx,
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
-            next_request_id: Arc::new(Mutex::new(1)),
+            next_request_id: Arc::new(AtomicU64::new(1)),
             id_prefix,
         }
     }
@@ -187,10 +188,8 @@ impl RequestHandler {
 
     /// Generate the next request ID
     async fn next_request_id(&self) -> String {
-        let mut id = self.next_request_id.lock().await;
-        let current = *id;
-        *id += 1;
-        format!("{}-{}", self.id_prefix, current)
+        let id = self.next_request_id.fetch_add(1, Ordering::Relaxed);
+        format!("{}-{}", self.id_prefix, id)
     }
 
     /// Handle a response from the remote side
