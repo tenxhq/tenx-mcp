@@ -1,10 +1,10 @@
+use dashmap::DashMap;
 use futures::SinkExt;
 use futures::stream::SplitSink;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{Mutex, oneshot};
-use dashmap::DashMap;
 
 use crate::{
     error::{Error, Result},
